@@ -1,0 +1,4 @@
+bin/
+build/
+.coverage_map.mvcov
+.trace
