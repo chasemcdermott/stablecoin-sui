@@ -35,20 +35,20 @@ function build() {
 }
 
 function test() {
-  if [ ! -z "$1" ] && [ "$1" != "--coverage" ]
-  then
-    echo "Unsupported flag: $1"
-    exit 1
-  fi
-
   for path in $(_get_packages); do
     echo ">> Testing $path..."
-    sui move test --path $path $1
+    sui move test --path "$path" --coverage
+
+    if [ -f $path/.coverage_map.mvcov ]
+    then
+      echo ">> Printing coverage results for $path..."
+      sui move coverage summary --path "$path"
+    fi
   done
 }
 
 function _get_packages() {
-  find packages -type d -depth 1
+  find "packages" -type d -mindepth 1 -maxdepth 1
 }
 
 # This script takes in a function name as the first argument, 

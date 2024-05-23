@@ -18,15 +18,19 @@
 
 set -e
 
-# In the CI, download the release version of the Sui binary which does not include
-# exporting test coverage results.
+# In the CI, download the prebuilt debug mode binary for Ubuntu.
 if [[ "$CI" == true ]]; then
   echo "Downloading the Sui binary from Github..."
 
+  # Download and extract Sui binaries.
   mkdir -p ./bin/sui
-  curl -L -o ./bin/sui/sui-v1.24.1.tgz https://github.com/MystenLabs/sui/releases/download/mainnet-v1.24.1/sui-mainnet-v1.24.1-ubuntu-x86_64.tgz
-  tar -xvzf ./bin/sui/sui-v1.24.1.tgz -C ./bin/sui
-  rm ./bin/sui/sui-v1.24.1.tgz
+  curl -L -o ./bin/sui/sui-v1.25.1.tgz https://github.com/MystenLabs/sui/releases/download/mainnet-v1.25.1/sui-mainnet-v1.25.1-ubuntu-x86_64.tgz
+  tar -xvzf ./bin/sui/sui-v1.25.1.tgz -C ./bin/sui
+  rm ./bin/sui/sui-v1.25.1.tgz
+
+  # Replace the release mode Sui with the debug mode Sui binary.
+  rm ./bin/sui/sui
+  mv ./bin/sui/sui-debug ./bin/sui/sui
 
   # Add Sui binaries to PATH for the current shell.
   export PATH="$PWD/bin/sui:$PATH"
@@ -34,19 +38,18 @@ if [[ "$CI" == true ]]; then
   # Add Sui binaries to the PATH for all other steps in the CI workflow.
   echo "$PWD/bin/sui" >> $GITHUB_PATH
 
-# In all other environments, build the Sui binary from source in debug mode. This
-# allows test coverage results to be exported.
+# In all other environments, build the Sui binary from source in debug mode.
 else
   echo "Building Sui binary from source in debug mode..."
 
   cargo install \
     --git https://github.com/MystenLabs/sui.git \
-    --rev d63ccc6f628feea8763c983aa9be85d3e9cabb12 \
+    --rev 6579e0ed9e432bae47a407daaf01f08c298bcb14 \
     --locked --debug sui  
 fi
 
 # Sanity check that the Sui binary was installed correctly
-if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.24.1-d63ccc6'
+if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.25.1-6579e0e'
 then
   echo "Sui binary was not installed"
   exit 1
