@@ -16,6 +16,7 @@
 
 module usdc::usdc {
   use sui::coin;
+  use stablecoin::treasury;
 
   /// The One-Time Witness struct for the USDC coin.
   public struct USDC has drop {}
@@ -31,14 +32,20 @@ module usdc::usdc {
       option::none(),  // icon url
       ctx
     );
+
+    let treasury = treasury::create_treasury(
+      treasury_cap, 
+      ctx.sender(), // treasury admin
+      ctx
+    );
     
-    transfer::public_transfer(treasury_cap, ctx.sender());
     transfer::public_transfer(deny_cap, ctx.sender());
     transfer::public_share_object(metadata);
+    transfer::public_share_object(treasury);
   }
 
   #[test_only]
-  public fun test_only_init(ctx: &mut TxContext) {
+  public fun init_for_testing(ctx: &mut TxContext) {
     init(USDC {}, ctx)
   }
 }

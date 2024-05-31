@@ -20,8 +20,9 @@ module usdc::usdc_tests {
   use sui::{
     test_scenario, 
     test_utils::{assert_eq},
-    coin::{CoinMetadata, RegulatedCoinMetadata, TreasuryCap, DenyCap}
+    coin::{CoinMetadata, RegulatedCoinMetadata, DenyCap}
   };
+  use stablecoin::treasury::{Treasury};
   use usdc::usdc::{Self, USDC};
 
   const DEPLOYER: address = @0x0;
@@ -29,12 +30,12 @@ module usdc::usdc_tests {
   #[test]
   fun init__should_create_correct_number_of_objects() {
     let mut scenario = test_scenario::begin(DEPLOYER);
-    usdc::test_only_init(scenario.ctx());
+    usdc::init_for_testing(scenario.ctx());
 
     let previous_tx_effects = scenario.next_tx(DEPLOYER);
     assert_eq(previous_tx_effects.created().length(), 4);
     assert_eq(previous_tx_effects.frozen().length(), 1);
-    assert_eq(previous_tx_effects.shared().length(), 1);
+    assert_eq(previous_tx_effects.shared().length(), 2); // Shared metadata and treasury objects
 
     scenario.end();
   }
@@ -42,7 +43,7 @@ module usdc::usdc_tests {
   #[test]
   fun init__should_create_correct_coin_metadata() {
     let mut scenario = test_scenario::begin(DEPLOYER);
-    usdc::test_only_init(scenario.ctx());
+    usdc::init_for_testing(scenario.ctx());
 
     scenario.next_tx(DEPLOYER);
     let metadata = scenario.take_shared<CoinMetadata<USDC>>();
@@ -59,7 +60,7 @@ module usdc::usdc_tests {
   #[test]
   fun init__should_create_regulated_coin_metadata() {
     let mut scenario = test_scenario::begin(DEPLOYER);
-    usdc::test_only_init(scenario.ctx());
+    usdc::init_for_testing(scenario.ctx());
 
     scenario.next_tx(DEPLOYER);
     assert_eq(test_scenario::has_most_recent_immutable<RegulatedCoinMetadata<USDC>>(), true);
@@ -68,14 +69,14 @@ module usdc::usdc_tests {
   }
 
   #[test]
-  fun init__should_transfer_treasury_cap_to_deployer() {
+  fun init__should_create_shared_treasury_and_wrap_treasury_cap() {
     let mut scenario = test_scenario::begin(DEPLOYER);
-    usdc::test_only_init(scenario.ctx());
+    usdc::init_for_testing(scenario.ctx());
 
     scenario.next_tx(DEPLOYER);
-    let treasury_cap = scenario.take_from_sender<TreasuryCap<USDC>>();
-    assert_eq(treasury_cap.total_supply(), 0);
-    scenario.return_to_sender(treasury_cap);
+    let treasury = scenario.take_shared<Treasury<USDC>>();
+    assert_eq(treasury.total_supply(), 0);
+    test_scenario::return_shared(treasury);
 
     scenario.end();
   }
@@ -83,7 +84,7 @@ module usdc::usdc_tests {
   #[test]
   fun init__should_transfer_deny_cap_to_deployer() {
     let mut scenario = test_scenario::begin(DEPLOYER);
-    usdc::test_only_init(scenario.ctx());
+    usdc::init_for_testing(scenario.ctx());
 
     scenario.next_tx(DEPLOYER);
     assert_eq(scenario.has_most_recent_for_sender<DenyCap<USDC>>(), true);

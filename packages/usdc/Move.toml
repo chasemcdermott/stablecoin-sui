@@ -24,6 +24,9 @@ git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
 rev = "6579e0ed9e432bae47a407daaf01f08c298bcb14"
 
+[dependencies.stablecoin]
+local = "../stablecoin"
+
 [addresses]
 usdc = "0x0"
 
