@@ -33,6 +33,7 @@ module stablecoin::treasury {
     const ENotPendingAdmin: u64 = 7;
     const EZeroAddress: u64 = 8;
     const EZeroAmount: u64 = 9;
+    const ESamePendingAdmin: u64 = 10;
 
     // === Structs ===
 
@@ -168,6 +169,7 @@ module stablecoin::treasury {
         ctx: &TxContext
     ) {
         assert!(treasury.admin == ctx.sender(), ENotAdmin);
+        assert!(!treasury.pending_admin.contains(&new_admin), ESamePendingAdmin);
         assert!(new_admin != @0x0, EZeroAddress);
 
         treasury.pending_admin = option::some(new_admin);
@@ -178,7 +180,7 @@ module stablecoin::treasury {
         });
     }
 
-    /// Start treasury admin role transfer process.
+    /// Finalize treasury admin role transfer process.
     public fun accept_admin<T>(
         treasury: &mut Treasury<T>, 
         ctx: &TxContext

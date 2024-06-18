@@ -86,6 +86,21 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ESamePendingAdmin)]
+    fun change_admin__should_fail_if_same_pending_admin() {
+        let mut scenario = setup();
+
+        // we should be able to set the pending admin initially
+        scenario.next_tx(TREASURY_ADMIN);
+        test_change_admin(TREASURY_ADMIN, RANDOM_ADDRESS, &mut scenario);
+
+        // expect the second to fail, once the pending admin is already set
+        scenario.next_tx(TREASURY_ADMIN);
+        test_change_admin(TREASURY_ADMIN, RANDOM_ADDRESS, &mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::EZeroAddress)]
     fun change_admin__should_fail_if_new_admin_is_zero_address() {
         let mut scenario = setup();
