@@ -1,0 +1,38 @@
+{
+  "name": "stablecoin-sui",
+  "version": "1.0.0",
+  "description": "Circle's Stablecoin Smart Contracts on Sui blockchain",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/circlefin/stablecoin-sui.git"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "env NODE_ENV=TESTING TS_NODE_COMPILER_OPTIONS='{\"module\": \"commonjs\" }' mocha -r ts-node/register -t 1000000 'test/**/*.test.ts'",
+    "type-check": "tsc --noEmit"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/circlefin/stablecoin-sui#readme",
+  "devDependencies": {
+    "@mysten/sui": "^1.0.3",
+    "@types/chai": "^4.3.16",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.12.13",
+    "@typescript-eslint/eslint-plugin": "^7.11.0",
+    "chai": "^5.1.1",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "eslint": "^9.4.0",
+    "mocha": "^10.4.0",
+    "prettier": "^3.2.5",
+    "prettier-eslint": "^16.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": "20.14.0",
+    "yarn": "1.22.22"
+  }
+}
