@@ -17,7 +17,7 @@
 #[test_only]
 module stablecoin::treasury_tests {
     use sui::{
-        coin::{Self, Coin, DenyCap},
+        coin::{Self, Coin},
         deny_list::{Self, DenyList},
         test_scenario::{Self, Scenario}, 
         test_utils::{Self, assert_eq},
@@ -32,7 +32,9 @@ module stablecoin::treasury_tests {
     const MINT_RECIPIENT: address = @0x50;
     const MINT_CAP_ADDR: address = @0x60;
     const RANDOM_ADDRESS: address = @0x70;
-    const DENYLIST_ADMIN: address = @0x80;
+    const OWNER: address = @0x80;
+    const BLOCKLISTER: address = @0x90;
+    const PAUSER: address = @0x01;
 
     public struct TREASURY_TESTS has drop {}
 
@@ -72,64 +74,6 @@ module stablecoin::treasury_tests {
         // Transaction 7: remove controller
         scenario.next_tx(TREASURY_ADMIN);
         test_remove_controller(CONTROLLER, &mut scenario);
-
-        scenario.end();
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotAdmin)]
-    fun change_admin__should_fail_if_not_sent_by_admin() {
-        let mut scenario = setup();
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        test_change_admin(RANDOM_ADDRESS, TREASURY_ADMIN, &mut scenario);
-
-        scenario.end();
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ESamePendingAdmin)]
-    fun change_admin__should_fail_if_same_pending_admin() {
-        let mut scenario = setup();
-
-        // we should be able to set the pending admin initially
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(TREASURY_ADMIN, RANDOM_ADDRESS, &mut scenario);
-
-        // expect the second to fail, once the pending admin is already set
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(TREASURY_ADMIN, RANDOM_ADDRESS, &mut scenario);
-
-        scenario.end();
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::EZeroAddress)]
-    fun change_admin__should_fail_if_new_admin_is_zero_address() {
-        let mut scenario = setup();
-
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(TREASURY_ADMIN, @0x0, &mut scenario);
-
-        scenario.end();
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotPendingAdmin)]
-    fun accept_admin__should_fail_if_sender_is_not_pending_admin() {
-        let mut scenario = setup();
-
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(TREASURY_ADMIN, CONTROLLER, &mut scenario);
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        test_accept_admin(&mut scenario);
-
-        scenario.end();
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::EPendingAdminNotSet)]
-    fun accept_admin__should_fail_if_pending_admin_is_not_set() {
-        let mut scenario = setup();
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        test_accept_admin(&mut scenario);
 
         scenario.end();
     }
@@ -346,7 +290,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(CONTROLLER);
         test_configure_minter(0, &mut scenario);
 
-        scenario.next_tx(DENYLIST_ADMIN);
+        scenario.next_tx(OWNER);
         test_add_to_deny_list(MINTER, &mut scenario);
 
         scenario.next_tx(MINTER);
@@ -365,7 +309,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(CONTROLLER);
         test_configure_minter(0, &mut scenario);
 
-        scenario.next_tx(DENYLIST_ADMIN);
+        scenario.next_tx(OWNER);
         test_add_to_deny_list(MINT_RECIPIENT, &mut scenario);
 
         scenario.next_tx(MINTER);
@@ -425,7 +369,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(MINTER);
         test_mint(1000000, MINTER, &mut scenario);
 
-        scenario.next_tx(DENYLIST_ADMIN);
+        scenario.next_tx(OWNER);
         test_add_to_deny_list(MINTER, &mut scenario);
 
         scenario.next_tx(MINTER);
@@ -454,6 +398,34 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test]
+    fun update_roles__should_succeed_and_pass_all_assertions() {
+        let mut scenario = setup();
+
+        // change admin to the OWNER address
+        scenario.next_tx(TREASURY_ADMIN);
+        test_change_admin(TREASURY_ADMIN, OWNER, &mut scenario);
+
+        scenario.next_tx(OWNER);
+        test_accept_admin(OWNER, &mut scenario);
+
+        // transfer ownership to the DEPLOYER address
+        scenario.next_tx(OWNER);
+        test_transfer_ownership(OWNER, DEPLOYER, &mut scenario);
+
+        scenario.next_tx(DEPLOYER);
+        test_accept_ownership(DEPLOYER, &mut scenario);
+
+        // use the DEPLOYER address to modify the blocklister and pauser
+        scenario.next_tx(DEPLOYER);
+        test_update_blocklister(BLOCKLISTER, &mut scenario);
+
+        scenario.next_tx(DEPLOYER);
+        test_update_pauser(PAUSER, &mut scenario);
+
+        scenario.end();
+    }
+
     // === Helpers ===
 
     fun setup(): Scenario {
@@ -470,45 +442,28 @@ module stablecoin::treasury_tests {
                 option::none(),
                 scenario.ctx()
             );
-            let treasury = treasury::create_treasury(treasury_cap, scenario.ctx().sender(), scenario.ctx());
+            let treasury = treasury::create_treasury(
+                treasury_cap,
+                deny_cap,
+                TREASURY_ADMIN,
+                OWNER,
+                OWNER,
+                OWNER,
+                scenario.ctx()
+            );
             assert_eq(treasury.total_supply(), 0);
             assert_eq(treasury.get_controllers_for_testing().length(), 0);
             assert_eq(treasury.get_mint_allowances_for_testing().length(), 0);
-            assert_eq(treasury.admin(), DEPLOYER);
-            assert_eq(option::is_none(&treasury.pending_admin()), true);
+            assert_eq(treasury.roles().admin(), TREASURY_ADMIN);
+            assert_eq(treasury.roles().owner(), OWNER);
+            assert_eq(treasury.roles().blocklister(), OWNER);
+            assert_eq(treasury.roles().pauser(), OWNER);
 
-            transfer::public_transfer(deny_cap, DENYLIST_ADMIN);
             transfer::public_share_object(metadata);
             transfer::public_share_object(treasury);
         };
 
-        scenario.next_tx(DEPLOYER);
-        test_change_admin(DEPLOYER, TREASURY_ADMIN, &mut scenario);
-
-        scenario.next_tx(TREASURY_ADMIN);
-        test_accept_admin(&mut scenario);
-
         scenario
-    }
-
-    fun test_change_admin(old_admin: address, new_admin: address, scenario: &mut Scenario) {
-        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-
-        treasury::change_admin(&mut treasury, new_admin, scenario.ctx());
-        assert_eq(treasury.admin(), old_admin);
-        assert_eq(*option::borrow(&treasury.pending_admin()), new_admin);
-
-        test_scenario::return_shared(treasury);
-    }
-
-    fun test_accept_admin(scenario: &mut Scenario) {
-        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-
-        treasury::accept_admin(&mut treasury, scenario.ctx());
-        assert_eq(treasury.admin(), TREASURY_ADMIN);
-        assert_eq(option::is_none(&treasury.pending_admin()), true);
-
-        test_scenario::return_shared(treasury);
     }
 
     fun test_configure_new_controller(controller: address, minter: address, scenario: &mut Scenario) {
@@ -618,12 +573,83 @@ module stablecoin::treasury_tests {
 
     fun test_add_to_deny_list(addr: address, scenario: &mut Scenario) {
         let mut deny_list = scenario.take_shared<DenyList>();
-        let mut deny_cap = scenario.take_from_sender<DenyCap<TREASURY_TESTS>>();
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        let deny_cap = treasury.get_deny_cap_for_testing();
 
-        coin::deny_list_add(&mut deny_list, &mut deny_cap, addr, scenario.ctx());
+        coin::deny_list_add(&mut deny_list, deny_cap, addr, scenario.ctx());
         assert_eq(coin::deny_list_contains<TREASURY_TESTS>(&deny_list, addr), true);
 
-        scenario.return_to_sender(deny_cap);
         test_scenario::return_shared(deny_list);
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_change_admin(expected_old_admin: address, new_admin: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.roles_mut().change_admin(new_admin, scenario.ctx());
+
+        let roles = treasury.roles();
+        assert_eq(roles.admin(), expected_old_admin);
+        assert_eq(*option::borrow(&roles.pending_admin()), new_admin);
+
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_accept_admin(expected_new_admin: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.roles_mut().accept_admin(scenario.ctx());
+
+        let roles = treasury.roles();
+        assert_eq(roles.admin(), expected_new_admin);
+        assert_eq(option::is_none(&roles.pending_admin()), true);
+
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_transfer_ownership(expected_old_owner: address, new_owner: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.roles_mut().transfer_ownership(new_owner, scenario.ctx());
+
+        let roles = treasury.roles();
+        assert_eq(roles.owner(), expected_old_owner);
+        assert_eq(*option::borrow(&roles.pending_owner()), new_owner);
+
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_accept_ownership(expected_new_owner: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.roles_mut().accept_ownership(scenario.ctx());
+
+        let roles = treasury.roles();
+        assert_eq(roles.owner(), expected_new_owner);
+        assert_eq(option::is_none(&roles.pending_owner()), true);
+
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_update_blocklister(new_blocklister: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.roles_mut().update_blocklister(new_blocklister, scenario.ctx());
+
+        let roles = treasury.roles();
+        assert_eq(roles.blocklister(), new_blocklister);
+
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_update_pauser(new_pauser: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.roles_mut().update_pauser(new_pauser, scenario.ctx());
+
+        let roles = treasury.roles();
+        assert_eq(roles.pauser(), new_pauser);
+
+        test_scenario::return_shared(treasury);
     }
 }

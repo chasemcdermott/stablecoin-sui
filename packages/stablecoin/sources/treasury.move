@@ -15,25 +15,23 @@
 // limitations under the License.
 
 module stablecoin::treasury {
-    use sui::coin::{Self, Coin, TreasuryCap};
+    use sui::coin::{Self, Coin, TreasuryCap, DenyCap};
     use sui::deny_list::{DenyList};
     use sui::event;
     use sui::table::{Self, Table};
     use stablecoin::mint_allowance::{Self, MintAllowance};
+    use stablecoin::roles::{Self, Roles};
 
     // === Errors ===
 
     const EControllerAlreadyConfigured: u64 = 0;
     const EDeniedAddress: u64 = 1;
     const EInsufficientAllowance: u64 = 2;
-    const EPendingAdminNotSet: u64 = 3;
-    const ENotAdmin: u64 = 4;
-    const ENotController: u64 = 5;
-    const ENotMinter: u64 = 6;
-    const ENotPendingAdmin: u64 = 7;
-    const EZeroAddress: u64 = 8;
-    const EZeroAmount: u64 = 9;
-    const ESamePendingAdmin: u64 = 10;
+    const ENotAdmin: u64 = 3;
+    const ENotController: u64 = 4;
+    const ENotMinter: u64 = 5;
+    const EZeroAddress: u64 = 6;
+    const EZeroAmount: u64 = 7;
 
     // === Structs ===
 
@@ -43,14 +41,14 @@ module stablecoin::treasury {
         id: UID,
         /// TreasuryCap of the same type `T`
         treasury_cap: TreasuryCap<T>,
+        /// DenyCap of the same type `T`
+        deny_cap: DenyCap<T>,
         /// Mapping between controllers and mint cap addresses
         controllers: Table<address, address>,
         /// Mapping between mint cap addresses and mint allowances
         mint_allowances: Table<address, MintAllowance<T>>, 
-        /// Mutable address of the treasury admin EOA
-        admin: address,
-        /// Mutable address of the pending treasury admin EOA
-        pending_admin: Option<address>,
+        /// Mutable privileged role addresses
+        roles: Roles,
     }
 
     /// An object representing the ability to mint up to an allowance 
@@ -61,16 +59,6 @@ module stablecoin::treasury {
     }
 
     // === Events ===
-
-    public struct TreasuryAdminTransferStarted has copy, drop {
-        old_admin: address,
-        new_admin: address,
-    }
-
-    public struct TreasuryAdminChanged has copy, drop {
-        old_admin: address,
-        new_admin: address,
-    }
 
     public struct MintCapCreated has copy, drop {
         mint_cap: address,
@@ -109,14 +97,14 @@ module stablecoin::treasury {
 
     // === View-only functions ===
 
-    /// Check the treasury admin address
-    public fun admin<T>(treasury: &Treasury<T>): address {
-        treasury.admin
+    /// Get immutable reference to the roles
+    public fun roles<T>(treasury: &Treasury<T>): &Roles {
+        &treasury.roles
     }
 
-    /// Check the treasury pending admin address
-    public fun pending_admin<T>(treasury: &Treasury<T>): Option<address> {
-        treasury.pending_admin
+    /// Get mutable reference to the roles
+    public fun roles_mut<T>(treasury: &mut Treasury<T>): &mut Roles {
+        &mut treasury.roles
     }
 
     /// Gets the corresponding MintCap address at address controller.
@@ -151,49 +139,26 @@ module stablecoin::treasury {
     // === Write functions ===
 
     /// Wrap `TreasuryCap` into a struct, accessible via additional capabilities
-    public fun create_treasury<T>(treasury_cap: TreasuryCap<T>, admin: address, ctx: &mut TxContext): Treasury<T> {
+    public fun create_treasury<T>(
+        treasury_cap: TreasuryCap<T>, 
+        deny_cap: DenyCap<T>, 
+        admin: address,
+        owner: address,
+        blocklister: address,
+        pauser: address,
+        ctx: &mut TxContext
+
+    ): Treasury<T> {
+        let roles = roles::create_roles(admin, owner, blocklister, pauser);
+
         Treasury {
             id: object::new(ctx),
             treasury_cap,
+            deny_cap,
             controllers: table::new<address, address>(ctx),
             mint_allowances: table::new<address, MintAllowance<T>>(ctx),
-            admin,
-            pending_admin: option::none(),
+            roles,
         }
-    }
-
-    /// Start treasury admin role transfer process.
-    public fun change_admin<T>(
-        treasury: &mut Treasury<T>, 
-        new_admin: address,
-        ctx: &TxContext
-    ) {
-        assert!(treasury.admin == ctx.sender(), ENotAdmin);
-        assert!(!treasury.pending_admin.contains(&new_admin), ESamePendingAdmin);
-        assert!(new_admin != @0x0, EZeroAddress);
-
-        treasury.pending_admin = option::some(new_admin);
-
-        event::emit(TreasuryAdminTransferStarted { 
-            old_admin: treasury.admin,
-            new_admin, 
-        });
-    }
-
-    /// Finalize treasury admin role transfer process.
-    public fun accept_admin<T>(
-        treasury: &mut Treasury<T>, 
-        ctx: &TxContext
-    ) {
-        let old_admin = treasury.admin;
-
-        assert!(treasury.pending_admin.is_some(), EPendingAdminNotSet);
-        let new_admin = treasury.pending_admin.extract();
-
-        assert!(new_admin == ctx.sender(), ENotPendingAdmin);
-        treasury.admin = new_admin;
-
-        event::emit(TreasuryAdminChanged { old_admin, new_admin });
     }
 
     /// Configure a controller by adding it to the controller mapping, 
@@ -203,7 +168,7 @@ module stablecoin::treasury {
         mint_cap_addr: address,
         ctx: &TxContext
     ) {
-        assert!(treasury.admin == ctx.sender(), ENotAdmin);
+        assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
         assert!(controller != @0x0, EZeroAddress);
         assert!(!is_controller(treasury, controller), EControllerAlreadyConfigured);
 
@@ -216,7 +181,7 @@ module stablecoin::treasury {
         treasury: &Treasury<T>, 
         ctx: &mut TxContext
     ): MintCap<T> {
-        assert!(treasury.admin == ctx.sender(), ENotAdmin);
+        assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
         let mint_cap = MintCap { id: object::new(ctx) };
         event::emit(MintCapCreated { mint_cap: object::id_address(&mint_cap) });
         mint_cap
@@ -243,7 +208,7 @@ module stablecoin::treasury {
         controller: address, 
         ctx: &TxContext
     ) {
-        assert!(treasury.admin == ctx.sender(), ENotAdmin);
+        assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
         assert!(controller != @0x0, EZeroAddress);
         assert!(is_controller(treasury, controller), ENotController);
 
@@ -347,5 +312,10 @@ module stablecoin::treasury {
     #[test_only]
     public fun get_mint_allowances_for_testing<T>(treasury: &Treasury<T>): &Table<address, MintAllowance<T>> {
         &treasury.mint_allowances
+    }
+
+    #[test_only]
+    public fun get_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
+        &mut treasury.deny_cap
     }
 }

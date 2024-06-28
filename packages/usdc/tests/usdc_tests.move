@@ -20,12 +20,14 @@ module usdc::usdc_tests {
   use sui::{
     test_scenario, 
     test_utils::{assert_eq},
-    coin::{CoinMetadata, RegulatedCoinMetadata, DenyCap}
+    coin::{Self, CoinMetadata, RegulatedCoinMetadata},
+    deny_list::{Self, DenyList}
   };
   use stablecoin::treasury::{Treasury};
   use usdc::usdc::{Self, USDC};
 
   const DEPLOYER: address = @0x0;
+  const RANDOM_ADDRESS: address = @0x10;
 
   #[test]
   fun init__should_create_correct_number_of_objects() {
@@ -33,7 +35,7 @@ module usdc::usdc_tests {
     usdc::init_for_testing(scenario.ctx());
 
     let previous_tx_effects = scenario.next_tx(DEPLOYER);
-    assert_eq(previous_tx_effects.created().length(), 4);
+    assert_eq(previous_tx_effects.created().length(), 3);
     assert_eq(previous_tx_effects.frozen().length(), 1);
     assert_eq(previous_tx_effects.shared().length(), 2); // Shared metadata and treasury objects
 
@@ -82,12 +84,24 @@ module usdc::usdc_tests {
   }
 
   #[test]
-  fun init__should_transfer_deny_cap_to_deployer() {
+  fun init__should_create_shared_treasury_and_wrap_deny_cap() {
     let mut scenario = test_scenario::begin(DEPLOYER);
     usdc::init_for_testing(scenario.ctx());
+    deny_list::create_for_test(scenario.ctx());
 
     scenario.next_tx(DEPLOYER);
-    assert_eq(scenario.has_most_recent_for_sender<DenyCap<USDC>>(), true);
+
+    // Get deny cap from treasury object
+    let mut treasury = scenario.take_shared<Treasury<USDC>>();
+    let deny_cap = treasury.get_deny_cap_for_testing();
+
+    // use deny cap to add an address to the deny list
+    let mut deny_list = scenario.take_shared<DenyList>();
+    coin::deny_list_add(&mut deny_list, deny_cap, RANDOM_ADDRESS, scenario.ctx());
+    assert_eq(coin::deny_list_contains<USDC>(&deny_list, RANDOM_ADDRESS), true);
+
+    test_scenario::return_shared(deny_list);
+    test_scenario::return_shared(treasury);
 
     scenario.end();
   }
