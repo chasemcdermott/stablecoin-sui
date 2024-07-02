@@ -31,10 +31,12 @@ module stablecoin::treasury_tests {
     const MINTER: address = @0x40;
     const MINT_RECIPIENT: address = @0x50;
     const MINT_CAP_ADDR: address = @0x60;
-    const RANDOM_ADDRESS: address = @0x70;
-    const OWNER: address = @0x80;
-    const BLOCKLISTER: address = @0x90;
+    const OWNER: address = @0x70;
+    const BLOCKLISTER: address = @0x80;
     const PAUSER: address = @0x01;
+
+    const RANDOM_ADDRESS: address = @0x1000;
+    const RANDOM_ADDRESS_2: address = @0x1001;
 
     public struct TREASURY_TESTS has drop {}
 
@@ -271,7 +273,7 @@ module stablecoin::treasury_tests {
         test_configure_minter(0, &mut scenario);
 
         scenario.next_tx(OWNER);
-        test_add_to_deny_list(MINTER, &mut scenario);
+        test_blocklist(MINTER, &mut scenario);
 
         scenario.next_tx(MINTER);
         test_mint(1000000, MINT_RECIPIENT, &mut scenario);
@@ -290,7 +292,7 @@ module stablecoin::treasury_tests {
         test_configure_minter(0, &mut scenario);
 
         scenario.next_tx(OWNER);
-        test_add_to_deny_list(MINT_RECIPIENT, &mut scenario);
+        test_blocklist(MINT_RECIPIENT, &mut scenario);
 
         scenario.next_tx(MINTER);
         test_mint(1000000, MINT_RECIPIENT, &mut scenario);
@@ -334,7 +336,7 @@ module stablecoin::treasury_tests {
         test_mint(1000000, MINTER, &mut scenario);
 
         scenario.next_tx(OWNER);
-        test_add_to_deny_list(MINTER, &mut scenario);
+        test_blocklist(MINTER, &mut scenario);
 
         scenario.next_tx(MINTER);
         test_burn(&mut scenario);
@@ -358,6 +360,92 @@ module stablecoin::treasury_tests {
 
         scenario.next_tx(MINTER);
         test_burn(&mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotBlocklister)]
+    fun blocklist__should_fail_if_caller_is_not_blocklister() {
+        let mut scenario = setup();
+
+        // Some random address tries to blocklist an address, should fail.
+        scenario.next_tx(RANDOM_ADDRESS);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test]
+    fun blocklist__should_succeed_if_caller_is_blocklister() {
+        let mut scenario = setup();
+
+        // Blocklister blocklists an address.
+        scenario.next_tx(OWNER);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test]
+    fun blocklist__should_be_idempotent() {
+        let mut scenario = setup();
+
+        // Blocklister blocklists an address.
+        scenario.next_tx(OWNER);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        // Blocklisting the same address keeps the address in the blocklisted state.
+        scenario.next_tx(OWNER);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotBlocklister)]
+    fun unblocklist__should_fail_if_caller_is_not_blocklister() {
+        let mut scenario = setup();
+
+        // Blocklister blocklists an address.
+        scenario.next_tx(OWNER);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        // Some random address tries to unblocklist the address, should fail.
+        scenario.next_tx(RANDOM_ADDRESS);
+        test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test]
+    fun unblocklist__should_succeed_if_caller_is_blocklister() {
+        let mut scenario = setup();
+
+        // Blocklister blocklists an address.
+        scenario.next_tx(OWNER);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        // Blocklister unblocklists the address.
+        scenario.next_tx(OWNER);
+        test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test]
+    fun unblocklist__should_be_idempotent() {
+        let mut scenario = setup();
+
+        // Blocklister blocklists an address.
+        scenario.next_tx(OWNER);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        // Blocklister unblocklists the address.
+        scenario.next_tx(OWNER);
+        test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        // Unblocklisting the same address keeps the address in the unblocklisted state.
+        scenario.next_tx(OWNER);
+        test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.end();
     }
@@ -583,13 +671,23 @@ module stablecoin::treasury_tests {
         assert_eq(scenario.ids_for_sender<Coin<TREASURY_TESTS>>().contains(&coin_id), false);
     }
 
-    fun test_add_to_deny_list(addr: address, scenario: &mut Scenario) {
-        let mut deny_list = scenario.take_shared<DenyList>();
+    fun test_blocklist(addr: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        let deny_cap = treasury.get_deny_cap_for_testing();
+        let mut deny_list = scenario.take_shared<DenyList>();
 
-        coin::deny_list_add(&mut deny_list, deny_cap, addr, scenario.ctx());
+        treasury.blocklist(&mut deny_list, addr, scenario.ctx());
         assert_eq(coin::deny_list_contains<TREASURY_TESTS>(&deny_list, addr), true);
+
+        test_scenario::return_shared(deny_list);
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_unblocklist(addr: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        let mut deny_list = scenario.take_shared<DenyList>();
+
+        treasury.unblocklist(&mut deny_list, addr, scenario.ctx());
+        assert_eq(coin::deny_list_contains<TREASURY_TESTS>(&deny_list, addr), false);
 
         test_scenario::return_shared(deny_list);
         test_scenario::return_shared(treasury);

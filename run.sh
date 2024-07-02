@@ -37,7 +37,7 @@ function build() {
 function test() {
   for path in $(_get_packages); do
     echo ">> Testing $path..."
-    sui move test --path "$path" --coverage
+    sui move test --path "$path" --statistics --coverage
 
     if [ -f $path/.coverage_map.mvcov ]
     then

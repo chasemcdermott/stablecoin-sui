@@ -30,9 +30,10 @@ module stablecoin::treasury {
     const ENotAdmin: u64 = 3;
     const ENotController: u64 = 4;
     const ENotMinter: u64 = 5;
-    const ENotPauser: u64 = 6;
-    const EUnimplemented: u64 = 7;
-    const EZeroAmount: u64 = 8;
+    const ENotBlocklister: u64 = 6;
+    const ENotPauser: u64 = 7;
+    const EUnimplemented: u64 = 8;
+    const EZeroAmount: u64 = 9;
 
     // === Structs ===
 
@@ -94,6 +95,14 @@ module stablecoin::treasury {
     public struct Burn has copy, drop {
         mint_cap: ID,
         amount: u64,
+    }
+
+    public struct Blocklisted has copy, drop {
+        `address`: address
+    }
+
+    public struct Unblocklisted has copy, drop {
+        `address`: address
     }
 
     public struct Pause<phantom T> has copy, drop {}
@@ -305,6 +314,36 @@ module stablecoin::treasury {
         event::emit(Burn { mint_cap: mint_cap_id, amount });
     }
 
+    /// Blocklists an address
+    public fun blocklist<T>(
+        treasury: &mut Treasury<T>,
+        deny_list: &mut DenyList,
+        addr: address,
+        ctx: &mut TxContext
+    ) {
+        assert!(treasury.roles.blocklister() == ctx.sender(), ENotBlocklister);
+
+        if (!coin::deny_list_contains<T>(deny_list, addr)) {
+            coin::deny_list_add<T>(deny_list, treasury.borrow_deny_cap_mut(), addr, ctx);
+        };
+        event::emit(Blocklisted { `address`: addr })
+    }
+
+    /// Unblocklists an address
+    public fun unblocklist<T>(
+        treasury: &mut Treasury<T>,
+        deny_list: &mut DenyList,
+        addr: address,
+        ctx: &mut TxContext
+    ) {
+        assert!(treasury.roles.blocklister() == ctx.sender(), ENotBlocklister);
+
+        if (coin::deny_list_contains<T>(deny_list, addr)) {
+            coin::deny_list_remove<T>(deny_list, treasury.borrow_deny_cap_mut(), addr, ctx);
+        };
+        event::emit(Unblocklisted { `address`: addr })
+    }
+
     #[allow(unused_variable)]
     /// Triggers stopped state; pause all transfers
     public fun pause<T>(
@@ -355,6 +394,6 @@ module stablecoin::treasury {
 
     #[test_only]
     public fun get_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
-        &mut treasury.deny_cap
+        treasury.borrow_deny_cap_mut()
     }
 }
