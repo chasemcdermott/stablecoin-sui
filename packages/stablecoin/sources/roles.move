@@ -29,7 +29,6 @@ module stablecoin::roles {
     const EPendingAdminNotSet: u64 = 7;
     const ENotPendingAdmin: u64 = 8;
     const ESamePendingAdmin: u64 = 9;
-    const EZeroAddress: u64 = 10;
 
     // === Structs ===
 
@@ -139,7 +138,6 @@ module stablecoin::roles {
     ) {
         assert!(roles.admin == ctx.sender(), ENotAdmin);
         assert!(!roles.pending_admin.contains(&new_admin), ESamePendingAdmin);
-        assert!(new_admin != @0x0, EZeroAddress);
 
         roles.pending_admin = option::some(new_admin);
 

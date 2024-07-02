@@ -87,7 +87,7 @@ module stablecoin::treasury_tests {
             let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
             let mint_cap = treasury.create_mint_cap(scenario.ctx());
-            assert_eq(treasury.mint_allowance(object::id_address(&mint_cap)), 0);
+            assert_eq(treasury.mint_allowance(object::id(&mint_cap)), 0);
             transfer::public_transfer(mint_cap, MINTER);
 
             test_scenario::return_shared(treasury);
@@ -111,12 +111,12 @@ module stablecoin::treasury_tests {
             let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
             let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();
 
-            treasury::configure_controller(&mut treasury, RANDOM_ADDRESS, object::id_address(&mint_cap), scenario.ctx());
+            treasury::configure_controller(&mut treasury, RANDOM_ADDRESS, object::id(&mint_cap), scenario.ctx());
             assert_eq(treasury.get_controllers_for_testing().contains(RANDOM_ADDRESS), true);
             assert_eq(treasury.get_controllers_for_testing().contains(CONTROLLER), true); 
-            let mint_cap_addr = treasury.get_worker(RANDOM_ADDRESS);
-            assert_eq(treasury.get_worker(CONTROLLER), mint_cap_addr);
-            assert_eq(treasury.mint_allowance(mint_cap_addr), 10);
+            let mint_cap_id = treasury.get_worker(RANDOM_ADDRESS);
+            assert_eq(treasury.get_worker(CONTROLLER), mint_cap_id);
+            assert_eq(treasury.mint_allowance(mint_cap_id), 10);
 
             scenario.return_to_sender(mint_cap);
             test_scenario::return_shared(treasury);
@@ -130,11 +130,11 @@ module stablecoin::treasury_tests {
         let mut scenario = setup();
 
         scenario.next_tx(TREASURY_ADMIN);
-        test_configure_controller(CONTROLLER, MINT_CAP_ADDR, &mut scenario);
+        test_configure_controller(CONTROLLER, object::id_from_address(MINT_CAP_ADDR), &mut scenario);
 
         // Configure the same controller - expect failure
         scenario.next_tx(TREASURY_ADMIN);
-        test_configure_controller(CONTROLLER, MINT_CAP_ADDR, &mut scenario);
+        test_configure_controller(CONTROLLER, object::id_from_address(MINT_CAP_ADDR), &mut scenario);
 
         scenario.end();
     }
@@ -146,19 +146,9 @@ module stablecoin::treasury_tests {
         scenario.next_tx(RANDOM_ADDRESS); 
         {
             let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-            treasury.configure_controller(RANDOM_ADDRESS, MINT_CAP_ADDR, scenario.ctx());
+            treasury.configure_controller(RANDOM_ADDRESS, object::id_from_address(MINT_CAP_ADDR), scenario.ctx());
             test_scenario::return_shared(treasury);
         };
-
-        scenario.end();
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::EZeroAddress)]
-    fun configure_controller__should_fail_if_controller_is_zero_address() {
-        let mut scenario = setup();
-
-        scenario.next_tx(TREASURY_ADMIN);
-        test_configure_controller(@0x0, MINT_CAP_ADDR, &mut scenario);
 
         scenario.end();
     }
@@ -169,16 +159,6 @@ module stablecoin::treasury_tests {
 
         scenario.next_tx(TREASURY_ADMIN);
         test_remove_controller(RANDOM_ADDRESS, &mut scenario);
-
-        scenario.end();
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::EZeroAddress)]
-    fun remove_controller__should_fail_with_zero_controller() {
-        let mut scenario = setup();
-
-        scenario.next_tx(TREASURY_ADMIN);
-        test_remove_controller(@0x0, &mut scenario);
 
         scenario.end();
     }
@@ -314,22 +294,6 @@ module stablecoin::treasury_tests {
 
         scenario.next_tx(MINTER);
         test_mint(1000000, MINT_RECIPIENT, &mut scenario);
-
-        scenario.end();
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::EZeroAddress)]
-    fun mint__should_fail_if_recipient_is_zero_address() {
-        let mut scenario = setup();
-
-        scenario.next_tx(TREASURY_ADMIN);
-        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
-
-        scenario.next_tx(CONTROLLER);
-        test_configure_minter(1000000, &mut scenario);
-
-        scenario.next_tx(MINTER);
-        test_mint(1000000, @0x0, &mut scenario);
 
         scenario.end();
     }
@@ -518,21 +482,21 @@ module stablecoin::treasury_tests {
         treasury::configure_new_controller(&mut treasury, controller, minter, scenario.ctx());
         assert_eq(treasury.get_controllers_for_testing().contains(controller), true);
         assert_eq(treasury.mint_allowance(treasury.get_worker(controller)), 0);
-        let mint_cap_addr = treasury.get_worker(controller);
+        let mint_cap_id = treasury.get_worker(controller);
 
         test_scenario::return_shared(treasury);
 
         // Check new MintCap has been transferred to minter.
         scenario.next_tx(minter);
         let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();
-        assert_eq(object::id_address(&mint_cap), mint_cap_addr);
+        assert_eq(object::id(&mint_cap), mint_cap_id);
         scenario.return_to_sender(mint_cap);
     }
     
-    fun test_configure_controller(controller: address, mint_cap_addr: address, scenario: &mut Scenario) {
+    fun test_configure_controller(controller: address, mint_cap_id: ID, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
-        treasury::configure_controller(&mut treasury, controller, mint_cap_addr, scenario.ctx());
+        treasury::configure_controller(&mut treasury, controller, mint_cap_id, scenario.ctx());
         assert_eq(treasury.get_controllers_for_testing().contains(controller), true);
         assert_eq(treasury.mint_allowance(treasury.get_worker(controller)), 0);
 
@@ -554,8 +518,8 @@ module stablecoin::treasury_tests {
 
         treasury::configure_minter(&mut treasury, &deny_list, allowance, scenario.ctx());
 
-        let mint_cap_addr = treasury::get_worker(&treasury, scenario.sender());
-        assert_eq(treasury::mint_allowance(&treasury, mint_cap_addr), allowance);
+        let mint_cap_id = treasury::get_worker(&treasury, scenario.sender());
+        assert_eq(treasury::mint_allowance(&treasury, mint_cap_id), allowance);
 
         test_scenario::return_shared(treasury);
         test_scenario::return_shared(deny_list);
@@ -566,9 +530,9 @@ module stablecoin::treasury_tests {
 
         treasury::remove_minter(&mut treasury, scenario.ctx());
 
-        let mint_cap_addr = treasury::get_worker(&treasury, scenario.sender());
-        assert_eq(treasury.mint_allowance(mint_cap_addr), 0);  
-        assert_eq(treasury.get_mint_allowances_for_testing().contains(mint_cap_addr), false);  
+        let mint_cap_id = treasury::get_worker(&treasury, scenario.sender());
+        assert_eq(treasury.mint_allowance(mint_cap_id), 0);  
+        assert_eq(treasury.get_mint_allowances_for_testing().contains(mint_cap_id), false);  
 
         test_scenario::return_shared(treasury);
     }
@@ -578,11 +542,11 @@ module stablecoin::treasury_tests {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
         let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();
 
-        let allowance_before = treasury.mint_allowance(object::id_address(&mint_cap));
+        let allowance_before = treasury.mint_allowance(object::id(&mint_cap));
         let amount_before = treasury.total_supply();
         treasury::mint(&mut treasury, &mint_cap, &deny_list, mint_amount, recipient, scenario.ctx());
         assert_eq(treasury.total_supply(), amount_before + mint_amount);
-        assert_eq(treasury.mint_allowance(object::id_address(&mint_cap)), allowance_before - mint_amount);
+        assert_eq(treasury.mint_allowance(object::id(&mint_cap)), allowance_before - mint_amount);
 
         scenario.return_to_sender(mint_cap);
         test_scenario::return_shared(treasury);
@@ -603,12 +567,12 @@ module stablecoin::treasury_tests {
         let coin = scenario.take_from_sender<Coin<TREASURY_TESTS>>();
         let coin_id = object::id(&coin);
         
-        let allowance_before = treasury.mint_allowance(object::id_address(&mint_cap));
+        let allowance_before = treasury.mint_allowance(object::id(&mint_cap));
         let amount_before = treasury.total_supply();
         let burn_amount = coin.value();
         treasury::burn(&mut treasury, &mint_cap, &deny_list, coin, scenario.ctx());
         assert_eq(treasury.total_supply(), amount_before - burn_amount);
-        assert_eq(treasury.mint_allowance(object::id_address(&mint_cap)), allowance_before);
+        assert_eq(treasury.mint_allowance(object::id(&mint_cap)), allowance_before);
 
         scenario.return_to_sender(mint_cap);
         test_scenario::return_shared(treasury);

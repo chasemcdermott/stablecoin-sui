@@ -57,17 +57,6 @@ module stablecoin::roles_tests {
         roles.destroy();
     }
 
-    #[test, expected_failure(abort_code = roles::EZeroAddress)]
-    fun change_admin__should_fail_if_new_admin_is_zero_address() {
-        let (mut scenario, mut roles) = setup();
-
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(TREASURY_ADMIN, @0x0, &mut roles, &mut scenario);
-
-        scenario.end();
-        roles.destroy();
-    }
-
     #[test, expected_failure(abort_code = roles::ENotPendingAdmin)]
     fun accept_admin__should_fail_if_sender_is_not_pending_admin() {
         let (mut scenario, mut roles) = setup();

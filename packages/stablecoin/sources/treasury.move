@@ -32,8 +32,7 @@ module stablecoin::treasury {
     const ENotMinter: u64 = 5;
     const ENotPauser: u64 = 6;
     const EUnimplemented: u64 = 7;
-    const EZeroAddress: u64 = 8;
-    const EZeroAmount: u64 = 9;
+    const EZeroAmount: u64 = 8;
 
     // === Structs ===
 
@@ -45,10 +44,10 @@ module stablecoin::treasury {
         treasury_cap: TreasuryCap<T>,
         /// DenyCap of the same type `T`
         deny_cap: DenyCap<T>,
-        /// Mapping between controllers and mint cap addresses
-        controllers: Table<address, address>,
-        /// Mapping between mint cap addresses and mint allowances
-        mint_allowances: Table<address, MintAllowance<T>>, 
+        /// Mapping between controllers and mint cap IDs
+        controllers: Table<address, ID>,
+        /// Mapping between mint cap IDs and mint allowances
+        mint_allowances: Table<ID, MintAllowance<T>>, 
         /// Mutable privileged role addresses
         roles: Roles,
     }
@@ -63,12 +62,12 @@ module stablecoin::treasury {
     // === Events ===
 
     public struct MintCapCreated has copy, drop {
-        mint_cap: address,
+        mint_cap: ID,
     }
 
     public struct ControllerConfigured has copy, drop {
         controller: address,
-        mint_cap: address,
+        mint_cap: ID,
     }
 
     public struct ControllerRemoved has copy, drop {
@@ -77,23 +76,23 @@ module stablecoin::treasury {
     
     public struct MinterConfigured has copy, drop {
         controller: address,
-        mint_cap: address,
+        mint_cap: ID,
         allowance: u64,
     }
     
     public struct MinterRemoved has copy, drop {
         controller: address,
-        mint_cap: address,
+        mint_cap: ID,
     }
 
     public struct Mint has copy, drop {
-        mint_cap: address,
+        mint_cap: ID,
         recipient: address,
         amount: u64,
     }
 
     public struct Burn has copy, drop {
-        mint_cap: address,
+        mint_cap: ID,
         amount: u64,
     }
 
@@ -112,18 +111,18 @@ module stablecoin::treasury {
         &mut treasury.roles
     }
 
-    /// Gets the corresponding MintCap address at address controller.
+    /// Gets the corresponding MintCap ID attached to a controller address.
     /// Errors if input address is not valid controller.
-    public fun get_worker<T>(treasury: &Treasury<T>, controller: address): address {
+    public fun get_worker<T>(treasury: &Treasury<T>, controller: address): ID {
         assert!(is_controller(treasury, controller), ENotController);
         *treasury.controllers.borrow(controller)
     }
     
-    /// Gets the allowance of a mint cap object address.
-    /// Returns 0 if mint cap object address is not an authorized mint cap. 
-    public fun mint_allowance<T>(treasury: &Treasury<T>, addr: address): u64 {
-        if (!is_authorized_mint_cap(treasury, addr)) return 0;
-        treasury.mint_allowances.borrow(addr).value()
+    /// Gets the allowance of a mint cap object.
+    /// Returns 0 if the mint cap object is not an authorized mint cap. 
+    public fun mint_allowance<T>(treasury: &Treasury<T>, mint_cap: ID): u64 {
+        if (!is_authorized_mint_cap(treasury, mint_cap)) return 0;
+        treasury.mint_allowances.borrow(mint_cap).value()
     }
 
     /// Return the total number of `T`'s in circulation.
@@ -136,9 +135,9 @@ module stablecoin::treasury {
         treasury.controllers.contains(controller_addr)
     }
 
-    /// Check if a mint cap address is authorized to mint
-    fun is_authorized_mint_cap<T>(treasury: &Treasury<T>, addr: address): bool {
-        treasury.mint_allowances.contains(addr)
+    /// Check if a mint cap ID is authorized to mint
+    fun is_authorized_mint_cap<T>(treasury: &Treasury<T>, id: ID): bool {
+        treasury.mint_allowances.contains(id)
     }
 
     // === Write functions ===
@@ -160,8 +159,8 @@ module stablecoin::treasury {
             id: object::new(ctx),
             treasury_cap,
             deny_cap,
-            controllers: table::new<address, address>(ctx),
-            mint_allowances: table::new<address, MintAllowance<T>>(ctx),
+            controllers: table::new<address, ID>(ctx),
+            mint_allowances: table::new<ID, MintAllowance<T>>(ctx),
             roles,
         }
     }
@@ -170,15 +169,14 @@ module stablecoin::treasury {
     public fun configure_controller<T>(
         treasury: &mut Treasury<T>, 
         controller: address, 
-        mint_cap_addr: address,
+        mint_cap_id: ID,
         ctx: &TxContext
     ) {
         assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
-        assert!(controller != @0x0, EZeroAddress);
         assert!(!is_controller(treasury, controller), EControllerAlreadyConfigured);
 
-        treasury.controllers.add(controller, mint_cap_addr);
-        event::emit(ControllerConfigured { controller, mint_cap: mint_cap_addr });
+        treasury.controllers.add(controller, mint_cap_id);
+        event::emit(ControllerConfigured { controller, mint_cap: mint_cap_id });
     }
 
     /// Create new MintCap object 
@@ -188,7 +186,7 @@ module stablecoin::treasury {
     ): MintCap<T> {
         assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
         let mint_cap = MintCap { id: object::new(ctx) };
-        event::emit(MintCapCreated { mint_cap: object::id_address(&mint_cap) });
+        event::emit(MintCapCreated { mint_cap: object::id(&mint_cap) });
         mint_cap
     }
 
@@ -203,7 +201,7 @@ module stablecoin::treasury {
         ctx: &mut TxContext
     ) {
         let mint_cap = create_mint_cap(treasury, ctx);
-        configure_controller(treasury, controller, object::id_address(&mint_cap), ctx);
+        configure_controller(treasury, controller, object::id(&mint_cap), ctx);
         transfer::transfer(mint_cap, minter)
     }
 
@@ -214,7 +212,6 @@ module stablecoin::treasury {
         ctx: &TxContext
     ) {
         assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
-        assert!(controller != @0x0, EZeroAddress);
         assert!(is_controller(treasury, controller), ENotController);
 
         treasury.controllers.remove(controller);
@@ -232,16 +229,16 @@ module stablecoin::treasury {
         ctx: &TxContext
     ) {
         let controller = ctx.sender();
-        let mint_cap_addr = get_worker(treasury, controller);
+        let mint_cap_id = get_worker(treasury, controller);
 
-        if (!treasury.mint_allowances.contains(mint_cap_addr)) {
+        if (!treasury.mint_allowances.contains(mint_cap_id)) {
             let mut allowance = mint_allowance::create();
             allowance.set(new_allowance);
-            treasury.mint_allowances.add(mint_cap_addr, allowance);
+            treasury.mint_allowances.add(mint_cap_id, allowance);
         } else {
-            treasury.mint_allowances.borrow_mut(mint_cap_addr).set(new_allowance);
+            treasury.mint_allowances.borrow_mut(mint_cap_id).set(new_allowance);
         };
-        event::emit(MinterConfigured { controller, mint_cap: mint_cap_addr, allowance: new_allowance });
+        event::emit(MinterConfigured { controller, mint_cap: mint_cap_id, allowance: new_allowance });
     }
 
     /// De-authorizes the controller's corresponding mint cap
@@ -250,10 +247,10 @@ module stablecoin::treasury {
         ctx: &TxContext
     ) {
         let controller = ctx.sender();
-        let mint_cap_addr = get_worker(treasury, controller);
-        let mint_allowance = treasury.mint_allowances.remove(mint_cap_addr);
+        let mint_cap_id = get_worker(treasury, controller);
+        let mint_allowance = treasury.mint_allowances.remove(mint_cap_id);
         mint_allowance.destroy();
-        event::emit(MinterRemoved { controller, mint_cap: mint_cap_addr });
+        event::emit(MinterRemoved { controller, mint_cap: mint_cap_id });
     }
     
     /// Mints coins to a recipient address.
@@ -267,14 +264,13 @@ module stablecoin::treasury {
         recipient: address, 
         ctx: &mut TxContext
     ) {
-        let mint_cap_addr = object::id_address(mint_cap);
-        assert!(is_authorized_mint_cap(treasury, mint_cap_addr), ENotMinter);
+        let mint_cap_id = object::id(mint_cap);
+        assert!(is_authorized_mint_cap(treasury, mint_cap_id), ENotMinter);
         assert!(!coin::deny_list_contains<T>(deny_list, ctx.sender()), EDeniedAddress);
         assert!(!coin::deny_list_contains<T>(deny_list, recipient), EDeniedAddress);
-        assert!(recipient != @0x0, EZeroAddress);
         assert!(amount > 0, EZeroAmount);
 
-        let mint_allowance = treasury.mint_allowances.borrow_mut(mint_cap_addr);
+        let mint_allowance = treasury.mint_allowances.borrow_mut(mint_cap_id);
         assert!(mint_allowance.value() >= amount, EInsufficientAllowance);
 
         mint_allowance.decrease(amount);
@@ -282,7 +278,7 @@ module stablecoin::treasury {
         coin::mint_and_transfer(&mut treasury.treasury_cap, amount, recipient, ctx);
         
         event::emit(Mint { 
-            mint_cap: mint_cap_addr, 
+            mint_cap: mint_cap_id, 
             recipient, 
             amount, 
         });
@@ -298,15 +294,15 @@ module stablecoin::treasury {
         coin: Coin<T>,
         ctx: &TxContext
     ) {
-        let mint_cap_addr = object::id_address(mint_cap);
-        assert!(is_authorized_mint_cap(treasury, mint_cap_addr), ENotMinter);
+        let mint_cap_id = object::id(mint_cap);
+        assert!(is_authorized_mint_cap(treasury, mint_cap_id), ENotMinter);
         assert!(!coin::deny_list_contains<T>(deny_list, ctx.sender()), EDeniedAddress);
 
         let amount = coin.value();
         assert!(amount > 0, EZeroAmount);
 
         coin::burn(&mut treasury.treasury_cap, coin);
-        event::emit(Burn { mint_cap: mint_cap_addr, amount });
+        event::emit(Burn { mint_cap: mint_cap_id, amount });
     }
 
     #[allow(unused_variable)]
@@ -348,12 +344,12 @@ module stablecoin::treasury {
     // === Test Only ===
 
     #[test_only]
-    public fun get_controllers_for_testing<T>(treasury: &Treasury<T>): &Table<address, address> {
+    public fun get_controllers_for_testing<T>(treasury: &Treasury<T>): &Table<address, ID> {
         &treasury.controllers
     }
 
     #[test_only]
-    public fun get_mint_allowances_for_testing<T>(treasury: &Treasury<T>): &Table<address, MintAllowance<T>> {
+    public fun get_mint_allowances_for_testing<T>(treasury: &Treasury<T>): &Table<ID, MintAllowance<T>> {
         &treasury.mint_allowances
     }
 
