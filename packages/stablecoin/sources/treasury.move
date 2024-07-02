@@ -30,8 +30,10 @@ module stablecoin::treasury {
     const ENotAdmin: u64 = 3;
     const ENotController: u64 = 4;
     const ENotMinter: u64 = 5;
-    const EZeroAddress: u64 = 6;
-    const EZeroAmount: u64 = 7;
+    const ENotPauser: u64 = 6;
+    const EUnimplemented: u64 = 7;
+    const EZeroAddress: u64 = 8;
+    const EZeroAmount: u64 = 9;
 
     // === Structs ===
 
@@ -94,6 +96,9 @@ module stablecoin::treasury {
         mint_cap: address,
         amount: u64,
     }
+
+    public struct Pause<phantom T> has copy, drop {}
+    public struct Unpause<phantom T> has copy, drop {}
 
     // === View-only functions ===
 
@@ -217,10 +222,12 @@ module stablecoin::treasury {
         event::emit(ControllerRemoved { controller });
     }
 
+    #[allow(unused_variable)]
     /// Enables the minter and sets its allowance.
-    /// TODO(SPG-270): Add pause check.
+    /// TODO(SPG-308): Add pause check.
     public fun configure_minter<T>(
         treasury: &mut Treasury<T>, 
+        deny_list: &DenyList, 
         new_allowance: u64, 
         ctx: &TxContext
     ) {
@@ -251,7 +258,7 @@ module stablecoin::treasury {
     
     /// Mints coins to a recipient address.
     /// The caller must own a MintCap, and can only mint up to its allowance
-    /// TODO(SPG-270): Add pause check.
+    /// TODO(SPG-308): Add pause check.
     public fun mint<T>(
         treasury: &mut Treasury<T>, 
         mint_cap: &MintCap<T>, 
@@ -283,7 +290,7 @@ module stablecoin::treasury {
 
     /// Allows a minter to burn some of its own coins.
     /// The caller must own a MintCap
-    /// TODO(SPG-270): Add pause check.
+    /// TODO(SPG-308): Add pause check.
     public fun burn<T>(
         treasury: &mut Treasury<T>, 
         mint_cap: &MintCap<T>, 
@@ -300,6 +307,42 @@ module stablecoin::treasury {
 
         coin::burn(&mut treasury.treasury_cap, coin);
         event::emit(Burn { mint_cap: mint_cap_addr, amount });
+    }
+
+    #[allow(unused_variable)]
+    /// Triggers stopped state; pause all transfers
+    public fun pause<T>(
+        treasury: &mut Treasury<T>, 
+        deny_list: &mut DenyList,
+        ctx: &mut TxContext
+    ) {
+        assert!(treasury.roles().pauser() == ctx.sender(), ENotPauser);
+
+        let deny_cap = treasury.borrow_deny_cap_mut();
+        // TODO(SPG-308): enable global pause
+        event::emit(Pause<T> {});
+
+        assert!(false, EUnimplemented);
+    }
+
+    #[allow(unused_variable)]
+    /// Restores normal state; unpause all transfers
+    public fun unpause<T>(
+        treasury: &mut Treasury<T>, 
+        deny_list: &mut DenyList,
+        ctx: &mut TxContext
+    ) {
+        assert!(treasury.roles().pauser() == ctx.sender(), ENotPauser);
+        let deny_cap = treasury.borrow_deny_cap_mut();
+        // TODO(SPG-308): enable global pause
+        event::emit(Unpause<T> {});
+        
+        assert!(false, EUnimplemented);
+    }
+
+    /// Package internal function to allow a reference of DenyCap to be borrowed
+    fun borrow_deny_cap_mut<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
+        &mut treasury.deny_cap
     }
 
     // === Test Only ===

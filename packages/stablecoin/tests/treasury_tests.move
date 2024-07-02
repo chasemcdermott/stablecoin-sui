@@ -426,6 +426,52 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotPauser)]
+    fun pause__should_fail_when_caller_is_not_pauser() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        test_pause(&mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EUnimplemented)]
+    fun pause__should_fail_with_unimplemented_error() {
+        let mut scenario = setup();
+
+        scenario.next_tx(OWNER);
+        test_update_pauser(PAUSER, &mut scenario);
+
+        scenario.next_tx(PAUSER);
+        test_pause(&mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotPauser)]
+    fun unpause__should_fail_when_caller_is_not_pauser() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        test_unpause(&mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EUnimplemented)]
+    fun unpause__should_succeed() {
+        let mut scenario = setup();
+
+        scenario.next_tx(OWNER);
+        test_update_pauser(PAUSER, &mut scenario);
+        
+        scenario.next_tx(PAUSER);
+        test_unpause(&mut scenario);
+
+        scenario.end();
+    }
+
     // === Helpers ===
 
     fun setup(): Scenario {
@@ -504,13 +550,15 @@ module stablecoin::treasury_tests {
 
     fun test_configure_minter(allowance: u64, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        let deny_list = scenario.take_shared<DenyList>();
 
-        treasury::configure_minter(&mut treasury, allowance, scenario.ctx());
+        treasury::configure_minter(&mut treasury, &deny_list, allowance, scenario.ctx());
 
         let mint_cap_addr = treasury::get_worker(&treasury, scenario.sender());
         assert_eq(treasury::mint_allowance(&treasury, mint_cap_addr), allowance);
 
         test_scenario::return_shared(treasury);
+        test_scenario::return_shared(deny_list);
     }
 
     fun test_remove_minter(scenario: &mut Scenario) {
@@ -650,6 +698,28 @@ module stablecoin::treasury_tests {
         let roles = treasury.roles();
         assert_eq(roles.pauser(), new_pauser);
 
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_pause(scenario: &mut Scenario) {
+        let mut deny_list = scenario.take_shared<DenyList>();
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.pause(&mut deny_list, scenario.ctx());
+        // TODO(SPG-308): check deny list state
+
+        test_scenario::return_shared(deny_list);
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_unpause(scenario: &mut Scenario) {
+        let mut deny_list = scenario.take_shared<DenyList>();
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.unpause(&mut deny_list, scenario.ctx());
+        // TODO(SPG-308): check deny list state
+
+        test_scenario::return_shared(deny_list);
         test_scenario::return_shared(treasury);
     }
 }
