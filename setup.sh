@@ -44,7 +44,7 @@ else
 
   cargo install \
     --git https://github.com/MystenLabs/sui.git \
-    --rev 6579e0ed9e432bae47a407daaf01f08c298bcb14 \
+    --rev 08b50387a184d842060888def915c4cf75c022aa \
     --locked --debug sui  
 fi
 
