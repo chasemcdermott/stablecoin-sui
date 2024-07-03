@@ -40,6 +40,7 @@ module usdc::usdc {
       ctx.sender(), // owner
       ctx.sender(), // blocklister
       ctx.sender(), // pauser
+      ctx.sender(), // metadata updater
       ctx
     );
     

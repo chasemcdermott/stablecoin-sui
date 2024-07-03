@@ -19,6 +19,7 @@ module stablecoin::roles_tests {
     use sui::{
         test_scenario::{Self, Scenario},
         test_utils::assert_eq,
+        test_utils::destroy,
     };
     use stablecoin::roles::{Self, Roles};
 
@@ -29,6 +30,7 @@ module stablecoin::roles_tests {
     const PAUSER: address = @0x40;
     const RANDOM_ADDRESS: address = @0x50;
     const TREASURY_ADMIN: address = @0x60;
+    const METADATA_UPDATER: address = @0x70;
 
     #[test, expected_failure(abort_code = roles::ENotAdmin)]
     fun change_admin__should_fail_if_not_sent_by_admin() {
@@ -38,7 +40,7 @@ module stablecoin::roles_tests {
         test_change_admin(RANDOM_ADDRESS, TREASURY_ADMIN, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ESamePendingAdmin)]
@@ -54,7 +56,7 @@ module stablecoin::roles_tests {
         test_change_admin(TREASURY_ADMIN, RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ENotPendingAdmin)]
@@ -68,7 +70,7 @@ module stablecoin::roles_tests {
         test_accept_admin(&mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::EPendingAdminNotSet)]
@@ -79,7 +81,7 @@ module stablecoin::roles_tests {
         test_accept_admin(&mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test]
@@ -93,15 +95,18 @@ module stablecoin::roles_tests {
         scenario.next_tx(DEPLOYER);
         test_accept_ownership(DEPLOYER, &mut roles, &mut scenario);
 
-        // use the DEPLOYER address to modify the blocklister and pauser
+        // use the DEPLOYER address to modify the blocklister, pauser, and metadata updater
         scenario.next_tx(DEPLOYER);
         test_update_blocklister(BLOCKLISTER, &mut roles, &mut scenario);
 
         scenario.next_tx(DEPLOYER);
         test_update_pauser(PAUSER, &mut roles, &mut scenario);
 
+        scenario.next_tx(DEPLOYER);
+        test_update_metadata_updater(METADATA_UPDATER, &mut roles, &mut scenario);
+
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test]
@@ -121,7 +126,7 @@ module stablecoin::roles_tests {
         test_accept_ownership(DEPLOYER, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ENotOwner)]
@@ -132,7 +137,7 @@ module stablecoin::roles_tests {
         test_transfer_ownership(OWNER, RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ESamePendingOwner)]
@@ -148,7 +153,7 @@ module stablecoin::roles_tests {
         test_transfer_ownership(OWNER, BLOCKLISTER, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::EPendingOwnerNotSet)]
@@ -159,7 +164,7 @@ module stablecoin::roles_tests {
         test_accept_ownership(OWNER, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ENotPendingOwner)]
@@ -173,7 +178,7 @@ module stablecoin::roles_tests {
         test_accept_ownership(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ENotOwner)]
@@ -184,7 +189,7 @@ module stablecoin::roles_tests {
         test_update_blocklister(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ESameBlocklister)]
@@ -196,7 +201,7 @@ module stablecoin::roles_tests {
         test_update_blocklister(OWNER, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ENotOwner)]
@@ -207,7 +212,7 @@ module stablecoin::roles_tests {
         test_update_pauser(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
     }
 
     #[test, expected_failure(abort_code = roles::ESamePauser)]
@@ -219,7 +224,30 @@ module stablecoin::roles_tests {
         test_update_pauser(OWNER, &mut roles, &mut scenario);
 
         scenario.end();
-        roles.destroy();
+        destroy(roles);
+    }
+
+    #[test, expected_failure(abort_code = roles::ENotOwner)]
+    fun update_metadata_updater__should_fail_if_not_sent_by_owner() {
+        let (mut scenario, mut roles) = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        test_update_metadata_updater(RANDOM_ADDRESS, &mut roles, &mut scenario);
+
+        scenario.end();
+        destroy(roles);
+    }
+
+    #[test, expected_failure(abort_code = roles::ESameMetadataUpdater)]
+    fun update_metadata_updater__should_fail_if_same_metadata_updater() {
+        let (mut scenario, mut roles) = setup();
+
+        // metadata updater starts as OWNER, fails to be set to OWNER again
+        scenario.next_tx(OWNER);
+        test_update_metadata_updater(OWNER, &mut roles, &mut scenario);
+
+        scenario.end();
+        destroy(roles);
     }
 
     // === Helpers ===
@@ -227,7 +255,7 @@ module stablecoin::roles_tests {
     /// Creates a Roles object and assigns admin to TREASURY_ADMIN and other roles to OWNER
     fun setup(): (Scenario, Roles) {
         let scenario = test_scenario::begin(DEPLOYER);
-        let roles = roles::create_roles(TREASURY_ADMIN, OWNER, OWNER, OWNER);
+        let roles = roles::create_roles(TREASURY_ADMIN, OWNER, OWNER, OWNER, OWNER);
         assert_eq(roles.admin(), TREASURY_ADMIN);
         assert_eq(roles.pending_admin().is_none(), true);
         assert_eq(roles.owner(), OWNER);
@@ -270,5 +298,10 @@ module stablecoin::roles_tests {
     fun test_update_pauser(new_pauser: address, roles: &mut Roles, scenario: &mut Scenario) {
         roles.update_pauser(new_pauser, scenario.ctx());
         assert_eq(roles.pauser(), new_pauser);
+    }
+
+    fun test_update_metadata_updater(new_metadata_updater: address, roles: &mut Roles, scenario: &mut Scenario) {
+        roles.update_metadata_updater(new_metadata_updater, scenario.ctx());
+        assert_eq(roles.metadata_updater(), new_metadata_updater);
     }
 }

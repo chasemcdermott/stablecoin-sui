@@ -44,4 +44,4 @@ jobs:
       start_containers: true
       start_containers_command: bash run.sh start_network
       run_command: cd typescript && yarn test
-      runner: small-dind-spot
+      runner: large-dind-spot

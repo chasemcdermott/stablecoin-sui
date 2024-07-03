@@ -34,7 +34,8 @@ export async function deploy(
   packageName: string,
   rpcUrl: string,
   deployerKey: string,
-  upgradeCapRecipient: string
+  upgradeCapRecipient: string,
+  withUnpublishedDependencies = false
 ) {
   const client = new SuiClient({ url: rpcUrl });
   console.log(`RPC URL: ${rpcUrl}`);
@@ -48,8 +49,11 @@ export async function deploy(
 
   console.log("Building packages...");
   const packagePath = path.join(__dirname, `../../packages/${packageName}`);
+  const withUnpublishedDependenciesArg = withUnpublishedDependencies
+    ? "--with-unpublished-dependencies"
+    : "";
   const rawCompiledPackages = execSync(
-    `sui move build --dump-bytecode-as-base64 --path ${packagePath}`,
+    `sui move build --dump-bytecode-as-base64 --path ${packagePath} ${withUnpublishedDependenciesArg}`,
     { encoding: "utf-8" }
   );
   const { modules, dependencies } = JSON.parse(rawCompiledPackages);

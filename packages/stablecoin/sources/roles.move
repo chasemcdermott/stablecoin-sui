@@ -29,6 +29,7 @@ module stablecoin::roles {
     const EPendingAdminNotSet: u64 = 7;
     const ENotPendingAdmin: u64 = 8;
     const ESamePendingAdmin: u64 = 9;
+    const ESameMetadataUpdater: u64 = 10;
 
     // === Structs ===
 
@@ -45,6 +46,8 @@ module stablecoin::roles {
         blocklister: address,
         /// Mutable address of the pauser EOA, controlled by owner
         pauser: address,
+        /// Mutable address of the metadata updater EOA, controlled by the owner
+        metadata_updater: address,
     }
 
     // === Events ===
@@ -79,6 +82,11 @@ module stablecoin::roles {
         new_pauser: address,
     }
 
+    public struct MetadataUpdaterChanged has copy, drop {
+        old_metadata_updater: address,
+        new_metadata_updater: address,
+    }
+
     // === View-only functions ===
 
     /// Check the treasury admin address
@@ -111,13 +119,19 @@ module stablecoin::roles {
         roles.pauser
     }
 
+    /// Check the metadata updater address
+    public fun metadata_updater(roles: &Roles): address {
+        roles.metadata_updater
+    }
+
     // === Write functions ===
 
     public(package) fun create_roles(
         admin: address,
         owner: address, 
         blocklister: address, 
-        pauser: address, 
+        pauser: address,
+        metadata_updater: address,
     ): Roles {
 
         Roles {
@@ -127,6 +141,7 @@ module stablecoin::roles {
             pending_owner: option::none(),
             blocklister,
             pauser,
+            metadata_updater,
         }
     }
 
@@ -218,10 +233,14 @@ module stablecoin::roles {
         event::emit(PauserChanged { old_pauser, new_pauser });
     }
 
-    // === Test Only ===
+    /// Change the metadata updater address.
+    public fun update_metadata_updater(roles: &mut Roles, new_metadata_updater: address, ctx: &TxContext) {
+        assert!(roles.owner == ctx.sender(), ENotOwner);
+        assert!(roles.metadata_updater != new_metadata_updater, ESameMetadataUpdater);
 
-    #[test_only]
-    public(package) fun destroy(self: Roles) {
-        let Roles { admin: _, pending_admin: _, owner: _, pending_owner: _, blocklister: _, pauser: _ } = self;
+        let old_metadata_updater = roles.metadata_updater;
+        roles.metadata_updater = new_metadata_updater;
+
+        event::emit(MetadataUpdaterChanged { old_metadata_updater, new_metadata_updater });
     }
 }

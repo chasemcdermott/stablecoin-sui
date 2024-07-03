@@ -15,7 +15,9 @@
 // limitations under the License.
 
 module stablecoin::treasury {
-    use sui::coin::{Self, Coin, TreasuryCap, DenyCap};
+    use std::string;
+    use std::ascii;
+    use sui::coin::{Self, Coin, TreasuryCap, DenyCap, CoinMetadata};
     use sui::deny_list::{DenyList};
     use sui::event;
     use sui::table::{Self, Table};
@@ -34,6 +36,7 @@ module stablecoin::treasury {
     const ENotPauser: u64 = 7;
     const EUnimplemented: u64 = 8;
     const EZeroAmount: u64 = 9;
+    const ENotMetadataUpdater: u64 = 10;
 
     // === Structs ===
 
@@ -159,10 +162,11 @@ module stablecoin::treasury {
         owner: address,
         blocklister: address,
         pauser: address,
+        metadata_updater: address,
         ctx: &mut TxContext
 
     ): Treasury<T> {
-        let roles = roles::create_roles(admin, owner, blocklister, pauser);
+        let roles = roles::create_roles(admin, owner, blocklister, pauser, metadata_updater);
 
         Treasury {
             id: object::new(ctx),
@@ -378,6 +382,22 @@ module stablecoin::treasury {
     /// Package internal function to allow a reference of DenyCap to be borrowed
     fun borrow_deny_cap_mut<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
         &mut treasury.deny_cap
+    }
+
+    public entry fun update_metadata<T>(
+        treasury: &Treasury<T>,
+        metadata: &mut CoinMetadata<T>,
+        name: string::String,
+        symbol: ascii::String,
+        description: string::String,
+        url: ascii::String,
+        ctx: &TxContext
+    ) {
+        assert!(treasury.roles.metadata_updater() == ctx.sender(), ENotMetadataUpdater);
+        treasury.treasury_cap.update_name(metadata, name);
+        treasury.treasury_cap.update_symbol(metadata, symbol);
+        treasury.treasury_cap.update_description(metadata, description);
+        treasury.treasury_cap.update_icon_url(metadata, url);
     }
 
     // === Test Only ===

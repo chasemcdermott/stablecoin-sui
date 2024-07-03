@@ -16,8 +16,10 @@
 
 #[test_only]
 module stablecoin::treasury_tests {
+    use std::string;
+    use std::ascii;
     use sui::{
-        coin::{Self, Coin},
+        coin::{Self, Coin, CoinMetadata},
         deny_list::{Self, DenyList},
         test_scenario::{Self, Scenario}, 
         test_utils::{Self, assert_eq},
@@ -34,6 +36,7 @@ module stablecoin::treasury_tests {
     const OWNER: address = @0x70;
     const BLOCKLISTER: address = @0x80;
     const PAUSER: address = @0x01;
+    const METADATA_UPDATER: address = @0x11;
 
     const RANDOM_ADDRESS: address = @0x1000;
     const RANDOM_ADDRESS_2: address = @0x1001;
@@ -468,12 +471,57 @@ module stablecoin::treasury_tests {
         scenario.next_tx(DEPLOYER);
         test_accept_ownership(DEPLOYER, &mut scenario);
 
-        // use the DEPLOYER address to modify the blocklister and pauser
+        // use the DEPLOYER address to modify the blocklister, pauser, and metadata updater
         scenario.next_tx(DEPLOYER);
         test_update_blocklister(BLOCKLISTER, &mut scenario);
 
         scenario.next_tx(DEPLOYER);
         test_update_pauser(PAUSER, &mut scenario);
+
+        scenario.next_tx(DEPLOYER);
+        test_update_metadata_updater(METADATA_UPDATER, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test]
+    fun update_metadata__should_succeed_and_pass_all_assertions() {
+        let mut scenario = setup();
+
+        scenario.next_tx(OWNER);
+        test_update_metadata(
+            string::utf8(b"new name"),
+            ascii::string(b"new symbol"),
+            string::utf8(b"new description"),
+            ascii::string(b"new url"),
+            &mut scenario
+        );
+
+        // try to unset the URL
+        scenario.next_tx(OWNER);
+        test_update_metadata(
+            string::utf8(b"new name"),
+            ascii::string(b"new symbol"),
+            string::utf8(b"new description"),
+            ascii::string(b""),
+            &mut scenario
+        );
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMetadataUpdater)]
+    fun update_metadata__should_fail_if_not_metadata_updater() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        test_update_metadata(
+            string::utf8(b"new name"),
+            ascii::string(b"new symbol"),
+            string::utf8(b"new description"),
+            ascii::string(b"new url"),
+            &mut scenario
+        );
 
         scenario.end();
     }
@@ -547,6 +595,7 @@ module stablecoin::treasury_tests {
                 OWNER,
                 OWNER,
                 OWNER,
+                OWNER,
                 scenario.ctx()
             );
             assert_eq(treasury.total_supply(), 0);
@@ -556,6 +605,7 @@ module stablecoin::treasury_tests {
             assert_eq(treasury.roles().owner(), OWNER);
             assert_eq(treasury.roles().blocklister(), OWNER);
             assert_eq(treasury.roles().pauser(), OWNER);
+            assert_eq(treasury.roles().metadata_updater(), OWNER);
 
             transfer::public_share_object(metadata);
             transfer::public_share_object(treasury);
@@ -783,5 +833,36 @@ module stablecoin::treasury_tests {
 
         test_scenario::return_shared(deny_list);
         test_scenario::return_shared(treasury);
+    }
+
+    fun test_update_metadata_updater(new_metadata_updater: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        treasury.roles_mut().update_metadata_updater(new_metadata_updater, scenario.ctx());
+
+        let roles = treasury.roles();
+        assert_eq(roles.metadata_updater(), new_metadata_updater);
+
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_update_metadata(
+        name: string::String,
+        symbol: ascii::String,
+        description: string::String,
+        url: ascii::String,
+        scenario: &mut Scenario
+    ) {
+        let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        let mut metadata = scenario.take_shared<CoinMetadata<TREASURY_TESTS>>();
+
+        treasury.update_metadata(&mut metadata, name, symbol, description, url, scenario.ctx());
+        assert_eq(metadata.get_name(), name);
+        assert_eq(metadata.get_symbol(), symbol);
+        assert_eq(metadata.get_description(), description);
+        assert_eq(metadata.get_icon_url().borrow().inner_url(), url);
+
+        test_scenario::return_shared(treasury);
+        test_scenario::return_shared(metadata);
     }
 }
