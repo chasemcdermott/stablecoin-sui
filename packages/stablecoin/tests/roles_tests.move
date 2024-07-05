@@ -23,6 +23,8 @@ module stablecoin::roles_tests {
     };
     use stablecoin::roles::{Self, Roles};
 
+    public struct ROLES_TEST has drop {}
+
     // test addresses
     const DEPLOYER: address = @0x0;
     const OWNER: address = @0x20;
@@ -253,7 +255,7 @@ module stablecoin::roles_tests {
     // === Helpers ===
 
     /// Creates a Roles object and assigns admin to TREASURY_ADMIN and other roles to OWNER
-    fun setup(): (Scenario, Roles) {
+    fun setup(): (Scenario, Roles<ROLES_TEST>) {
         let scenario = test_scenario::begin(DEPLOYER);
         let roles = roles::create_roles(TREASURY_ADMIN, OWNER, OWNER, OWNER, OWNER);
         assert_eq(roles.admin(), TREASURY_ADMIN);
@@ -266,41 +268,41 @@ module stablecoin::roles_tests {
         (scenario, roles)
     }
 
-    fun test_change_admin(old_admin: address, new_admin: address, roles: &mut Roles, scenario: &mut Scenario) {
+    fun test_change_admin(old_admin: address, new_admin: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
         roles.change_admin(new_admin, scenario.ctx());
         assert_eq(roles.admin(), old_admin);
         assert_eq(*option::borrow(&roles.pending_admin()), new_admin);
     }
 
-    fun test_accept_admin(roles: &mut Roles, scenario: &mut Scenario) {
+    fun test_accept_admin(roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
         roles.accept_admin(scenario.ctx());
         assert_eq(roles.admin(), TREASURY_ADMIN);
         assert_eq(option::is_none(&roles.pending_admin()), true);
     }
 
-    fun test_transfer_ownership(expected_old_owner: address, new_owner: address, roles: &mut Roles, scenario: &mut Scenario) {
+    fun test_transfer_ownership(expected_old_owner: address, new_owner: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
         roles.transfer_ownership(new_owner, scenario.ctx());
         assert_eq(roles.owner(), expected_old_owner);
         assert_eq(*option::borrow(&roles.pending_owner()), new_owner);
     }
 
-    fun test_accept_ownership(expected_new_owner: address, roles: &mut Roles, scenario: &mut Scenario) {
+    fun test_accept_ownership(expected_new_owner: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
         roles.accept_ownership(scenario.ctx());
         assert_eq(roles.owner(), expected_new_owner);
         assert_eq(option::is_none(&roles.pending_owner()), true);
     }
 
-    fun test_update_blocklister(new_blocklister: address, roles: &mut Roles, scenario: &mut Scenario) {
+    fun test_update_blocklister(new_blocklister: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
         roles.update_blocklister(new_blocklister, scenario.ctx());
         assert_eq(roles.blocklister(), new_blocklister);
     }
 
-    fun test_update_pauser(new_pauser: address, roles: &mut Roles, scenario: &mut Scenario) {
+    fun test_update_pauser(new_pauser: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
         roles.update_pauser(new_pauser, scenario.ctx());
         assert_eq(roles.pauser(), new_pauser);
     }
 
-    fun test_update_metadata_updater(new_metadata_updater: address, roles: &mut Roles, scenario: &mut Scenario) {
+    fun test_update_metadata_updater(new_metadata_updater: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
         roles.update_metadata_updater(new_metadata_updater, scenario.ctx());
         assert_eq(roles.metadata_updater(), new_metadata_updater);
     }

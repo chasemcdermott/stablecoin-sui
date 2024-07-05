@@ -33,7 +33,7 @@ module stablecoin::roles {
 
     // === Structs ===
 
-    public struct Roles has store {
+    public struct Roles<phantom T> has store {
         /// Mutable address of the treasury admin EOA
         admin: address,
         /// Mutable address of the pending treasury admin EOA
@@ -52,37 +52,37 @@ module stablecoin::roles {
 
     // === Events ===
 
-    public struct TreasuryAdminTransferStarted has copy, drop {
+    public struct TreasuryAdminTransferStarted<phantom T> has copy, drop {
         old_admin: address,
         new_admin: address,
     }
 
-    public struct TreasuryAdminChanged has copy, drop {
+    public struct TreasuryAdminChanged<phantom T> has copy, drop {
         old_admin: address,
         new_admin: address,
     }
 
-    public struct OwnershipTransferStarted has copy, drop {
+    public struct OwnershipTransferStarted<phantom T> has copy, drop {
         old_owner: address,
         new_owner: address,
     }
 
-    public struct OwnershipTransferred has copy, drop {
+    public struct OwnershipTransferred<phantom T> has copy, drop {
         old_owner: address,
         new_owner: address,
     }
 
-    public struct BlocklisterChanged has copy, drop {
+    public struct BlocklisterChanged<phantom T> has copy, drop {
         old_blocklister: address,
         new_blocklister: address,
     }
 
-    public struct PauserChanged has copy, drop {
+    public struct PauserChanged<phantom T> has copy, drop {
         old_pauser: address,
         new_pauser: address,
     }
 
-    public struct MetadataUpdaterChanged has copy, drop {
+    public struct MetadataUpdaterChanged<phantom T> has copy, drop {
         old_metadata_updater: address,
         new_metadata_updater: address,
     }
@@ -90,50 +90,49 @@ module stablecoin::roles {
     // === View-only functions ===
 
     /// Check the treasury admin address
-    public fun admin(roles: &Roles): address {
+    public fun admin<T>(roles: &Roles<T>): address {
         roles.admin
     }
 
     /// Check the treasury pending admin address
-    public fun pending_admin(roles: &Roles): Option<address> {
+    public fun pending_admin<T>(roles: &Roles<T>): Option<address> {
         roles.pending_admin
     }
 
     /// Check the owner address
-    public fun owner(roles: &Roles): address {
+    public fun owner<T>(roles: &Roles<T>): address {
         roles.owner
     }
 
     /// Check the pending owner address
-    public fun pending_owner(roles: &Roles): Option<address> {
+    public fun pending_owner<T>(roles: &Roles<T>): Option<address> {
         roles.pending_owner
     }
 
     /// Check the blocklister address
-    public fun blocklister(roles: &Roles): address {
+    public fun blocklister<T>(roles: &Roles<T>): address {
         roles.blocklister
     }
 
     /// Check the pauser address
-    public fun pauser(roles: &Roles): address {
+    public fun pauser<T>(roles: &Roles<T>): address {
         roles.pauser
     }
 
     /// Check the metadata updater address
-    public fun metadata_updater(roles: &Roles): address {
+    public fun metadata_updater<T>(roles: &Roles<T>): address {
         roles.metadata_updater
     }
 
     // === Write functions ===
 
-    public(package) fun create_roles(
+    public(package) fun create_roles<T>(
         admin: address,
         owner: address, 
         blocklister: address, 
         pauser: address,
         metadata_updater: address,
-    ): Roles {
-
+    ): Roles<T> {
         Roles {
             admin,
             pending_admin: option::none(),
@@ -146,8 +145,8 @@ module stablecoin::roles {
     }
 
     /// Start treasury admin role transfer process.
-    public fun change_admin(
-        roles: &mut Roles,
+    public fun change_admin<T>(
+        roles: &mut Roles<T>,
         new_admin: address,
         ctx: &TxContext
     ) {
@@ -156,15 +155,15 @@ module stablecoin::roles {
 
         roles.pending_admin = option::some(new_admin);
 
-        event::emit(TreasuryAdminTransferStarted {
+        event::emit(TreasuryAdminTransferStarted<T> {
             old_admin: roles.admin,
             new_admin,
         });
     }
 
     /// Finalize treasury admin role transfer process.
-    public fun accept_admin(
-        roles: &mut Roles,
+    public fun accept_admin<T>(
+        roles: &mut Roles<T>,
         ctx: &TxContext
     ) {
         let old_admin = roles.admin;
@@ -175,12 +174,15 @@ module stablecoin::roles {
         assert!(new_admin == ctx.sender(), ENotPendingAdmin);
         roles.admin = new_admin;
 
-        event::emit(TreasuryAdminChanged { old_admin, new_admin });
+        event::emit(TreasuryAdminChanged<T> {
+            old_admin,
+            new_admin
+        });
     }
 
     /// Start owner role transfer process.
-    public fun transfer_ownership(
-        roles: &mut Roles,
+    public fun transfer_ownership<T>(
+        roles: &mut Roles<T>,
         new_owner: address,
         ctx: &TxContext
     ) {
@@ -189,15 +191,15 @@ module stablecoin::roles {
 
         roles.pending_owner = option::some(new_owner);
 
-        event::emit(OwnershipTransferStarted {
+        event::emit(OwnershipTransferStarted<T> {
             old_owner: roles.owner,
             new_owner,
         });
     }
 
     /// Finalize owner role transfer process.
-    public fun accept_ownership(
-        roles: &mut Roles,
+    public fun accept_ownership<T>(
+        roles: &mut Roles<T>,
         ctx: &TxContext
     ) {
         let old_owner = roles.owner;
@@ -208,39 +210,51 @@ module stablecoin::roles {
         assert!(new_owner == ctx.sender(), ENotPendingOwner);
         roles.owner = new_owner;
 
-        event::emit(OwnershipTransferred { old_owner, new_owner });
+        event::emit(OwnershipTransferred<T> {
+            old_owner,
+            new_owner
+        });
     }
 
     /// Change the blocklister address.
-    public fun update_blocklister(roles: &mut Roles, new_blocklister: address, ctx: &TxContext) {
+    public fun update_blocklister<T>(roles: &mut Roles<T>, new_blocklister: address, ctx: &TxContext) {
         assert!(roles.owner == ctx.sender(), ENotOwner);
         assert!(roles.blocklister != new_blocklister, ESameBlocklister);
 
         let old_blocklister = roles.blocklister;
         roles.blocklister = new_blocklister;
 
-        event::emit(BlocklisterChanged { old_blocklister, new_blocklister });
+        event::emit(BlocklisterChanged<T> {
+            old_blocklister,
+            new_blocklister
+        });
     }
 
     /// Change the pauser address.
-    public fun update_pauser(roles: &mut Roles, new_pauser: address, ctx: &TxContext) {
+    public fun update_pauser<T>(roles: &mut Roles<T>, new_pauser: address, ctx: &TxContext) {
         assert!(roles.owner == ctx.sender(), ENotOwner);
         assert!(roles.pauser != new_pauser, ESamePauser);
 
         let old_pauser = roles.pauser;
         roles.pauser = new_pauser;
 
-        event::emit(PauserChanged { old_pauser, new_pauser });
+        event::emit(PauserChanged<T> {
+            old_pauser,
+            new_pauser
+        });
     }
 
     /// Change the metadata updater address.
-    public fun update_metadata_updater(roles: &mut Roles, new_metadata_updater: address, ctx: &TxContext) {
+    public fun update_metadata_updater<T>(roles: &mut Roles<T>, new_metadata_updater: address, ctx: &TxContext) {
         assert!(roles.owner == ctx.sender(), ENotOwner);
         assert!(roles.metadata_updater != new_metadata_updater, ESameMetadataUpdater);
 
         let old_metadata_updater = roles.metadata_updater;
         roles.metadata_updater = new_metadata_updater;
 
-        event::emit(MetadataUpdaterChanged { old_metadata_updater, new_metadata_updater });
+        event::emit(MetadataUpdaterChanged<T> {
+            old_metadata_updater,
+            new_metadata_updater
+        });
     }
 }

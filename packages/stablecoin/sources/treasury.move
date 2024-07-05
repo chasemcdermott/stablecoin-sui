@@ -53,7 +53,7 @@ module stablecoin::treasury {
         /// Mapping between mint cap IDs and mint allowances
         mint_allowances: Table<ID, MintAllowance<T>>, 
         /// Mutable privileged role addresses
-        roles: Roles,
+        roles: Roles<T>,
     }
 
     /// An object representing the ability to mint up to an allowance 
@@ -65,61 +65,62 @@ module stablecoin::treasury {
 
     // === Events ===
 
-    public struct MintCapCreated has copy, drop {
+    public struct MintCapCreated<phantom T> has copy, drop {
         mint_cap: ID,
     }
 
-    public struct ControllerConfigured has copy, drop {
+    public struct ControllerConfigured<phantom T> has copy, drop {
         controller: address,
         mint_cap: ID,
     }
 
-    public struct ControllerRemoved has copy, drop {
+    public struct ControllerRemoved<phantom T> has copy, drop {
         controller: address,
     }
     
-    public struct MinterConfigured has copy, drop {
+    public struct MinterConfigured<phantom T> has copy, drop {
         controller: address,
         mint_cap: ID,
         allowance: u64,
     }
     
-    public struct MinterRemoved has copy, drop {
+    public struct MinterRemoved<phantom T> has copy, drop {
         controller: address,
         mint_cap: ID,
     }
 
-    public struct Mint has copy, drop {
+    public struct Mint<phantom T> has copy, drop {
         mint_cap: ID,
         recipient: address,
         amount: u64,
     }
 
-    public struct Burn has copy, drop {
+    public struct Burn<phantom T> has copy, drop {
         mint_cap: ID,
         amount: u64,
     }
 
-    public struct Blocklisted has copy, drop {
+    public struct Blocklisted<phantom T> has copy, drop {
         `address`: address
     }
 
-    public struct Unblocklisted has copy, drop {
+    public struct Unblocklisted<phantom T> has copy, drop {
         `address`: address
     }
 
     public struct Pause<phantom T> has copy, drop {}
+
     public struct Unpause<phantom T> has copy, drop {}
 
     // === View-only functions ===
 
     /// Get immutable reference to the roles
-    public fun roles<T>(treasury: &Treasury<T>): &Roles {
+    public fun roles<T>(treasury: &Treasury<T>): &Roles<T> {
         &treasury.roles
     }
 
     /// Get mutable reference to the roles
-    public fun roles_mut<T>(treasury: &mut Treasury<T>): &mut Roles {
+    public fun roles_mut<T>(treasury: &mut Treasury<T>): &mut Roles<T> {
         &mut treasury.roles
     }
 
@@ -166,7 +167,7 @@ module stablecoin::treasury {
         ctx: &mut TxContext
 
     ): Treasury<T> {
-        let roles = roles::create_roles(admin, owner, blocklister, pauser, metadata_updater);
+        let roles = roles::create_roles<T>(admin, owner, blocklister, pauser, metadata_updater);
 
         Treasury {
             id: object::new(ctx),
@@ -189,7 +190,10 @@ module stablecoin::treasury {
         assert!(!is_controller(treasury, controller), EControllerAlreadyConfigured);
 
         treasury.controllers.add(controller, mint_cap_id);
-        event::emit(ControllerConfigured { controller, mint_cap: mint_cap_id });
+        event::emit(ControllerConfigured<T> {
+            controller,
+            mint_cap: mint_cap_id
+        });
     }
 
     /// Create new MintCap object 
@@ -199,7 +203,9 @@ module stablecoin::treasury {
     ): MintCap<T> {
         assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
         let mint_cap = MintCap { id: object::new(ctx) };
-        event::emit(MintCapCreated { mint_cap: object::id(&mint_cap) });
+        event::emit(MintCapCreated<T> { 
+            mint_cap: object::id(&mint_cap)
+        });
         mint_cap
     }
 
@@ -229,7 +235,9 @@ module stablecoin::treasury {
 
         treasury.controllers.remove(controller);
         
-        event::emit(ControllerRemoved { controller });
+        event::emit(ControllerRemoved<T> {
+            controller
+        });
     }
 
     #[allow(unused_variable)]
@@ -251,7 +259,11 @@ module stablecoin::treasury {
         } else {
             treasury.mint_allowances.borrow_mut(mint_cap_id).set(new_allowance);
         };
-        event::emit(MinterConfigured { controller, mint_cap: mint_cap_id, allowance: new_allowance });
+        event::emit(MinterConfigured<T> {
+            controller,
+            mint_cap: mint_cap_id,
+            allowance: new_allowance
+        });
     }
 
     /// De-authorizes the controller's corresponding mint cap
@@ -263,7 +275,10 @@ module stablecoin::treasury {
         let mint_cap_id = get_worker(treasury, controller);
         let mint_allowance = treasury.mint_allowances.remove(mint_cap_id);
         mint_allowance.destroy();
-        event::emit(MinterRemoved { controller, mint_cap: mint_cap_id });
+        event::emit(MinterRemoved<T> {
+            controller,
+            mint_cap: mint_cap_id
+        });
     }
     
     /// Mints coins to a recipient address.
@@ -290,7 +305,7 @@ module stablecoin::treasury {
 
         coin::mint_and_transfer(&mut treasury.treasury_cap, amount, recipient, ctx);
         
-        event::emit(Mint { 
+        event::emit(Mint<T> { 
             mint_cap: mint_cap_id, 
             recipient, 
             amount, 
@@ -315,7 +330,10 @@ module stablecoin::treasury {
         assert!(amount > 0, EZeroAmount);
 
         coin::burn(&mut treasury.treasury_cap, coin);
-        event::emit(Burn { mint_cap: mint_cap_id, amount });
+        event::emit(Burn<T> {
+            mint_cap: mint_cap_id,
+            amount
+        });
     }
 
     /// Blocklists an address
@@ -330,7 +348,9 @@ module stablecoin::treasury {
         if (!coin::deny_list_contains<T>(deny_list, addr)) {
             coin::deny_list_add<T>(deny_list, treasury.borrow_deny_cap_mut(), addr, ctx);
         };
-        event::emit(Blocklisted { `address`: addr })
+        event::emit(Blocklisted<T> {
+            `address`: addr
+        })
     }
 
     /// Unblocklists an address
@@ -345,7 +365,9 @@ module stablecoin::treasury {
         if (coin::deny_list_contains<T>(deny_list, addr)) {
             coin::deny_list_remove<T>(deny_list, treasury.borrow_deny_cap_mut(), addr, ctx);
         };
-        event::emit(Unblocklisted { `address`: addr })
+        event::emit(Unblocklisted<T> {
+            `address`: addr
+        })
     }
 
     #[allow(unused_variable)]
