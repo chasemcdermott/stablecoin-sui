@@ -21,7 +21,8 @@ module usdc::usdc_tests {
     test_scenario, 
     test_utils::{assert_eq},
     coin::{Self, CoinMetadata, RegulatedCoinMetadata},
-    deny_list::{Self, DenyList}
+    deny_list::{Self, DenyList},
+    url
   };
   use stablecoin::treasury::{Treasury};
   use usdc::usdc::{Self, USDC};
@@ -52,8 +53,8 @@ module usdc::usdc_tests {
     assert_eq(metadata.get_decimals(), 6);
     assert_eq(metadata.get_name(), string::utf8(b"USDC"));
     assert_eq(metadata.get_symbol(), ascii::string(b"USDC"));
-    assert_eq(metadata.get_description(), string::utf8(b""));
-    assert_eq(metadata.get_icon_url(), option::none());
+    assert_eq(metadata.get_description(), string::utf8(b"USDC is a US dollar-backed stablecoin issued by Circle. USDC is designed to provide a faster, safer, and more efficient way to send, spend, and exchange money around the world."));
+    assert_eq(metadata.get_icon_url(), option::some(url::new_unsafe(ascii::string(b"https://www.circle.com/hubfs/Brand/USDC/USDC_icon_32x32.png"))));
     test_scenario::return_shared(metadata);
 
     scenario.end();
