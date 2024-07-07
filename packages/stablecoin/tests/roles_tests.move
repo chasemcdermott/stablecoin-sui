@@ -17,11 +17,13 @@
 #[test_only]
 module stablecoin::roles_tests {
     use sui::{
+        event,
         test_scenario::{Self, Scenario},
         test_utils::assert_eq,
         test_utils::destroy,
     };
     use stablecoin::roles::{Self, Roles};
+    use stablecoin::test_utils::last_event_by_type;
 
     public struct ROLES_TEST has drop {}
 
@@ -39,7 +41,7 @@ module stablecoin::roles_tests {
         let (mut scenario, mut roles) = setup();
 
         scenario.next_tx(RANDOM_ADDRESS);
-        test_change_admin(RANDOM_ADDRESS, TREASURY_ADMIN, &mut roles, &mut scenario);
+        test_change_admin(TREASURY_ADMIN, &mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
@@ -51,11 +53,11 @@ module stablecoin::roles_tests {
 
         // we should be able to set the pending admin initially
         scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(TREASURY_ADMIN, RANDOM_ADDRESS, &mut roles, &mut scenario);
+        test_change_admin(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         // expect the second to fail, once the pending admin is already set
         scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(TREASURY_ADMIN, RANDOM_ADDRESS, &mut roles, &mut scenario);
+        test_change_admin(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
@@ -66,7 +68,7 @@ module stablecoin::roles_tests {
         let (mut scenario, mut roles) = setup();
 
         scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(TREASURY_ADMIN, OWNER, &mut roles, &mut scenario);
+        test_change_admin(OWNER, &mut roles, &mut scenario);
 
         scenario.next_tx(RANDOM_ADDRESS);
         test_accept_admin(&mut roles, &mut scenario);
@@ -92,10 +94,10 @@ module stablecoin::roles_tests {
 
         // transfer ownership to the DEPLOYER address
         scenario.next_tx(OWNER);
-        test_transfer_ownership(OWNER, DEPLOYER, &mut roles, &mut scenario);
+        test_transfer_ownership(DEPLOYER, &mut roles, &mut scenario);
 
         scenario.next_tx(DEPLOYER);
-        test_accept_ownership(DEPLOYER, &mut roles, &mut scenario);
+        test_accept_ownership(&mut roles, &mut scenario);
 
         // use the DEPLOYER address to modify the blocklister, pauser, and metadata updater
         scenario.next_tx(DEPLOYER);
@@ -117,15 +119,15 @@ module stablecoin::roles_tests {
 
         // make RANDOM_ADDRESS the pending owner
         scenario.next_tx(OWNER);
-        test_transfer_ownership(OWNER, RANDOM_ADDRESS, &mut roles, &mut scenario);
+        test_transfer_ownership(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         // make DEPLOYER the pending owner
         scenario.next_tx(OWNER);
-        test_transfer_ownership(OWNER, DEPLOYER, &mut roles, &mut scenario);
+        test_transfer_ownership(DEPLOYER, &mut roles, &mut scenario);
 
         // accept DEPLOYER as new owner
         scenario.next_tx(DEPLOYER);
-        test_accept_ownership(DEPLOYER, &mut roles, &mut scenario);
+        test_accept_ownership(&mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
@@ -136,7 +138,7 @@ module stablecoin::roles_tests {
         let (mut scenario, mut roles) = setup();
 
         scenario.next_tx(RANDOM_ADDRESS);
-        test_transfer_ownership(OWNER, RANDOM_ADDRESS, &mut roles, &mut scenario);
+        test_transfer_ownership(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
@@ -148,11 +150,11 @@ module stablecoin::roles_tests {
 
         // we should be able to set the pending owner initially
         scenario.next_tx(OWNER);
-        test_transfer_ownership(OWNER, BLOCKLISTER, &mut roles, &mut scenario);
+        test_transfer_ownership(BLOCKLISTER, &mut roles, &mut scenario);
 
         // expect the second to fail, once the pending owner is already set
         scenario.next_tx(OWNER);
-        test_transfer_ownership(OWNER, BLOCKLISTER, &mut roles, &mut scenario);
+        test_transfer_ownership(BLOCKLISTER, &mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
@@ -163,7 +165,7 @@ module stablecoin::roles_tests {
         let (mut scenario, mut roles) = setup();
 
         scenario.next_tx(OWNER);
-        test_accept_ownership(OWNER, &mut roles, &mut scenario);
+        test_accept_ownership(&mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
@@ -174,10 +176,10 @@ module stablecoin::roles_tests {
         let (mut scenario, mut roles) = setup();
 
         scenario.next_tx(OWNER);
-        test_transfer_ownership(OWNER, BLOCKLISTER, &mut roles, &mut scenario);
+        test_transfer_ownership(BLOCKLISTER, &mut roles, &mut scenario);
 
         scenario.next_tx(RANDOM_ADDRESS);
-        test_accept_ownership(RANDOM_ADDRESS, &mut roles, &mut scenario);
+        test_accept_ownership(&mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
@@ -268,42 +270,82 @@ module stablecoin::roles_tests {
         (scenario, roles)
     }
 
-    fun test_change_admin(old_admin: address, new_admin: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
+    public(package) fun test_change_admin<T>(new_admin: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
+        let old_admin = roles.admin();
         roles.change_admin(new_admin, scenario.ctx());
+
+        let expected_event = roles::create_admin_transfer_started_event<T>(old_admin, new_admin);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<roles::TreasuryAdminTransferStarted<T>>(), expected_event);
         assert_eq(roles.admin(), old_admin);
-        assert_eq(*option::borrow(&roles.pending_admin()), new_admin);
+        assert_eq(*roles.pending_admin().borrow(), new_admin);
     }
 
-    fun test_accept_admin(roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
+    public(package) fun test_accept_admin<T>(roles: &mut Roles<T>, scenario: &mut Scenario) {
+        let old_admin = roles.admin();
+        let pending_admin = roles.pending_admin();
         roles.accept_admin(scenario.ctx());
-        assert_eq(roles.admin(), TREASURY_ADMIN);
-        assert_eq(option::is_none(&roles.pending_admin()), true);
+
+        let expected_new_admin = *pending_admin.borrow();
+        let expected_event = roles::create_admin_changed_event<T>(old_admin, expected_new_admin);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<roles::TreasuryAdminChanged<T>>(), expected_event);
+        assert_eq(roles.admin(), expected_new_admin);
+        assert_eq(roles.pending_admin().is_none(), true);
     }
 
-    fun test_transfer_ownership(expected_old_owner: address, new_owner: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
+    public(package) fun test_transfer_ownership<T>(new_owner: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
+        let old_owner = roles.owner();
         roles.transfer_ownership(new_owner, scenario.ctx());
-        assert_eq(roles.owner(), expected_old_owner);
-        assert_eq(*option::borrow(&roles.pending_owner()), new_owner);
+
+        let expected_event = roles::create_owner_transfer_started_event<T>(old_owner, new_owner);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<roles::OwnershipTransferStarted<T>>(), expected_event);
+        assert_eq(roles.owner(), old_owner);
+        assert_eq(*roles.pending_owner().borrow(), new_owner);
     }
 
-    fun test_accept_ownership(expected_new_owner: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
+    public(package) fun test_accept_ownership<T>(roles: &mut Roles<T>, scenario: &mut Scenario) {
+        let old_owner = roles.owner();
+        let pending_owner = roles.pending_owner();
         roles.accept_ownership(scenario.ctx());
+
+        let expected_new_owner = *pending_owner.borrow();
+        let expected_event = roles::create_owner_transferred_event<T>(old_owner, expected_new_owner);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<roles::OwnershipTransferred<T>>(), expected_event);
         assert_eq(roles.owner(), expected_new_owner);
-        assert_eq(option::is_none(&roles.pending_owner()), true);
+        assert_eq(roles.pending_owner().is_none(), true);
     }
 
-    fun test_update_blocklister(new_blocklister: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
+    public(package) fun test_update_blocklister<T>(new_blocklister: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
+        let old_blocklister = roles.blocklister();
         roles.update_blocklister(new_blocklister, scenario.ctx());
+
+        let expected_event = roles::create_blocklister_changed_event<T>(old_blocklister, new_blocklister);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<roles::BlocklisterChanged<T>>(), expected_event);
         assert_eq(roles.blocklister(), new_blocklister);
     }
 
-    fun test_update_pauser(new_pauser: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
+    public(package) fun test_update_pauser<T>(new_pauser: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
+        let old_pauser = roles.pauser();
         roles.update_pauser(new_pauser, scenario.ctx());
+
+        let expected_event = roles::create_pauser_changed_event<T>(old_pauser, new_pauser);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<roles::PauserChanged<T>>(), expected_event);
         assert_eq(roles.pauser(), new_pauser);
     }
 
-    fun test_update_metadata_updater(new_metadata_updater: address, roles: &mut Roles<ROLES_TEST>, scenario: &mut Scenario) {
+    public(package) fun test_update_metadata_updater<T>(new_metadata_updater: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
+        let old_metadata_updater = roles.metadata_updater();
         roles.update_metadata_updater(new_metadata_updater, scenario.ctx());
+
+        let expected_event = roles::create_metadata_updater_changed_event<T>(old_metadata_updater, new_metadata_updater);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<roles::MetadataUpdaterChanged<T>>(), expected_event);
+
         assert_eq(roles.metadata_updater(), new_metadata_updater);
     }
 }
