@@ -38,6 +38,8 @@ if [[ "$CI" == true ]]; then
   # Add Sui binaries to the PATH for all other steps in the CI workflow.
   echo "$PWD/bin/sui" >> $GITHUB_PATH
 
+  echo $(sui -V)
+
 # In all other environments, build the Sui binary from source in debug mode.
 else
   echo "Building Sui binary from source in debug mode..."
