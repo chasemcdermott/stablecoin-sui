@@ -438,4 +438,49 @@ module stablecoin::treasury {
     public fun get_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
         treasury.borrow_deny_cap_mut()
     }
+
+    #[test_only]
+    public(package) fun create_mint_cap_created_event<T>(mint_cap: ID): MintCapCreated<T> {
+        MintCapCreated { mint_cap }
+    }
+
+    #[test_only]
+    public(package) fun create_controller_configured_event<T>(controller: address, mint_cap: ID): ControllerConfigured<T> {
+        ControllerConfigured { controller, mint_cap }
+    }
+
+    #[test_only]
+    public(package) fun create_controller_removed_event<T>(controller: address): ControllerRemoved<T> {
+        ControllerRemoved { controller }
+    }
+
+    #[test_only]
+    public(package) fun create_minter_configured_event<T>(controller: address, mint_cap: ID, allowance: u64): MinterConfigured<T> {
+        MinterConfigured { controller, mint_cap, allowance }
+    }
+
+    #[test_only]
+    public(package) fun create_minter_removed_event<T>(controller: address, mint_cap: ID): MinterRemoved<T> {
+        MinterRemoved { controller, mint_cap }
+    }
+
+    #[test_only]
+    public(package) fun create_mint_event<T>(mint_cap: ID, recipient: address, amount: u64): Mint<T> {
+        Mint { mint_cap, recipient, amount }
+    }
+
+    #[test_only]
+    public(package) fun create_burn_event<T>(mint_cap: ID, amount: u64): Burn<T> {
+        Burn { mint_cap, amount }
+    }
+
+    #[test_only]
+    public(package) fun create_blocklisted_event<T>(`address`: address): Blocklisted<T> {
+        Blocklisted { `address` }
+    }
+
+    #[test_only]
+    public(package) fun create_unblocklisted_event<T>(`address`: address): Unblocklisted<T> {
+        Unblocklisted { `address` }
+    }
 }

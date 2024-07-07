@@ -257,4 +257,41 @@ module stablecoin::roles {
             new_metadata_updater
         });
     }
+
+    // === Test Only ===
+
+    #[test_only]
+    public(package) fun create_admin_transfer_started_event<T>(old_admin: address, new_admin: address): TreasuryAdminTransferStarted<T> {
+        TreasuryAdminTransferStarted { old_admin, new_admin }
+    }
+
+    #[test_only]
+    public(package) fun create_admin_changed_event<T>(old_admin: address, new_admin: address): TreasuryAdminChanged<T> {
+        TreasuryAdminChanged { old_admin, new_admin }
+    }
+
+    #[test_only]
+    public(package) fun create_owner_transfer_started_event<T>(old_owner: address, new_owner: address): OwnershipTransferStarted<T> {
+        OwnershipTransferStarted { old_owner, new_owner }
+    }
+
+    #[test_only]
+    public(package) fun create_owner_transferred_event<T>(old_owner: address, new_owner: address): OwnershipTransferred<T> {
+        OwnershipTransferred { old_owner, new_owner }
+    }
+
+    #[test_only]
+    public(package) fun create_blocklister_changed_event<T>(old_blocklister: address, new_blocklister: address): BlocklisterChanged<T> {
+        BlocklisterChanged { old_blocklister, new_blocklister }
+    }
+
+    #[test_only]
+    public(package) fun create_pauser_changed_event<T>(old_pauser: address, new_pauser: address): PauserChanged<T> {
+        PauserChanged { old_pauser, new_pauser }
+    }
+
+    #[test_only]
+    public(package) fun create_metadata_updater_changed_event<T>(old_metadata_updater: address, new_metadata_updater: address): MetadataUpdaterChanged<T> {
+        MetadataUpdaterChanged { old_metadata_updater, new_metadata_updater }
+    }
 }
