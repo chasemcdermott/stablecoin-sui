@@ -863,6 +863,7 @@ module stablecoin::treasury_tests {
         let mut metadata = scenario.take_shared<CoinMetadata<TREASURY_TESTS>>();
 
         treasury.update_metadata(&mut metadata, name, symbol, description, url, scenario.ctx());
+        assert_eq(event::num_events(), 0);
         assert_eq(metadata.get_name(), name);
         assert_eq(metadata.get_symbol(), symbol);
         assert_eq(metadata.get_description(), description);
