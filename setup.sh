@@ -24,9 +24,9 @@ if [[ "$CI" == true ]]; then
 
   # Download and extract Sui binaries.
   mkdir -p ./bin/sui
-  curl -L -o ./bin/sui/sui-v1.25.1.tgz https://github.com/MystenLabs/sui/releases/download/mainnet-v1.25.1/sui-mainnet-v1.25.1-ubuntu-x86_64.tgz
-  tar -xvzf ./bin/sui/sui-v1.25.1.tgz -C ./bin/sui
-  rm ./bin/sui/sui-v1.25.1.tgz
+  curl -L -o ./bin/sui/sui-v1.28.2.tgz https://github.com/MystenLabs/sui/releases/download/testnet-v1.28.2/sui-testnet-v1.28.2-ubuntu-x86_64.tgz
+  tar -xvzf ./bin/sui/sui-v1.28.2.tgz -C ./bin/sui
+  rm ./bin/sui/sui-v1.28.2.tgz
 
   # Replace the release mode Sui with the debug mode Sui binary.
   rm ./bin/sui/sui
