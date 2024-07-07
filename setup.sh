@@ -49,7 +49,7 @@ else
 fi
 
 # Sanity check that the Sui binary was installed correctly
-if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.25.1-6579e0e'
+if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.28.2-08b50387a184'
 then
   echo "Sui binary was not installed"
   exit 1
