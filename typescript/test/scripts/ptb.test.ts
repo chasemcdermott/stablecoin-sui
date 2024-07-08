@@ -58,13 +58,15 @@ describe("Test PTBs", () => {
     USDC_TYPE_ID = `${PACKAGE_ID}::usdc::USDC`;
 
     const isTreasury = (c: SuiObjectChange) =>
-      c.type === "created" && c.objectType.includes("treasury::Treasury");
+      c.type === "created" &&
+      c.objectType.includes(`treasury::Treasury<${USDC_TYPE_ID}>`);
     const treasury = objectChanges?.filter(isTreasury) || [];
     assert.equal(treasury.length, 1);
     TREASURY_OBJECT_ID = (treasury[0] as SuiObjectChangeCreated).objectId;
 
     const isMetadata = (c: SuiObjectChange) =>
-      c.type === "created" && c.objectType.includes("coin::CoinMetadata");
+      c.type === "created" &&
+      c.objectType.includes(`coin::CoinMetadata<${USDC_TYPE_ID}>`);
     const metadata = objectChanges?.filter(isMetadata) || [];
     assert.equal(metadata.length, 1);
     METADATA_OBJECT_ID = (metadata[0] as SuiObjectChangeCreated).objectId;

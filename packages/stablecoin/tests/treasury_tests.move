@@ -306,6 +306,25 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ETreasuryCapNotFound)]
+    fun mint__should_fail_if_treasury_cap_not_found() {
+        let mut scenario = setup();
+
+        scenario.next_tx(TREASURY_ADMIN);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(TREASURY_ADMIN);
+        remove_treasury_cap(&scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_configure_minter(1000000, &mut scenario);
+
+        scenario.next_tx(MINTER);
+        test_mint(1000000, MINT_RECIPIENT, &mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMinter)]
     fun burn__should_fail_from_deauthorized_mint_cap() {
         let mut scenario = setup();
@@ -370,12 +389,48 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ETreasuryCapNotFound)]
+    fun burn__should_fail_if_treasury_cap_not_found() {
+        let mut scenario = setup();
+
+        scenario.next_tx(TREASURY_ADMIN);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(TREASURY_ADMIN);
+        remove_treasury_cap(&scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_configure_minter(0, &mut scenario);
+
+        scenario.next_tx(MINTER);
+        let coin = coin::zero<TREASURY_TESTS>(scenario.ctx());
+        transfer::public_transfer(coin, MINTER);
+
+        scenario.next_tx(MINTER);
+        test_burn(&mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotBlocklister)]
     fun blocklist__should_fail_if_caller_is_not_blocklister() {
         let mut scenario = setup();
 
         // Some random address tries to blocklist an address, should fail.
         scenario.next_tx(RANDOM_ADDRESS);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EDenyCapNotFound)]
+    fun blocklist__should_fail_when_deny_cap_is_missing() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        remove_deny_cap(&scenario);
+
+        scenario.next_tx(OWNER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.end();
@@ -417,6 +472,22 @@ module stablecoin::treasury_tests {
 
         // Some random address tries to unblocklist the address, should fail.
         scenario.next_tx(RANDOM_ADDRESS);
+        test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EDenyCapNotFound)]
+    fun unblocklist__should_fail_when_deny_cap_is_missing() {
+        let mut scenario = setup();
+
+        scenario.next_tx(OWNER);
+        test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        remove_deny_cap(&scenario);
+
+        scenario.next_tx(OWNER);
         test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.end();
@@ -529,11 +600,43 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ETreasuryCapNotFound)]
+    fun update_metadata__should_fail_if_not_treasury_cap_not_found() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        remove_treasury_cap(&scenario);
+
+        scenario.next_tx(OWNER);
+        test_update_metadata(
+            string::utf8(b"new name"),
+            ascii::string(b"new symbol"),
+            string::utf8(b"new description"),
+            ascii::string(b"new url"),
+            &mut scenario
+        );
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotPauser)]
     fun pause__should_fail_when_caller_is_not_pauser() {
         let mut scenario = setup();
 
         scenario.next_tx(RANDOM_ADDRESS);
+        test_pause(&mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EDenyCapNotFound)]
+    fun pause__should_fail_when_deny_cap_is_missing() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        remove_deny_cap(&scenario);
+
+        scenario.next_tx(OWNER);
         test_pause(&mut scenario);
 
         scenario.end();
@@ -562,8 +665,21 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EDenyCapNotFound)]
+    fun unpause__should_fail_when_deny_cap_is_missing() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        remove_deny_cap(&scenario);
+
+        scenario.next_tx(OWNER);
+        test_unpause(&mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::EUnimplemented)]
-    fun unpause__should_succeed() {
+    fun unpause__should_fail_with_unimplemented_error() {
         let mut scenario = setup();
 
         scenario.next_tx(OWNER);
@@ -571,6 +687,23 @@ module stablecoin::treasury_tests {
         
         scenario.next_tx(PAUSER);
         test_unpause(&mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ETreasuryCapNotFound)]
+    fun total_supply__should_fail_when_treasury_cap_is_missing() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        remove_treasury_cap(&scenario);
+        
+        scenario.next_tx(RANDOM_ADDRESS);
+        {
+            let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+            treasury.total_supply();
+            test_scenario::return_shared(treasury);
+        };
 
         scenario.end();
     }
@@ -591,6 +724,7 @@ module stablecoin::treasury_tests {
                 option::none(),
                 scenario.ctx()
             );
+
             let treasury = treasury::create_treasury(
                 treasury_cap,
                 deny_cap,
@@ -609,6 +743,8 @@ module stablecoin::treasury_tests {
             assert_eq(treasury.roles().blocklister(), OWNER);
             assert_eq(treasury.roles().pauser(), OWNER);
             assert_eq(treasury.roles().metadata_updater(), OWNER);
+            treasury.assert_treasury_cap_exists();
+            treasury.assert_deny_cap_exists();
 
             transfer::public_share_object(metadata);
             transfer::public_share_object(treasury);
@@ -706,13 +842,12 @@ module stablecoin::treasury_tests {
         let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();
 
         let allowance_before = treasury.mint_allowance(object::id(&mint_cap));
-        let amount_before = treasury.total_supply();
         treasury::mint(&mut treasury, &mint_cap, &deny_list, mint_amount, recipient, scenario.ctx());
 
         let expected_event = treasury::create_mint_event<TREASURY_TESTS>(object::id(&mint_cap), recipient, mint_amount);
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<treasury::Mint<TREASURY_TESTS>>(), expected_event);
-        assert_eq(treasury.total_supply(), amount_before + mint_amount);
+        assert_eq(treasury.total_supply(), mint_amount);
         assert_eq(treasury.mint_allowance(object::id(&mint_cap)), allowance_before - mint_amount);
 
         scenario.return_to_sender(mint_cap);
@@ -871,5 +1006,23 @@ module stablecoin::treasury_tests {
 
         test_scenario::return_shared(treasury);
         test_scenario::return_shared(metadata);
+    }
+
+    fun remove_treasury_cap(scenario: &Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+            
+        let treasury_cap = treasury.remove_treasury_cap_for_testing();
+        transfer::public_transfer(treasury_cap, TREASURY_ADMIN);
+
+        test_scenario::return_shared(treasury);
+    }
+
+    fun remove_deny_cap(scenario: &Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+            
+        let treasury_cap = treasury.remove_deny_cap_for_testing();
+        transfer::public_transfer(treasury_cap, TREASURY_ADMIN);
+
+        test_scenario::return_shared(treasury);
     }
 }
