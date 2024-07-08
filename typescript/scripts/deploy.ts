@@ -70,9 +70,14 @@ export async function deploy(
   // Command #2: Publish Transfer UpgradeCap
   transaction.transferObjects([upgradeCap], upgradeCapRecipient);
 
-  const transactionOutput = await client.signAndExecuteTransaction({
+  const initialTxOutput = await client.signAndExecuteTransaction({
     signer: deployer,
-    transaction,
+    transaction
+  });
+
+  // Wait for the transaction to be available over API
+  const txOutput = await client.waitForTransaction({
+    digest: initialTxOutput.digest,
     options: {
       showBalanceChanges: true,
       showEffects: true,
@@ -83,9 +88,9 @@ export async function deploy(
     }
   });
 
-  console.log(transactionOutput);
+  console.log(txOutput);
   console.log("Deploy process complete!");
-  return transactionOutput;
+  return txOutput;
 }
 
 program

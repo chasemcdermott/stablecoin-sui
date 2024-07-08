@@ -21,6 +21,7 @@ module stablecoin::treasury {
     use sui::deny_list::{DenyList};
     use sui::event;
     use sui::table::{Self, Table};
+    use sui::dynamic_object_field as dof;
     use stablecoin::mint_allowance::{Self, MintAllowance};
     use stablecoin::roles::{Self, Roles};
 
@@ -28,15 +29,17 @@ module stablecoin::treasury {
 
     const EControllerAlreadyConfigured: u64 = 0;
     const EDeniedAddress: u64 = 1;
-    const EInsufficientAllowance: u64 = 2;
-    const ENotAdmin: u64 = 3;
-    const ENotController: u64 = 4;
-    const ENotMinter: u64 = 5;
-    const ENotBlocklister: u64 = 6;
-    const ENotPauser: u64 = 7;
-    const EUnimplemented: u64 = 8;
-    const EZeroAmount: u64 = 9;
-    const ENotMetadataUpdater: u64 = 10;
+    const EDenyCapNotFound: u64 = 2;
+    const EInsufficientAllowance: u64 = 3;
+    const ENotAdmin: u64 = 4;
+    const ENotBlocklister: u64 = 5;
+    const ENotController: u64 = 6;
+    const ENotMetadataUpdater: u64 = 7;
+    const ENotMinter: u64 = 8;
+    const ENotPauser: u64 = 9;
+    const ETreasuryCapNotFound: u64 = 10;
+    const EUnimplemented: u64 = 11;
+    const EZeroAmount: u64 = 12;
 
     // === Structs ===
 
@@ -44,10 +47,6 @@ module stablecoin::treasury {
     /// and additional configurations related to minting and burning.
     public struct Treasury<phantom T> has key, store {
         id: UID,
-        /// TreasuryCap of the same type `T`
-        treasury_cap: TreasuryCap<T>,
-        /// DenyCap of the same type `T`
-        deny_cap: DenyCap<T>,
         /// Mapping between controllers and mint cap IDs
         controllers: Table<address, ID>,
         /// Mapping between mint cap IDs and mint allowances
@@ -62,6 +61,11 @@ module stablecoin::treasury {
     public struct MintCap<phantom T> has key, store {
         id: UID,
     }
+
+    /// Key for retrieving TreasuryCap stored in dynamic field
+    public struct TreasuryCapKey has copy, store, drop {}
+    /// Key for retrieving DenyCap stored in dynamic field
+    public struct DenyCapKey has copy, store, drop {}
 
     // === Events ===
 
@@ -140,7 +144,17 @@ module stablecoin::treasury {
 
     /// Return the total number of `T`'s in circulation.
     public fun total_supply<T>(treasury: &Treasury<T>): u64 {
-        coin::total_supply(&treasury.treasury_cap)
+        treasury.borrow_treasury_cap().total_supply()
+    }
+
+    /// [Package private] ensure treasury cap exists
+    public(package) fun assert_treasury_cap_exists<T>(treasury: &Treasury<T>) {
+        assert!(dof::exists_with_type<_, TreasuryCap<T>>(&treasury.id, TreasuryCapKey {}), ETreasuryCapNotFound);
+    }
+
+    /// [Package private] ensure deny cap exists
+    public(package) fun assert_deny_cap_exists<T>(treasury: &Treasury<T>) {
+        assert!(dof::exists_with_type<_, DenyCap<T>>(&treasury.id, DenyCapKey {}), EDenyCapNotFound);
     }
 
     /// Check if an address is a mint controller
@@ -165,18 +179,17 @@ module stablecoin::treasury {
         pauser: address,
         metadata_updater: address,
         ctx: &mut TxContext
-
     ): Treasury<T> {
         let roles = roles::create_roles<T>(admin, owner, blocklister, pauser, metadata_updater);
-
-        Treasury {
+        let mut treasury = Treasury {
             id: object::new(ctx),
-            treasury_cap,
-            deny_cap,
             controllers: table::new<address, ID>(ctx),
             mint_allowances: table::new<ID, MintAllowance<T>>(ctx),
             roles,
-        }
+        };
+        dof::add(&mut treasury.id, TreasuryCapKey {}, treasury_cap);
+        dof::add(&mut treasury.id, DenyCapKey {}, deny_cap);
+        treasury
     }
 
     /// Configure a controller by adding it to the controller mapping, 
@@ -303,7 +316,7 @@ module stablecoin::treasury {
 
         mint_allowance.decrease(amount);
 
-        coin::mint_and_transfer(&mut treasury.treasury_cap, amount, recipient, ctx);
+        treasury.borrow_treasury_cap_mut().mint_and_transfer(amount, recipient, ctx);
         
         event::emit(Mint<T> { 
             mint_cap: mint_cap_id, 
@@ -329,7 +342,7 @@ module stablecoin::treasury {
         let amount = coin.value();
         assert!(amount > 0, EZeroAmount);
 
-        coin::burn(&mut treasury.treasury_cap, coin);
+        treasury.borrow_treasury_cap_mut().burn(coin);
         event::emit(Burn<T> {
             mint_cap: mint_cap_id,
             amount
@@ -400,12 +413,26 @@ module stablecoin::treasury {
         
         assert!(false, EUnimplemented);
     }
-
-    /// Package internal function to allow a reference of DenyCap to be borrowed
-    fun borrow_deny_cap_mut<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
-        &mut treasury.deny_cap
+   
+    /// Returns an immutable reference of the TreasuryCap
+    fun borrow_treasury_cap<T>(treasury: &Treasury<T>): &TreasuryCap<T> {
+        treasury.assert_treasury_cap_exists();
+        dof::borrow(&treasury.id, TreasuryCapKey {})
     }
 
+    /// Returns a mutable reference of the TreasuryCap
+    fun borrow_treasury_cap_mut<T>(treasury: &mut Treasury<T>): &mut TreasuryCap<T> {
+        treasury.assert_treasury_cap_exists();
+        dof::borrow_mut(&mut treasury.id, TreasuryCapKey {})
+    }
+
+    /// Returns a mutable reference of the DenyCap
+    fun borrow_deny_cap_mut<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
+        treasury.assert_deny_cap_exists();
+        dof::borrow_mut(&mut treasury.id, DenyCapKey {})
+    }
+
+    /// Update coin metadata
     public entry fun update_metadata<T>(
         treasury: &Treasury<T>,
         metadata: &mut CoinMetadata<T>,
@@ -416,10 +443,10 @@ module stablecoin::treasury {
         ctx: &TxContext
     ) {
         assert!(treasury.roles.metadata_updater() == ctx.sender(), ENotMetadataUpdater);
-        treasury.treasury_cap.update_name(metadata, name);
-        treasury.treasury_cap.update_symbol(metadata, symbol);
-        treasury.treasury_cap.update_description(metadata, description);
-        treasury.treasury_cap.update_icon_url(metadata, url);
+        treasury.borrow_treasury_cap().update_name(metadata, name);
+        treasury.borrow_treasury_cap().update_symbol(metadata, symbol);
+        treasury.borrow_treasury_cap().update_description(metadata, description);
+        treasury.borrow_treasury_cap().update_icon_url(metadata, url);
     }
 
     // === Test Only ===
@@ -437,5 +464,15 @@ module stablecoin::treasury {
     #[test_only]
     public fun get_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
         treasury.borrow_deny_cap_mut()
+    }
+
+    #[test_only]
+    public fun remove_treasury_cap_for_testing<T>(treasury: &mut Treasury<T>): TreasuryCap<T> {
+        dof::remove(&mut treasury.id, TreasuryCapKey {})
+    }
+
+    #[test_only]
+    public fun remove_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): DenyCap<T> {
+        dof::remove(&mut treasury.id, DenyCapKey {})
     }
 }
