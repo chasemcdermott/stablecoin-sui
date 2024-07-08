@@ -273,79 +273,76 @@ module stablecoin::roles_tests {
     public(package) fun test_change_admin<T>(new_admin: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_admin = roles.admin();
         roles.change_admin(new_admin, scenario.ctx());
+        assert_eq(roles.admin(), old_admin);
+        assert_eq(*roles.pending_admin().borrow(), new_admin);
 
         let expected_event = roles::create_admin_transfer_started_event<T>(old_admin, new_admin);
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<roles::TreasuryAdminTransferStarted<T>>(), expected_event);
-        assert_eq(roles.admin(), old_admin);
-        assert_eq(*roles.pending_admin().borrow(), new_admin);
     }
 
     public(package) fun test_accept_admin<T>(roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_admin = roles.admin();
         let pending_admin = roles.pending_admin();
         roles.accept_admin(scenario.ctx());
+        assert_eq(roles.admin(), *pending_admin.borrow());
+        assert_eq(roles.pending_admin().is_none(), true);
 
-        let expected_new_admin = *pending_admin.borrow();
-        let expected_event = roles::create_admin_changed_event<T>(old_admin, expected_new_admin);
+        let expected_event = roles::create_admin_changed_event<T>(old_admin, *pending_admin.borrow());
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<roles::TreasuryAdminChanged<T>>(), expected_event);
-        assert_eq(roles.admin(), expected_new_admin);
-        assert_eq(roles.pending_admin().is_none(), true);
     }
 
     public(package) fun test_transfer_ownership<T>(new_owner: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_owner = roles.owner();
         roles.transfer_ownership(new_owner, scenario.ctx());
+        assert_eq(roles.owner(), old_owner);
+        assert_eq(*roles.pending_owner().borrow(), new_owner);
 
         let expected_event = roles::create_owner_transfer_started_event<T>(old_owner, new_owner);
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<roles::OwnershipTransferStarted<T>>(), expected_event);
-        assert_eq(roles.owner(), old_owner);
-        assert_eq(*roles.pending_owner().borrow(), new_owner);
     }
 
     public(package) fun test_accept_ownership<T>(roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_owner = roles.owner();
         let pending_owner = roles.pending_owner();
         roles.accept_ownership(scenario.ctx());
+        assert_eq(roles.owner(), *pending_owner.borrow());
+        assert_eq(roles.pending_owner().is_none(), true);
 
-        let expected_new_owner = *pending_owner.borrow();
-        let expected_event = roles::create_owner_transferred_event<T>(old_owner, expected_new_owner);
+        let expected_event = roles::create_owner_transferred_event<T>(old_owner, *pending_owner.borrow());
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<roles::OwnershipTransferred<T>>(), expected_event);
-        assert_eq(roles.owner(), expected_new_owner);
-        assert_eq(roles.pending_owner().is_none(), true);
     }
 
     public(package) fun test_update_blocklister<T>(new_blocklister: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_blocklister = roles.blocklister();
         roles.update_blocklister(new_blocklister, scenario.ctx());
+        assert_eq(roles.blocklister(), new_blocklister);
 
         let expected_event = roles::create_blocklister_changed_event<T>(old_blocklister, new_blocklister);
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<roles::BlocklisterChanged<T>>(), expected_event);
-        assert_eq(roles.blocklister(), new_blocklister);
     }
 
     public(package) fun test_update_pauser<T>(new_pauser: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_pauser = roles.pauser();
         roles.update_pauser(new_pauser, scenario.ctx());
+        assert_eq(roles.pauser(), new_pauser);
 
         let expected_event = roles::create_pauser_changed_event<T>(old_pauser, new_pauser);
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<roles::PauserChanged<T>>(), expected_event);
-        assert_eq(roles.pauser(), new_pauser);
     }
 
     public(package) fun test_update_metadata_updater<T>(new_metadata_updater: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_metadata_updater = roles.metadata_updater();
         roles.update_metadata_updater(new_metadata_updater, scenario.ctx());
+        assert_eq(roles.metadata_updater(), new_metadata_updater);
 
         let expected_event = roles::create_metadata_updater_changed_event<T>(old_metadata_updater, new_metadata_updater);
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<roles::MetadataUpdaterChanged<T>>(), expected_event);
-
-        assert_eq(roles.metadata_updater(), new_metadata_updater);
     }
 }
