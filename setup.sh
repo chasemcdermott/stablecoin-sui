@@ -51,7 +51,8 @@ else
 fi
 
 # Sanity check that the Sui binary was installed correctly
-if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.28.2-08b5038'
+# TODO update the version so that the commits match
+if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.29.0-1bc3c6996246'
 then
   echo "Sui binary was not installed"
   exit 1
