@@ -31,9 +31,9 @@ module stablecoin::treasury {
     const EDeniedAddress: u64 = 1;
     const EDenyCapNotFound: u64 = 2;
     const EInsufficientAllowance: u64 = 3;
-    const ENotAdmin: u64 = 4;
-    const ENotBlocklister: u64 = 5;
-    const ENotController: u64 = 6;
+    const ENotBlocklister: u64 = 4;
+    const ENotController: u64 = 5;
+    const ENotMasterMinter: u64 = 6;
     const ENotMetadataUpdater: u64 = 7;
     const ENotMinter: u64 = 8;
     const ENotPauser: u64 = 9;
@@ -57,7 +57,7 @@ module stablecoin::treasury {
 
     /// An object representing the ability to mint up to an allowance 
     /// specified in the Treasury. 
-    /// The privilege can be revoked by the treasury admin.
+    /// The privilege can be revoked by the master minter.
     public struct MintCap<phantom T> has key, store {
         id: UID,
     }
@@ -173,14 +173,14 @@ module stablecoin::treasury {
     public fun create_treasury<T>(
         treasury_cap: TreasuryCap<T>, 
         deny_cap: DenyCap<T>, 
-        admin: address,
         owner: address,
+        master_minter: address,
         blocklister: address,
         pauser: address,
         metadata_updater: address,
         ctx: &mut TxContext
     ): Treasury<T> {
-        let roles = roles::create_roles<T>(admin, owner, blocklister, pauser, metadata_updater);
+        let roles = roles::create_roles<T>(owner, master_minter, blocklister, pauser, metadata_updater);
         let mut treasury = Treasury {
             id: object::new(ctx),
             controllers: table::new<address, ID>(ctx),
@@ -199,7 +199,7 @@ module stablecoin::treasury {
         mint_cap_id: ID,
         ctx: &TxContext
     ) {
-        assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
+        assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         assert!(!is_controller(treasury, controller), EControllerAlreadyConfigured);
 
         treasury.controllers.add(controller, mint_cap_id);
@@ -214,7 +214,7 @@ module stablecoin::treasury {
         treasury: &Treasury<T>, 
         ctx: &mut TxContext
     ): MintCap<T> {
-        assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
+        assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         let mint_cap = MintCap { id: object::new(ctx) };
         event::emit(MintCapCreated<T> { 
             mint_cap: object::id(&mint_cap)
@@ -243,7 +243,7 @@ module stablecoin::treasury {
         controller: address, 
         ctx: &TxContext
     ) {
-        assert!(treasury.roles.admin() == ctx.sender(), ENotAdmin);
+        assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         assert!(is_controller(treasury, controller), ENotController);
 
         treasury.controllers.remove(controller);
