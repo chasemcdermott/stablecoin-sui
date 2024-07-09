@@ -31,7 +31,7 @@ module stablecoin::treasury_tests {
 
     // test addresses
     const DEPLOYER: address = @0x0;
-    const TREASURY_ADMIN: address = @0x20;
+    const MASTER_MINTER: address = @0x20;
     const CONTROLLER: address = @0x30;
     const MINTER: address = @0x40;
     const MINT_RECIPIENT: address = @0x50;
@@ -52,7 +52,7 @@ module stablecoin::treasury_tests {
         let mut scenario = setup();
 
         // Transaction 2: configure mint controller and worker
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         // Transaction 3: configure minter
@@ -80,14 +80,14 @@ module stablecoin::treasury_tests {
         test_remove_minter(&mut scenario);
 
         // Transaction 7: remove controller
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_remove_controller(CONTROLLER, &mut scenario);
 
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotAdmin)]
-    fun create_mint_cap__should_fail_if_not_sent_by_admin() {
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMasterMinter)]
+    fun create_mint_cap__should_fail_if_not_sent_by_master_minter() {
         let mut scenario = setup();
 
         scenario.next_tx(RANDOM_ADDRESS);
@@ -108,13 +108,13 @@ module stablecoin::treasury_tests {
     fun configure_controller__should_succeed_with_existing_mint_cap() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
-        test_configure_new_controller(CONTROLLER, TREASURY_ADMIN, &mut scenario);
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, MASTER_MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
         test_configure_minter(10, &mut scenario);
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         {
             let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
             let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();
@@ -137,18 +137,18 @@ module stablecoin::treasury_tests {
     fun configure_controller__should_fail_with_existing_controller() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_controller(CONTROLLER, object::id_from_address(MINT_CAP_ADDR), &mut scenario);
 
         // Configure the same controller - expect failure
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_controller(CONTROLLER, object::id_from_address(MINT_CAP_ADDR), &mut scenario);
 
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotAdmin)]
-    fun configure_controller__should_fail_if_caller_is_not_admin() {
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMasterMinter)]
+    fun configure_controller__should_fail_if_caller_is_not_master_minter() {
         let mut scenario = setup();
 
         scenario.next_tx(RANDOM_ADDRESS); 
@@ -165,14 +165,14 @@ module stablecoin::treasury_tests {
     fun remove_controller__should_fail_with_non_controller() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_remove_controller(RANDOM_ADDRESS, &mut scenario);
 
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotAdmin)]
-    fun remove_controller__should_fail_if_not_sent_by_admin() {
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMasterMinter)]
+    fun remove_controller__should_fail_if_not_sent_by_master_minter() {
         let mut scenario = setup();
 
         scenario.next_tx(RANDOM_ADDRESS);
@@ -185,7 +185,7 @@ module stablecoin::treasury_tests {
     fun configure_minter__should_reset_allowance() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER); 
@@ -221,7 +221,7 @@ module stablecoin::treasury_tests {
     fun mint__should_fail_with_zero_amount() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -237,7 +237,7 @@ module stablecoin::treasury_tests {
     fun mint__should_fail_from_deauthorized_mint_cap() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -256,7 +256,7 @@ module stablecoin::treasury_tests {
     fun mint__should_fail_if_exceed_allowance() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -272,7 +272,7 @@ module stablecoin::treasury_tests {
     fun mint__should_fail_from_denylisted_sender() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -291,7 +291,7 @@ module stablecoin::treasury_tests {
     fun mint__should_fail_given_denylisted_recipient() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -310,10 +310,10 @@ module stablecoin::treasury_tests {
     fun mint__should_fail_if_treasury_cap_not_found() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         remove_treasury_cap(&scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -329,7 +329,7 @@ module stablecoin::treasury_tests {
     fun burn__should_fail_from_deauthorized_mint_cap() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -351,7 +351,7 @@ module stablecoin::treasury_tests {
     fun burn__should_fail_from_denylisted_sender() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -373,7 +373,7 @@ module stablecoin::treasury_tests {
     fun burn__should_fail_with_zero_amount() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -393,10 +393,10 @@ module stablecoin::treasury_tests {
     fun burn__should_fail_if_treasury_cap_not_found() {
         let mut scenario = setup();
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
 
-        scenario.next_tx(TREASURY_ADMIN);
+        scenario.next_tx(MASTER_MINTER);
         remove_treasury_cap(&scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -531,13 +531,6 @@ module stablecoin::treasury_tests {
     fun update_roles__should_succeed_and_pass_all_assertions() {
         let mut scenario = setup();
 
-        // change admin to the OWNER address
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(OWNER, &mut scenario);
-
-        scenario.next_tx(OWNER);
-        test_accept_admin(&mut scenario);
-
         // transfer ownership to the DEPLOYER address
         scenario.next_tx(OWNER);
         test_transfer_ownership(DEPLOYER, &mut scenario);
@@ -545,7 +538,10 @@ module stablecoin::treasury_tests {
         scenario.next_tx(DEPLOYER);
         test_accept_ownership(&mut scenario);
 
-        // use the DEPLOYER address to modify the blocklister, pauser, and metadata updater
+        // use the DEPLOYER address to modify the master minter, blocklister, pauser, and metadata updater
+        scenario.next_tx(DEPLOYER);
+        test_update_master_minter(MASTER_MINTER, &mut scenario);
+
         scenario.next_tx(DEPLOYER);
         test_update_blocklister(BLOCKLISTER, &mut scenario);
 
@@ -728,8 +724,8 @@ module stablecoin::treasury_tests {
             let treasury = treasury::create_treasury(
                 treasury_cap,
                 deny_cap,
-                TREASURY_ADMIN,
                 OWNER,
+                MASTER_MINTER,
                 OWNER,
                 OWNER,
                 OWNER,
@@ -738,8 +734,8 @@ module stablecoin::treasury_tests {
             assert_eq(treasury.total_supply(), 0);
             assert_eq(treasury.get_controllers_for_testing().length(), 0);
             assert_eq(treasury.get_mint_allowances_for_testing().length(), 0);
-            assert_eq(treasury.roles().admin(), TREASURY_ADMIN);
             assert_eq(treasury.roles().owner(), OWNER);
+            assert_eq(treasury.roles().master_minter(), MASTER_MINTER);
             assert_eq(treasury.roles().blocklister(), OWNER);
             assert_eq(treasury.roles().pauser(), OWNER);
             assert_eq(treasury.roles().metadata_updater(), OWNER);
@@ -919,18 +915,6 @@ module stablecoin::treasury_tests {
         test_scenario::return_shared(treasury);
     }
 
-    fun test_change_admin(new_admin: address, scenario: &mut Scenario) {
-        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        roles_tests::test_change_admin(new_admin, treasury.roles_mut(), scenario);
-        test_scenario::return_shared(treasury);
-    }
-
-    fun test_accept_admin(scenario: &mut Scenario) {
-        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        roles_tests::test_accept_admin(treasury.roles_mut(), scenario);
-        test_scenario::return_shared(treasury);
-    }
-
     fun test_transfer_ownership(new_owner: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
         roles_tests::test_transfer_ownership(new_owner, treasury.roles_mut(), scenario);
@@ -940,6 +924,12 @@ module stablecoin::treasury_tests {
     fun test_accept_ownership(scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
         roles_tests::test_accept_ownership(treasury.roles_mut(), scenario);
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_update_master_minter(new_master_minter: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        roles_tests::test_update_master_minter(new_master_minter, treasury.roles_mut(), scenario);
         test_scenario::return_shared(treasury);
     }
 
@@ -1014,7 +1004,7 @@ module stablecoin::treasury_tests {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
             
         let treasury_cap = treasury.remove_treasury_cap_for_testing();
-        transfer::public_transfer(treasury_cap, TREASURY_ADMIN);
+        transfer::public_transfer(treasury_cap, MASTER_MINTER);
 
         test_scenario::return_shared(treasury);
     }
@@ -1023,7 +1013,7 @@ module stablecoin::treasury_tests {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
             
         let treasury_cap = treasury.remove_deny_cap_for_testing();
-        transfer::public_transfer(treasury_cap, TREASURY_ADMIN);
+        transfer::public_transfer(treasury_cap, MASTER_MINTER);
 
         test_scenario::return_shared(treasury);
     }

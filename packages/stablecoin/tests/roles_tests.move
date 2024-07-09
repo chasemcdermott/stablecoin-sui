@@ -33,60 +33,8 @@ module stablecoin::roles_tests {
     const BLOCKLISTER: address = @0x30;
     const PAUSER: address = @0x40;
     const RANDOM_ADDRESS: address = @0x50;
-    const TREASURY_ADMIN: address = @0x60;
+    const MASTER_MINTER: address = @0x60;
     const METADATA_UPDATER: address = @0x70;
-
-    #[test, expected_failure(abort_code = roles::ENotAdmin)]
-    fun change_admin__should_fail_if_not_sent_by_admin() {
-        let (mut scenario, mut roles) = setup();
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        test_change_admin(TREASURY_ADMIN, &mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
-    #[test, expected_failure(abort_code = roles::ESamePendingAdmin)]
-    fun change_admin__should_fail_if_same_pending_admin() {
-        let (mut scenario, mut roles) = setup();
-
-        // we should be able to set the pending admin initially
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(RANDOM_ADDRESS, &mut roles, &mut scenario);
-
-        // expect the second to fail, once the pending admin is already set
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(RANDOM_ADDRESS, &mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
-    #[test, expected_failure(abort_code = roles::ENotPendingAdmin)]
-    fun accept_admin__should_fail_if_sender_is_not_pending_admin() {
-        let (mut scenario, mut roles) = setup();
-
-        scenario.next_tx(TREASURY_ADMIN);
-        test_change_admin(OWNER, &mut roles, &mut scenario);
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        test_accept_admin(&mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
-    #[test, expected_failure(abort_code = roles::EPendingAdminNotSet)]
-    fun accept_admin__should_fail_if_pending_admin_is_not_set() {
-        let (mut scenario, mut roles) = setup();
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        test_accept_admin(&mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
 
     #[test]
     fun transfer_ownership_and_update_roles__should_succeed_and_pass_all_assertions() {
@@ -99,7 +47,10 @@ module stablecoin::roles_tests {
         scenario.next_tx(DEPLOYER);
         test_accept_ownership(&mut roles, &mut scenario);
 
-        // use the DEPLOYER address to modify the blocklister, pauser, and metadata updater
+        // use the DEPLOYER address to modify the master minter, blocklister, pauser, and metadata updater
+        scenario.next_tx(DEPLOYER);
+        test_update_master_minter(MASTER_MINTER, &mut roles, &mut scenario);
+
         scenario.next_tx(DEPLOYER);
         test_update_blocklister(BLOCKLISTER, &mut roles, &mut scenario);
 
@@ -144,22 +95,6 @@ module stablecoin::roles_tests {
         destroy(roles);
     }
 
-    #[test, expected_failure(abort_code = roles::ESamePendingOwner)]
-    fun transfer_ownership__should_fail_if_same_pending_owner() {
-        let (mut scenario, mut roles) = setup();
-
-        // we should be able to set the pending owner initially
-        scenario.next_tx(OWNER);
-        test_transfer_ownership(BLOCKLISTER, &mut roles, &mut scenario);
-
-        // expect the second to fail, once the pending owner is already set
-        scenario.next_tx(OWNER);
-        test_transfer_ownership(BLOCKLISTER, &mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
     #[test, expected_failure(abort_code = roles::EPendingOwnerNotSet)]
     fun accept_ownership__should_fail_if_pending_owner_not_set() {
         let (mut scenario, mut roles) = setup();
@@ -186,23 +121,22 @@ module stablecoin::roles_tests {
     }
 
     #[test, expected_failure(abort_code = roles::ENotOwner)]
-    fun update_blocklister__should_fail_if_not_sent_by_owner() {
+    fun update_master_minter__should_fail_if_not_sent_by_owner() {
         let (mut scenario, mut roles) = setup();
 
         scenario.next_tx(RANDOM_ADDRESS);
-        test_update_blocklister(RANDOM_ADDRESS, &mut roles, &mut scenario);
+        test_update_master_minter(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
     }
 
-    #[test, expected_failure(abort_code = roles::ESameBlocklister)]
-    fun update_blocklister__should_fail_if_same_blocklister() {
+    #[test, expected_failure(abort_code = roles::ENotOwner)]
+    fun update_blocklister__should_fail_if_not_sent_by_owner() {
         let (mut scenario, mut roles) = setup();
 
-        // blocklister starts as OWNER, fails to be set to OWNER again
-        scenario.next_tx(OWNER);
-        test_update_blocklister(OWNER, &mut roles, &mut scenario);
+        scenario.next_tx(RANDOM_ADDRESS);
+        test_update_blocklister(RANDOM_ADDRESS, &mut roles, &mut scenario);
 
         scenario.end();
         destroy(roles);
@@ -219,18 +153,6 @@ module stablecoin::roles_tests {
         destroy(roles);
     }
 
-    #[test, expected_failure(abort_code = roles::ESamePauser)]
-    fun update_pauser__should_fail_if_same_pauser() {
-        let (mut scenario, mut roles) = setup();
-
-        // pauser starts as OWNER, fails to be set to OWNER again
-        scenario.next_tx(OWNER);
-        test_update_pauser(OWNER, &mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
     #[test, expected_failure(abort_code = roles::ENotOwner)]
     fun update_metadata_updater__should_fail_if_not_sent_by_owner() {
         let (mut scenario, mut roles) = setup();
@@ -242,55 +164,19 @@ module stablecoin::roles_tests {
         destroy(roles);
     }
 
-    #[test, expected_failure(abort_code = roles::ESameMetadataUpdater)]
-    fun update_metadata_updater__should_fail_if_same_metadata_updater() {
-        let (mut scenario, mut roles) = setup();
-
-        // metadata updater starts as OWNER, fails to be set to OWNER again
-        scenario.next_tx(OWNER);
-        test_update_metadata_updater(OWNER, &mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
     // === Helpers ===
 
-    /// Creates a Roles object and assigns admin to TREASURY_ADMIN and other roles to OWNER
+    /// Creates a Roles object and assigns all roles to OWNER
     fun setup(): (Scenario, Roles<ROLES_TEST>) {
         let scenario = test_scenario::begin(DEPLOYER);
-        let roles = roles::create_roles(TREASURY_ADMIN, OWNER, OWNER, OWNER, OWNER);
-        assert_eq(roles.admin(), TREASURY_ADMIN);
-        assert_eq(roles.pending_admin().is_none(), true);
+        let roles = roles::create_roles(OWNER, OWNER, OWNER, OWNER, OWNER);
         assert_eq(roles.owner(), OWNER);
         assert_eq(roles.pending_owner().is_none(), true);
+        assert_eq(roles.master_minter(), OWNER);
         assert_eq(roles.pauser(), OWNER);
         assert_eq(roles.blocklister(), OWNER);
 
         (scenario, roles)
-    }
-
-    public(package) fun test_change_admin<T>(new_admin: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
-        let old_admin = roles.admin();
-        roles.change_admin(new_admin, scenario.ctx());
-        assert_eq(roles.admin(), old_admin);
-        assert_eq(*roles.pending_admin().borrow(), new_admin);
-
-        let expected_event = roles::create_admin_transfer_started_event<T>(old_admin, new_admin);
-        assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<roles::TreasuryAdminTransferStarted<T>>(), expected_event);
-    }
-
-    public(package) fun test_accept_admin<T>(roles: &mut Roles<T>, scenario: &mut Scenario) {
-        let old_admin = roles.admin();
-        let pending_admin = roles.pending_admin();
-        roles.accept_admin(scenario.ctx());
-        assert_eq(roles.admin(), *pending_admin.borrow());
-        assert_eq(roles.pending_admin().is_none(), true);
-
-        let expected_event = roles::create_admin_changed_event<T>(old_admin, *pending_admin.borrow());
-        assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<roles::TreasuryAdminChanged<T>>(), expected_event);
     }
 
     public(package) fun test_transfer_ownership<T>(new_owner: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
@@ -314,6 +200,16 @@ module stablecoin::roles_tests {
         let expected_event = roles::create_owner_transferred_event<T>(old_owner, *pending_owner.borrow());
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type<roles::OwnershipTransferred<T>>(), expected_event);
+    }
+
+    public(package) fun test_update_master_minter<T>(new_master_minter: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
+        let old_master_minter = roles.master_minter();
+        roles.update_master_minter(new_master_minter, scenario.ctx());
+        assert_eq(roles.master_minter(), new_master_minter);
+
+        let expected_event = roles::create_master_minter_changed_event<T>(old_master_minter, new_master_minter);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<roles::MasterMinterChanged<T>>(), expected_event);
     }
 
     public(package) fun test_update_blocklister<T>(new_blocklister: address, roles: &mut Roles<T>, scenario: &mut Scenario) {

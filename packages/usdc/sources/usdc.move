@@ -42,8 +42,8 @@ module usdc::usdc {
     let treasury = treasury::create_treasury(
       treasury_cap, 
       deny_cap,
-      ctx.sender(), // treasury admin
       ctx.sender(), // owner
+      ctx.sender(), // master minter
       ctx.sender(), // blocklister
       ctx.sender(), // pauser
       ctx.sender(), // metadata updater
