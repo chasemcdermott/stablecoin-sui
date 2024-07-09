@@ -24,9 +24,9 @@ if [[ "$CI" == true ]]; then
 
   # Download and extract Sui binaries.
   mkdir -p ./bin/sui
-  curl -L -o ./bin/sui/sui-v1.25.1.tgz https://github.com/MystenLabs/sui/releases/download/mainnet-v1.25.1/sui-mainnet-v1.25.1-ubuntu-x86_64.tgz
-  tar -xvzf ./bin/sui/sui-v1.25.1.tgz -C ./bin/sui
-  rm ./bin/sui/sui-v1.25.1.tgz
+  curl -L -o ./bin/sui/sui-v1.28.2.tgz https://github.com/MystenLabs/sui/releases/download/testnet-v1.28.2/sui-testnet-v1.28.2-ubuntu-x86_64.tgz
+  tar -xvzf ./bin/sui/sui-v1.28.2.tgz -C ./bin/sui
+  rm ./bin/sui/sui-v1.28.2.tgz
 
   # Replace the release mode Sui with the debug mode Sui binary.
   rm ./bin/sui/sui
@@ -38,18 +38,21 @@ if [[ "$CI" == true ]]; then
   # Add Sui binaries to the PATH for all other steps in the CI workflow.
   echo "$PWD/bin/sui" >> $GITHUB_PATH
 
+  echo $(sui -V)
+
 # In all other environments, build the Sui binary from source in debug mode.
 else
   echo "Building Sui binary from source in debug mode..."
 
   cargo install \
     --git https://github.com/MystenLabs/sui.git \
-    --rev 6579e0ed9e432bae47a407daaf01f08c298bcb14 \
+    --rev 08b50387a184d842060888def915c4cf75c022aa \
     --locked --debug sui  
 fi
 
 # Sanity check that the Sui binary was installed correctly
-if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.25.1-6579e0e'
+# TODO update the version so that the commits match
+if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.29.0-1bc3c6996246'
 then
   echo "Sui binary was not installed"
   exit 1
