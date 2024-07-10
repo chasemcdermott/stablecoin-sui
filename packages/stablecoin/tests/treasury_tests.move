@@ -25,9 +25,11 @@ module stablecoin::treasury_tests {
         test_scenario::{Self, Scenario}, 
         test_utils::{Self, assert_eq},
     };
-    use stablecoin::treasury::{Self, MintCap, Treasury};
-    use stablecoin::roles_tests;
-    use stablecoin::test_utils::last_event_by_type;
+    use stablecoin::{
+        entry,
+        test_utils::last_event_by_type,
+        treasury::{Self, MintCap, Treasury}
+    };
 
     // test addresses
     const DEPLOYER: address = @0x0;
@@ -917,31 +919,45 @@ module stablecoin::treasury_tests {
 
     fun test_transfer_ownership(new_owner: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        roles_tests::test_transfer_ownership(new_owner, treasury.roles_mut(), scenario);
+        entry::transfer_ownership(&mut treasury, new_owner, scenario.ctx());
+        assert_eq(*treasury.roles().pending_owner().borrow(), new_owner);
         test_scenario::return_shared(treasury);
     }
 
     fun test_accept_ownership(scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        roles_tests::test_accept_ownership(treasury.roles_mut(), scenario);
+        let pending_owner = treasury.roles().pending_owner();
+        entry::accept_ownership(&mut treasury, scenario.ctx());
+        assert_eq(treasury.roles().owner(), *pending_owner.borrow());
+        assert_eq(treasury.roles().pending_owner().is_none(), true);
         test_scenario::return_shared(treasury);
     }
 
     fun test_update_master_minter(new_master_minter: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        roles_tests::test_update_master_minter(new_master_minter, treasury.roles_mut(), scenario);
+        entry::update_master_minter(&mut treasury, new_master_minter, scenario.ctx());
+        assert_eq(treasury.roles().master_minter(), new_master_minter);
         test_scenario::return_shared(treasury);
     }
 
     fun test_update_blocklister(new_blocklister: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        roles_tests::test_update_blocklister(new_blocklister, treasury.roles_mut(), scenario);
+        entry::update_blocklister(&mut treasury, new_blocklister, scenario.ctx());
+        assert_eq(treasury.roles().blocklister(), new_blocklister);
         test_scenario::return_shared(treasury);
     }
 
     fun test_update_pauser(new_pauser: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        roles_tests::test_update_pauser(new_pauser, treasury.roles_mut(), scenario);
+        entry::update_pauser(&mut treasury, new_pauser, scenario.ctx());
+        assert_eq(treasury.roles().pauser(), new_pauser);
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_update_metadata_updater(new_metadata_updater: address, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        entry::update_metadata_updater(&mut treasury, new_metadata_updater, scenario.ctx());
+        assert_eq(treasury.roles().metadata_updater(), new_metadata_updater);
         test_scenario::return_shared(treasury);
     }
 
@@ -970,12 +986,6 @@ module stablecoin::treasury_tests {
         assert_eq(event::events_by_type<treasury::Unpause<TREASURY_TESTS>>().length(), 1);
 
         test_scenario::return_shared(deny_list);
-        test_scenario::return_shared(treasury);
-    }
-
-    fun test_update_metadata_updater(metadata_updater: address, scenario: &mut Scenario) {
-        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        roles_tests::test_update_metadata_updater(metadata_updater, treasury.roles_mut(), scenario);
         test_scenario::return_shared(treasury);
     }
 
