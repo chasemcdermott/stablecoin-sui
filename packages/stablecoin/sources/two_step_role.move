@@ -114,4 +114,16 @@ module stablecoin::two_step_role {
 
         event::emit(RoleTransferred<T> { old_address, new_address: role.active_address });
     }
+
+    // === Test Only ===
+
+    #[test_only]
+    public(package) fun create_role_transfer_started_event<T>(old_address: address, new_address: address): RoleTransferStarted<T> {
+        RoleTransferStarted { old_address, new_address }
+    }
+
+    #[test_only]
+    public(package) fun create_role_transferred_event<T>(old_address: address, new_address: address): RoleTransferred<T> {
+        RoleTransferred { old_address, new_address }
+    }
 }

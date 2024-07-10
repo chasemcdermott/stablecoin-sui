@@ -16,20 +16,13 @@
 
 module stablecoin::roles {
     use sui::event;
-
-    // === Errors ===
-
-    const ENotOwner: u64 = 0;
-    const EPendingOwnerNotSet: u64 = 1;
-    const ENotPendingOwner: u64 = 2;
+    use stablecoin::two_step_role::{Self, TwoStepRole};
 
     // === Structs ===
 
     public struct Roles<phantom T> has store {
         /// Mutable address of the owner EOA
-        owner: address,
-        /// Mutable address of the pending owner EOA
-        pending_owner: Option<address>,
+        owner: TwoStepRole<OwnerRole<T>>,
         /// Mutable address of the master minter EOA
         master_minter: address,
         /// Mutable address of the blocklister EOA, controlled by owner
@@ -40,17 +33,10 @@ module stablecoin::roles {
         metadata_updater: address,
     }
 
+    // Type used to specify which TwoStepRole the owner role corresponds to.
+    public struct OwnerRole<phantom T> {}
+
     // === Events ===
-
-    public struct OwnershipTransferStarted<phantom T> has copy, drop {
-        old_owner: address,
-        new_owner: address,
-    }
-
-    public struct OwnershipTransferred<phantom T> has copy, drop {
-        old_owner: address,
-        new_owner: address,
-    }
 
     public struct MasterMinterChanged<phantom T> has copy, drop {
         old_master_minter: address,
@@ -74,9 +60,19 @@ module stablecoin::roles {
 
     // === View-only functions ===
 
+    /// Check the owner role object mutably
+    public(package) fun owner_role_mut<T>(roles: &mut Roles<T>): &mut TwoStepRole<OwnerRole<T>> {
+        &mut roles.owner
+    }
+
+    /// Check the owner role object
+    public(package) fun owner_role<T>(roles: &Roles<T>): &TwoStepRole<OwnerRole<T>> {
+        &roles.owner
+    }
+    
     /// Check the owner address
     public fun owner<T>(roles: &Roles<T>): address {
-        roles.owner
+        roles.owner.active_address()
     }
 
     /// Check the master minter address
@@ -86,7 +82,7 @@ module stablecoin::roles {
 
     /// Check the pending owner address
     public fun pending_owner<T>(roles: &Roles<T>): Option<address> {
-        roles.pending_owner
+        roles.owner.pending_address()
     }
 
     /// Check the blocklister address
@@ -114,53 +110,17 @@ module stablecoin::roles {
         metadata_updater: address,
     ): Roles<T> {
         Roles {
-            owner,
+            owner: two_step_role::new<OwnerRole<T>>(owner),
             master_minter,
-            pending_owner: option::none(),
             blocklister,
             pauser,
             metadata_updater,
         }
     }
 
-    /// Start owner role transfer process.
-    public fun transfer_ownership<T>(
-        roles: &mut Roles<T>,
-        new_owner: address,
-        ctx: &TxContext
-    ) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
-
-        roles.pending_owner = option::some(new_owner);
-
-        event::emit(OwnershipTransferStarted<T> {
-            old_owner: roles.owner,
-            new_owner,
-        });
-    }
-
-    /// Finalize owner role transfer process.
-    public fun accept_ownership<T>(
-        roles: &mut Roles<T>,
-        ctx: &TxContext
-    ) {
-        let old_owner = roles.owner;
-
-        assert!(roles.pending_owner.is_some(), EPendingOwnerNotSet);
-        let new_owner = roles.pending_owner.extract();
-
-        assert!(new_owner == ctx.sender(), ENotPendingOwner);
-        roles.owner = new_owner;
-
-        event::emit(OwnershipTransferred<T> {
-            old_owner,
-            new_owner
-        });
-    }
-
     /// Change the master minter address.
     public fun update_master_minter<T>(roles: &mut Roles<T>, new_master_minter: address, ctx: &TxContext) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
+        roles.owner_role().assert_sender_is_active_role(ctx);
 
         let old_master_minter = roles.master_minter;
         roles.master_minter = new_master_minter;
@@ -173,7 +133,7 @@ module stablecoin::roles {
 
     /// Change the blocklister address.
     public fun update_blocklister<T>(roles: &mut Roles<T>, new_blocklister: address, ctx: &TxContext) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
+        roles.owner_role().assert_sender_is_active_role(ctx);
 
         let old_blocklister = roles.blocklister;
         roles.blocklister = new_blocklister;
@@ -186,7 +146,7 @@ module stablecoin::roles {
 
     /// Change the pauser address.
     public fun update_pauser<T>(roles: &mut Roles<T>, new_pauser: address, ctx: &TxContext) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
+        roles.owner_role().assert_sender_is_active_role(ctx);
 
         let old_pauser = roles.pauser;
         roles.pauser = new_pauser;
@@ -199,7 +159,7 @@ module stablecoin::roles {
 
     /// Change the metadata updater address.
     public fun update_metadata_updater<T>(roles: &mut Roles<T>, new_metadata_updater: address, ctx: &TxContext) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
+        roles.owner_role().assert_sender_is_active_role(ctx);
 
         let old_metadata_updater = roles.metadata_updater;
         roles.metadata_updater = new_metadata_updater;
@@ -211,16 +171,6 @@ module stablecoin::roles {
     }
 
     // === Test Only ===
-
-    #[test_only]
-    public(package) fun create_owner_transfer_started_event<T>(old_owner: address, new_owner: address): OwnershipTransferStarted<T> {
-        OwnershipTransferStarted { old_owner, new_owner }
-    }
-
-    #[test_only]
-    public(package) fun create_owner_transferred_event<T>(old_owner: address, new_owner: address): OwnershipTransferred<T> {
-        OwnershipTransferred { old_owner, new_owner }
-    }
 
     #[test_only]
     public(package) fun create_master_minter_changed_event<T>(old_master_minter: address, new_master_minter: address): MasterMinterChanged<T> {

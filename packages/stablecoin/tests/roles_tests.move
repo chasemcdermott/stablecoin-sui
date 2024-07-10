@@ -22,8 +22,11 @@ module stablecoin::roles_tests {
         test_utils::assert_eq,
         test_utils::destroy,
     };
-    use stablecoin::roles::{Self, Roles};
-    use stablecoin::test_utils::last_event_by_type;
+    use stablecoin::{
+        roles::{Self, Roles},
+        test_utils::last_event_by_type,
+        two_step_role
+    };
 
     public struct ROLES_TEST has drop {}
 
@@ -64,63 +67,7 @@ module stablecoin::roles_tests {
         destroy(roles);
     }
 
-    #[test]
-    fun transfer_ownership__change_pending_owner() {
-        let (mut scenario, mut roles) = setup();
-
-        // make RANDOM_ADDRESS the pending owner
-        scenario.next_tx(OWNER);
-        test_transfer_ownership(RANDOM_ADDRESS, &mut roles, &mut scenario);
-
-        // make DEPLOYER the pending owner
-        scenario.next_tx(OWNER);
-        test_transfer_ownership(DEPLOYER, &mut roles, &mut scenario);
-
-        // accept DEPLOYER as new owner
-        scenario.next_tx(DEPLOYER);
-        test_accept_ownership(&mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
-    #[test, expected_failure(abort_code = roles::ENotOwner)]
-    fun transfer_ownership__should_fail_if_not_sent_by_owner() {
-        let (mut scenario, mut roles) = setup();
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        test_transfer_ownership(RANDOM_ADDRESS, &mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
-    #[test, expected_failure(abort_code = roles::EPendingOwnerNotSet)]
-    fun accept_ownership__should_fail_if_pending_owner_not_set() {
-        let (mut scenario, mut roles) = setup();
-
-        scenario.next_tx(OWNER);
-        test_accept_ownership(&mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
-    #[test, expected_failure(abort_code = roles::ENotPendingOwner)]
-    fun accept_ownership__should_fail_if_sender_is_not_pending_owner() {
-        let (mut scenario, mut roles) = setup();
-
-        scenario.next_tx(OWNER);
-        test_transfer_ownership(BLOCKLISTER, &mut roles, &mut scenario);
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        test_accept_ownership(&mut roles, &mut scenario);
-
-        scenario.end();
-        destroy(roles);
-    }
-
-    #[test, expected_failure(abort_code = roles::ENotOwner)]
+    #[test, expected_failure(abort_code = two_step_role::ESenderNotActiveRole)]
     fun update_master_minter__should_fail_if_not_sent_by_owner() {
         let (mut scenario, mut roles) = setup();
 
@@ -131,7 +78,7 @@ module stablecoin::roles_tests {
         destroy(roles);
     }
 
-    #[test, expected_failure(abort_code = roles::ENotOwner)]
+    #[test, expected_failure(abort_code = two_step_role::ESenderNotActiveRole)]
     fun update_blocklister__should_fail_if_not_sent_by_owner() {
         let (mut scenario, mut roles) = setup();
 
@@ -142,7 +89,7 @@ module stablecoin::roles_tests {
         destroy(roles);
     }
 
-    #[test, expected_failure(abort_code = roles::ENotOwner)]
+    #[test, expected_failure(abort_code = two_step_role::ESenderNotActiveRole)]
     fun update_pauser__should_fail_if_not_sent_by_owner() {
         let (mut scenario, mut roles) = setup();
 
@@ -153,7 +100,7 @@ module stablecoin::roles_tests {
         destroy(roles);
     }
 
-    #[test, expected_failure(abort_code = roles::ENotOwner)]
+    #[test, expected_failure(abort_code = two_step_role::ESenderNotActiveRole)]
     fun update_metadata_updater__should_fail_if_not_sent_by_owner() {
         let (mut scenario, mut roles) = setup();
 
@@ -181,25 +128,37 @@ module stablecoin::roles_tests {
 
     public(package) fun test_transfer_ownership<T>(new_owner: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_owner = roles.owner();
-        roles.transfer_ownership(new_owner, scenario.ctx());
-        assert_eq(roles.owner(), old_owner);
+        let owner_obj = roles.owner_role_mut();
+        two_step_role::begin_role_transfer(owner_obj, new_owner, scenario.ctx());
+        assert_eq(roles.owner(), old_owner);    
         assert_eq(*roles.pending_owner().borrow(), new_owner);
 
-        let expected_event = roles::create_owner_transfer_started_event<T>(old_owner, new_owner);
+        let expected_event = two_step_role::create_role_transfer_started_event(
+            old_owner, new_owner
+        );
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<roles::OwnershipTransferStarted<T>>(), expected_event);
+        assert_eq(
+            last_event_by_type<two_step_role::RoleTransferStarted<roles::OwnerRole<T>>>(), 
+            expected_event
+        );
     }
 
     public(package) fun test_accept_ownership<T>(roles: &mut Roles<T>, scenario: &mut Scenario) {
         let old_owner = roles.owner();
         let pending_owner = roles.pending_owner();
-        roles.accept_ownership(scenario.ctx());
+        let owner_role = roles.owner_role_mut();
+        two_step_role::accept_role(owner_role, scenario.ctx());
         assert_eq(roles.owner(), *pending_owner.borrow());
         assert_eq(roles.pending_owner().is_none(), true);
 
-        let expected_event = roles::create_owner_transferred_event<T>(old_owner, *pending_owner.borrow());
+        let expected_event = two_step_role::create_role_transferred_event(
+            old_owner, *pending_owner.borrow()
+        );
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<roles::OwnershipTransferred<T>>(), expected_event);
+        assert_eq(
+            last_event_by_type<two_step_role::RoleTransferred<roles::OwnerRole<T>>>(), 
+            expected_event
+        );
     }
 
     public(package) fun test_update_master_minter<T>(new_master_minter: address, roles: &mut Roles<T>, scenario: &mut Scenario) {
