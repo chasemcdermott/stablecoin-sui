@@ -116,6 +116,13 @@ module stablecoin::treasury {
 
     public struct Unpause<phantom T> has copy, drop {}
 
+    public struct MetadataUpdated<phantom T> has copy, drop {
+        name: string::String,
+        symbol: ascii::String,
+        description: string::String,
+        icon_url: ascii::String
+    }
+
     // === View-only functions ===
 
     /// Get immutable reference to the roles
@@ -439,14 +446,20 @@ module stablecoin::treasury {
         name: string::String,
         symbol: ascii::String,
         description: string::String,
-        url: ascii::String,
+        icon_url: ascii::String,
         ctx: &TxContext
     ) {
         assert!(treasury.roles.metadata_updater() == ctx.sender(), ENotMetadataUpdater);
         treasury.borrow_treasury_cap().update_name(metadata, name);
         treasury.borrow_treasury_cap().update_symbol(metadata, symbol);
         treasury.borrow_treasury_cap().update_description(metadata, description);
-        treasury.borrow_treasury_cap().update_icon_url(metadata, url);
+        treasury.borrow_treasury_cap().update_icon_url(metadata, icon_url);
+        event::emit(MetadataUpdated<T> {
+            name,
+            symbol,
+            description,
+            icon_url
+        })
     }
 
     // === Test Only ===
@@ -519,5 +532,20 @@ module stablecoin::treasury {
     #[test_only]
     public(package) fun create_unblocklisted_event<T>(`address`: address): Unblocklisted<T> {
         Unblocklisted { `address` }
+    }
+
+    #[test_only]
+    public(package) fun create_metadata_updated_event<T>(
+        name: string::String,
+        symbol: ascii::String,
+        description: string::String,
+        icon_url: ascii::String
+    ): MetadataUpdated<T> {
+        MetadataUpdated {
+            name,
+            symbol,
+            description,
+            icon_url
+        }
     }
 }

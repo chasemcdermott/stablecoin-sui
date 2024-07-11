@@ -1000,11 +1000,14 @@ module stablecoin::treasury_tests {
         let mut metadata = scenario.take_shared<CoinMetadata<TREASURY_TESTS>>();
 
         treasury.update_metadata(&mut metadata, name, symbol, description, url, scenario.ctx());
-        assert_eq(event::num_events(), 0);
         assert_eq(metadata.get_name(), name);
         assert_eq(metadata.get_symbol(), symbol);
         assert_eq(metadata.get_description(), description);
         assert_eq(metadata.get_icon_url().borrow().inner_url(), url);
+
+        let expected_event = treasury::create_metadata_updated_event<TREASURY_TESTS>(name, symbol, description, url);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type<treasury::MetadataUpdated<TREASURY_TESTS>>(), expected_event);
 
         test_scenario::return_shared(treasury);
         test_scenario::return_shared(metadata);

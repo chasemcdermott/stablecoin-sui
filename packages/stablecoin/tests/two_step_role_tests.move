@@ -17,10 +17,14 @@
 #[test_only]
 module stablecoin::two_step_role_tests {
     use sui::{
+        event,
         test_scenario::{Self, Scenario},
         test_utils::{destroy, assert_eq}
     };
-    use stablecoin::two_step_role::{Self, TwoStepRole};
+    use stablecoin::{
+        test_utils::last_event_by_type,
+        two_step_role::{Self, TwoStepRole}
+    };
 
     public struct TWO_STEP_ROLE_TESTS has drop {}
 
@@ -65,6 +69,15 @@ module stablecoin::two_step_role_tests {
         assert_eq(role.active_address(), ADMIN);
         assert_eq(role.pending_address(), option::some(NEW_ADMIN));
 
+        let expected_event = two_step_role::create_role_transfer_started_event(
+            ADMIN, NEW_ADMIN
+        );
+        assert_eq(event::num_events(), 1);
+        assert_eq(
+            last_event_by_type<two_step_role::RoleTransferStarted<TWO_STEP_ROLE_TESTS>>(), 
+            expected_event
+        );
+
         destroy(role);
         scenario.end();
     }
@@ -104,6 +117,15 @@ module stablecoin::two_step_role_tests {
         
         assert_eq(role.active_address(), NEW_ADMIN);
         assert_eq(role.pending_address(), option::none());
+
+        let expected_event = two_step_role::create_role_transferred_event(
+            ADMIN, NEW_ADMIN
+        );
+        assert_eq(event::num_events(), 1);
+        assert_eq(
+            last_event_by_type<two_step_role::RoleTransferred<TWO_STEP_ROLE_TESTS>>(), 
+            expected_event
+        );
 
         destroy(role);
         scenario.end();
