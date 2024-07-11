@@ -130,8 +130,8 @@ module stablecoin::treasury {
         &treasury.roles
     }
 
-    /// Get mutable reference to the roles
-    public fun roles_mut<T>(treasury: &mut Treasury<T>): &mut Roles<T> {
+    /// [Package private] Get mutable reference to the roles
+    public(package) fun roles_mut<T>(treasury: &mut Treasury<T>): &mut Roles<T> {
         &mut treasury.roles
     }
 

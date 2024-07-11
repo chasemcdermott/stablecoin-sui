@@ -126,4 +126,67 @@ describe("Test PTBs", () => {
     assert.equal(metadata.description, new_desc);
     assert.equal(metadata.iconUrl, new_icon);
   });
+
+  it("Builds and submits a PTB to update roles via entry functions", async () => {
+    const deployerAddress = deployerKeys.getPublicKey().toSuiAddress();
+    const newAddress = (await generateKeypair(false)).getPublicKey().toSuiAddress();
+
+    // Build a PTB to update some roles
+    const txb = new Transaction();
+    txb.moveCall({
+      target: `${PACKAGE_ID}::entry::update_blocklister`,
+      typeArguments: [USDC_TYPE_ID],
+      arguments: [
+        txb.object(TREASURY_OBJECT_ID),
+        txb.pure.address(newAddress)
+      ]
+    });
+    txb.moveCall({
+      target: `${PACKAGE_ID}::entry::update_pauser`,
+      typeArguments: [USDC_TYPE_ID],
+      arguments: [
+        txb.object(TREASURY_OBJECT_ID),
+        txb.pure.address(newAddress)
+      ]
+    });
+
+    // Sign and submit transaction, assert success
+    const result = await client.signAndExecuteTransaction({
+      signer: deployerKeys,
+      transaction: txb,
+      options: {
+        showBalanceChanges: true,
+        showEffects: true,
+        showEvents: true,
+        showInput: true,
+        showObjectChanges: true,
+        showRawInput: true
+      }
+    });
+    assert.equal(result.effects?.status.status, "success");
+
+    // Wait for the transaction to be available over API
+    await client.waitForTransaction({
+      digest: result.digest
+    });
+
+    // Assert that roles were updated
+    const treasury = await client.getObject({
+      id: TREASURY_OBJECT_ID,
+      options: {
+        showContent: true
+      }
+    });
+    assert.equal(treasury.data?.content?.dataType, 'moveObject');
+
+    const treasuryFields = treasury.data.content.fields as any;
+    const roleFields = treasuryFields.roles.fields as any;
+    const ownerFields = roleFields.owner.fields as any;
+    assert.equal(ownerFields.active_address, deployerAddress);
+    assert.equal(ownerFields.pending_address, null);
+    assert.equal(roleFields.master_minter, deployerAddress);
+    assert.equal(roleFields.blocklister, newAddress);
+    assert.equal(roleFields.pauser, newAddress);
+    assert.equal(roleFields.metadata_updater, deployerAddress);
+  });
 });
