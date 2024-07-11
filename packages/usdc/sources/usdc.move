@@ -29,13 +29,14 @@ module usdc::usdc {
 
   #[allow(lint(share_owned))]
   fun init(witness: USDC, ctx: &mut TxContext) {
-    let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency(
+    let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency_v2(
       witness,
       6,               // decimals
       b"USDC",         // symbol
       b"USDC",         // name
       DESCRIPTION,
       option::some(url::new_unsafe(string(ICON_URL))),
+      true,            // allow global pause
       ctx
     );
 

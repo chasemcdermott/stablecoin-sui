@@ -98,8 +98,8 @@ module usdc::usdc_tests {
 
     // use deny cap to add an address to the deny list
     let mut deny_list = scenario.take_shared<DenyList>();
-    coin::deny_list_add(&mut deny_list, deny_cap, RANDOM_ADDRESS, scenario.ctx());
-    assert_eq(coin::deny_list_contains<USDC>(&deny_list, RANDOM_ADDRESS), true);
+    coin::deny_list_v2_add(&mut deny_list, deny_cap, RANDOM_ADDRESS, scenario.ctx());
+    assert_eq(coin::deny_list_v2_contains_next_epoch<USDC>(&deny_list, RANDOM_ADDRESS), true);
 
     test_scenario::return_shared(deny_list);
     test_scenario::return_shared(treasury);

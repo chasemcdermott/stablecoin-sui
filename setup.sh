@@ -24,9 +24,9 @@ if [[ "$CI" == true ]]; then
 
   # Download and extract Sui binaries.
   mkdir -p ./bin/sui
-  curl -L -o ./bin/sui/sui-v1.28.2.tgz https://github.com/MystenLabs/sui/releases/download/testnet-v1.28.2/sui-testnet-v1.28.2-ubuntu-x86_64.tgz
-  tar -xvzf ./bin/sui/sui-v1.28.2.tgz -C ./bin/sui
-  rm ./bin/sui/sui-v1.28.2.tgz
+  curl -L -o ./bin/sui/sui-v1.29.0.tgz https://github.com/MystenLabs/sui/releases/download/devnet-afe6d26-v1.29.0/sui-devnet-afe6d26-v1.29.0-ubuntu-x86_64.tgz
+  tar -xvzf ./bin/sui/sui-v1.29.0.tgz -C ./bin/sui
+  rm ./bin/sui/sui-v1.29.0.tgz
 
   # Replace the release mode Sui with the debug mode Sui binary.
   rm ./bin/sui/sui
@@ -46,13 +46,12 @@ else
 
   cargo install \
     --git https://github.com/MystenLabs/sui.git \
-    --rev 08b50387a184d842060888def915c4cf75c022aa \
+    --rev afe6d2679a8fa397757a3e0188fc211e7387ee0a \
     --locked --debug sui  
 fi
 
 # Sanity check that the Sui binary was installed correctly
-# TODO update the version so that the commits match
-if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.29.0-1bc3c6996246'
+if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.29.0-afe6d2679a8f'
 then
   echo "Sui binary was not installed"
   exit 1

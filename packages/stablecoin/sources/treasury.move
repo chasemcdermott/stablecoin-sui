@@ -17,11 +17,20 @@
 module stablecoin::treasury {
     use std::string;
     use std::ascii;
-    use sui::coin::{Self, Coin, TreasuryCap, DenyCap, CoinMetadata};
-    use sui::deny_list::{DenyList};
-    use sui::event;
-    use sui::table::{Self, Table};
-    use sui::dynamic_object_field as dof;
+    use sui::{
+        coin::{
+            Self, Coin, CoinMetadata, DenyCapV2, TreasuryCap, 
+
+            // returns if address is on the deny list based on the most recent update
+            deny_list_v2_contains_next_epoch as is_blocklisted,
+            // returns if the global pause is effective based on the most recent update
+            deny_list_v2_is_global_pause_enabled_next_epoch as is_paused,
+        },
+        deny_list::{DenyList},
+        event,
+        table::{Self, Table},
+        dynamic_object_field as dof
+    };
     use stablecoin::mint_allowance::{Self, MintAllowance};
     use stablecoin::roles::{Self, Roles};
 
@@ -37,8 +46,8 @@ module stablecoin::treasury {
     const ENotMetadataUpdater: u64 = 7;
     const ENotMinter: u64 = 8;
     const ENotPauser: u64 = 9;
-    const ETreasuryCapNotFound: u64 = 10;
-    const EUnimplemented: u64 = 11;
+    const EPaused: u64 = 10;
+    const ETreasuryCapNotFound: u64 = 11;
     const EZeroAmount: u64 = 12;
 
     // === Structs ===
@@ -161,7 +170,7 @@ module stablecoin::treasury {
 
     /// [Package private] ensure deny cap exists
     public(package) fun assert_deny_cap_exists<T>(treasury: &Treasury<T>) {
-        assert!(dof::exists_with_type<_, DenyCap<T>>(&treasury.id, DenyCapKey {}), EDenyCapNotFound);
+        assert!(dof::exists_with_type<_, DenyCapV2<T>>(&treasury.id, DenyCapKey {}), EDenyCapNotFound);
     }
 
     /// Check if an address is a mint controller
@@ -179,7 +188,7 @@ module stablecoin::treasury {
     /// Wrap `TreasuryCap` into a struct, accessible via additional capabilities
     public fun create_treasury<T>(
         treasury_cap: TreasuryCap<T>, 
-        deny_cap: DenyCap<T>, 
+        deny_cap: DenyCapV2<T>, 
         owner: address,
         master_minter: address,
         blocklister: address,
@@ -260,15 +269,14 @@ module stablecoin::treasury {
         });
     }
 
-    #[allow(unused_variable)]
     /// Enables the minter and sets its allowance.
-    /// TODO(SPG-308): Add pause check.
     public fun configure_minter<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &DenyList, 
         new_allowance: u64, 
         ctx: &TxContext
     ) {
+        assert!(!is_paused<T>(deny_list), EPaused);
         let controller = ctx.sender();
         let mint_cap_id = get_worker(treasury, controller);
 
@@ -303,7 +311,6 @@ module stablecoin::treasury {
     
     /// Mints coins to a recipient address.
     /// The caller must own a MintCap, and can only mint up to its allowance
-    /// TODO(SPG-308): Add pause check.
     public fun mint<T>(
         treasury: &mut Treasury<T>, 
         mint_cap: &MintCap<T>, 
@@ -312,10 +319,11 @@ module stablecoin::treasury {
         recipient: address, 
         ctx: &mut TxContext
     ) {
+        assert!(!is_paused<T>(deny_list), EPaused);
+        assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
+        assert!(!is_blocklisted<T>(deny_list, recipient), EDeniedAddress);
         let mint_cap_id = object::id(mint_cap);
         assert!(is_authorized_mint_cap(treasury, mint_cap_id), ENotMinter);
-        assert!(!coin::deny_list_contains<T>(deny_list, ctx.sender()), EDeniedAddress);
-        assert!(!coin::deny_list_contains<T>(deny_list, recipient), EDeniedAddress);
         assert!(amount > 0, EZeroAmount);
 
         let mint_allowance = treasury.mint_allowances.borrow_mut(mint_cap_id);
@@ -334,7 +342,6 @@ module stablecoin::treasury {
 
     /// Allows a minter to burn some of its own coins.
     /// The caller must own a MintCap
-    /// TODO(SPG-308): Add pause check.
     public fun burn<T>(
         treasury: &mut Treasury<T>, 
         mint_cap: &MintCap<T>, 
@@ -342,9 +349,10 @@ module stablecoin::treasury {
         coin: Coin<T>,
         ctx: &TxContext
     ) {
+        assert!(!is_paused<T>(deny_list), EPaused);
+        assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
         let mint_cap_id = object::id(mint_cap);
         assert!(is_authorized_mint_cap(treasury, mint_cap_id), ENotMinter);
-        assert!(!coin::deny_list_contains<T>(deny_list, ctx.sender()), EDeniedAddress);
 
         let amount = coin.value();
         assert!(amount > 0, EZeroAmount);
@@ -365,8 +373,8 @@ module stablecoin::treasury {
     ) {
         assert!(treasury.roles.blocklister() == ctx.sender(), ENotBlocklister);
 
-        if (!coin::deny_list_contains<T>(deny_list, addr)) {
-            coin::deny_list_add<T>(deny_list, treasury.borrow_deny_cap_mut(), addr, ctx);
+        if (!is_blocklisted<T>(deny_list, addr)) {
+            coin::deny_list_v2_add<T>(deny_list, treasury.borrow_deny_cap_mut(), addr, ctx);
         };
         event::emit(Blocklisted<T> {
             `address`: addr
@@ -382,31 +390,29 @@ module stablecoin::treasury {
     ) {
         assert!(treasury.roles.blocklister() == ctx.sender(), ENotBlocklister);
 
-        if (coin::deny_list_contains<T>(deny_list, addr)) {
-            coin::deny_list_remove<T>(deny_list, treasury.borrow_deny_cap_mut(), addr, ctx);
+        if (is_blocklisted<T>(deny_list, addr)) {
+            coin::deny_list_v2_remove<T>(deny_list, treasury.borrow_deny_cap_mut(), addr, ctx);
         };
         event::emit(Unblocklisted<T> {
             `address`: addr
         })
     }
 
-    #[allow(unused_variable)]
     /// Triggers stopped state; pause all transfers
     public fun pause<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &mut DenyList,
         ctx: &mut TxContext
     ) {
-        assert!(treasury.roles().pauser() == ctx.sender(), ENotPauser);
-
+        assert!(treasury.roles.pauser() == ctx.sender(), ENotPauser);
         let deny_cap = treasury.borrow_deny_cap_mut();
-        // TODO(SPG-308): enable global pause
-        event::emit(Pause<T> {});
 
-        assert!(false, EUnimplemented);
+        if (!is_paused<T>(deny_list)) {
+            coin::deny_list_v2_enable_global_pause(deny_list, deny_cap, ctx);
+        };
+        event::emit(Pause<T> {});
     }
 
-    #[allow(unused_variable)]
     /// Restores normal state; unpause all transfers
     public fun unpause<T>(
         treasury: &mut Treasury<T>, 
@@ -415,10 +421,11 @@ module stablecoin::treasury {
     ) {
         assert!(treasury.roles().pauser() == ctx.sender(), ENotPauser);
         let deny_cap = treasury.borrow_deny_cap_mut();
-        // TODO(SPG-308): enable global pause
+
+        if (is_paused<T>(deny_list)) {
+            coin::deny_list_v2_disable_global_pause(deny_list, deny_cap, ctx);
+        };
         event::emit(Unpause<T> {});
-        
-        assert!(false, EUnimplemented);
     }
    
     /// Returns an immutable reference of the TreasuryCap
@@ -434,7 +441,7 @@ module stablecoin::treasury {
     }
 
     /// Returns a mutable reference of the DenyCap
-    fun borrow_deny_cap_mut<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
+    fun borrow_deny_cap_mut<T>(treasury: &mut Treasury<T>): &mut DenyCapV2<T> {
         treasury.assert_deny_cap_exists();
         dof::borrow_mut(&mut treasury.id, DenyCapKey {})
     }
@@ -475,7 +482,7 @@ module stablecoin::treasury {
     }
 
     #[test_only]
-    public fun get_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): &mut DenyCap<T> {
+    public fun get_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): &mut DenyCapV2<T> {
         treasury.borrow_deny_cap_mut()
     }
 
@@ -485,7 +492,7 @@ module stablecoin::treasury {
     }
 
     #[test_only]
-    public fun remove_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): DenyCap<T> {
+    public fun remove_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): DenyCapV2<T> {
         dof::remove(&mut treasury.id, DenyCapKey {})
     }
 

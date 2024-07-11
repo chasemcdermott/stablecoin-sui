@@ -209,6 +209,19 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EPaused)]
+    fun configure_minter__should_fail_when_paused() {
+        let mut scenario = setup();
+
+        scenario.next_tx(OWNER); 
+        test_pause(&mut scenario);
+
+        scenario.next_tx(CONTROLLER); 
+        test_configure_minter(10, &mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotController)]
     fun remove_minter__should_fail_from_non_controller() {
         let mut scenario = setup();
@@ -349,6 +362,25 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EPaused)]
+    fun mint__should_fail_when_paused() {
+        let mut scenario = setup();
+
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_configure_minter(0, &mut scenario);
+
+        scenario.next_tx(OWNER);
+        test_pause(&mut scenario);
+
+        scenario.next_tx(MINTER);
+        test_mint(1000000, MINT_RECIPIENT, &mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::EDeniedAddress)]
     fun burn__should_fail_from_denylisted_sender() {
         let mut scenario = setup();
@@ -384,6 +416,28 @@ module stablecoin::treasury_tests {
         scenario.next_tx(MINTER);
         let coin = coin::zero<TREASURY_TESTS>(scenario.ctx());
         transfer::public_transfer(coin, MINTER);
+
+        scenario.next_tx(MINTER);
+        test_burn(&mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EPaused)]
+    fun burn__should_fail_when_paused() {
+        let mut scenario = setup();
+
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_configure_minter(1000000, &mut scenario);
+
+        scenario.next_tx(MINTER);
+        test_mint(1000000, MINTER, &mut scenario);
+
+        scenario.next_tx(OWNER);
+        test_pause(&mut scenario);
 
         scenario.next_tx(MINTER);
         test_burn(&mut scenario);
@@ -446,6 +500,9 @@ module stablecoin::treasury_tests {
         scenario.next_tx(OWNER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_blocklisted_current_epoch(&mut scenario, RANDOM_ADDRESS_2, true);
+
         scenario.end();
     }
 
@@ -460,6 +517,9 @@ module stablecoin::treasury_tests {
         // Blocklisting the same address keeps the address in the blocklisted state.
         scenario.next_tx(OWNER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_blocklisted_current_epoch(&mut scenario, RANDOM_ADDRESS_2, true);
 
         scenario.end();
     }
@@ -507,6 +567,10 @@ module stablecoin::treasury_tests {
         scenario.next_tx(OWNER);
         test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
 
+        // Fast forward to next epoch, check blocklist state
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_blocklisted_current_epoch(&mut scenario, RANDOM_ADDRESS_2, false);
+
         scenario.end();
     }
 
@@ -525,6 +589,10 @@ module stablecoin::treasury_tests {
         // Unblocklisting the same address keeps the address in the unblocklisted state.
         scenario.next_tx(OWNER);
         test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
+
+        // Fast forward to next epoch, check blocklist state
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_blocklisted_current_epoch(&mut scenario, RANDOM_ADDRESS_2, false);
 
         scenario.end();
     }
@@ -640,8 +708,8 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::EUnimplemented)]
-    fun pause__should_fail_with_unimplemented_error() {
+    #[test]
+    fun pause__should_succeed() {
         let mut scenario = setup();
 
         scenario.next_tx(OWNER);
@@ -649,6 +717,28 @@ module stablecoin::treasury_tests {
 
         scenario.next_tx(PAUSER);
         test_pause(&mut scenario);
+
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_paused_current_epoch(&mut scenario, true);
+
+        scenario.end();
+    }
+
+    #[test]
+    fun pause__should_be_idempotent() {
+        let mut scenario = setup();
+
+        scenario.next_tx(OWNER);
+        test_update_pauser(PAUSER, &mut scenario);
+
+        scenario.next_tx(PAUSER);
+        test_pause(&mut scenario);
+
+        scenario.next_tx(PAUSER);
+        test_pause(&mut scenario);
+
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_paused_current_epoch(&mut scenario, true);
 
         scenario.end();
     }
@@ -676,15 +766,43 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::EUnimplemented)]
-    fun unpause__should_fail_with_unimplemented_error() {
+    #[test]
+    fun unpause__should_succeed() {
+        let mut scenario = setup();
+
+        scenario.next_tx(OWNER);
+        test_pause(&mut scenario);
+        
+        scenario.next_tx(OWNER);
+        test_unpause(&mut scenario);
+
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_paused_current_epoch(&mut scenario, false);
+
+        scenario.end();
+    }
+
+    #[test]
+    fun unpause__should_be_idempotent() {
         let mut scenario = setup();
 
         scenario.next_tx(OWNER);
         test_update_pauser(PAUSER, &mut scenario);
         
         scenario.next_tx(PAUSER);
+        test_pause(&mut scenario);
+
+        scenario.next_tx(PAUSER);
         test_unpause(&mut scenario);
+
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_paused_current_epoch(&mut scenario, false);
+
+        scenario.next_tx(PAUSER);
+        test_unpause(&mut scenario);
+
+        scenario.next_epoch(RANDOM_ADDRESS);
+        test_is_paused_current_epoch(&mut scenario, false);
 
         scenario.end();
     }
@@ -713,13 +831,14 @@ module stablecoin::treasury_tests {
         {
             deny_list::create_for_test(scenario.ctx());
             let otw = test_utils::create_one_time_witness<TREASURY_TESTS>();
-            let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency(
+            let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency_v2(
                 otw,
                 6,
                 b"SYMBOL",
                 b"NAME",
                 b"",
                 option::none(),
+                true,
                 scenario.ctx()
             );
 
@@ -890,12 +1009,15 @@ module stablecoin::treasury_tests {
     fun test_blocklist(addr: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
         let mut deny_list = scenario.take_shared<DenyList>();
+        let blocklisted_before = coin::deny_list_v2_contains_current_epoch<TREASURY_TESTS>(&deny_list, addr, scenario.ctx());
 
         treasury.blocklist(&mut deny_list, addr, scenario.ctx());
-        assert_eq(coin::deny_list_contains<TREASURY_TESTS>(&deny_list, addr), true);
+        assert_eq(coin::deny_list_v2_contains_next_epoch<TREASURY_TESTS>(&deny_list, addr), true);
+        assert_eq(coin::deny_list_v2_contains_current_epoch<TREASURY_TESTS>(&deny_list, addr, scenario.ctx()), blocklisted_before);
 
         let expected_event = treasury::create_blocklisted_event<TREASURY_TESTS>(addr);
-        assert_eq(event::num_events(), 1);
+        let expected_event_count = 1 + event::events_by_type<deny_list::PerTypeConfigCreated>().length();
+        assert_eq(event::num_events() as u64, expected_event_count);
         assert_eq(last_event_by_type<treasury::Blocklisted<TREASURY_TESTS>>(), expected_event);
 
         test_scenario::return_shared(deny_list);
@@ -905,9 +1027,11 @@ module stablecoin::treasury_tests {
     fun test_unblocklist(addr: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
         let mut deny_list = scenario.take_shared<DenyList>();
+        let blocklisted_before = coin::deny_list_v2_contains_current_epoch<TREASURY_TESTS>(&deny_list, addr, scenario.ctx());
 
         treasury.unblocklist(&mut deny_list, addr, scenario.ctx());
-        assert_eq(coin::deny_list_contains<TREASURY_TESTS>(&deny_list, addr), false);
+        assert_eq(coin::deny_list_v2_contains_next_epoch<TREASURY_TESTS>(&deny_list, addr), false);
+        assert_eq(coin::deny_list_v2_contains_current_epoch<TREASURY_TESTS>(&deny_list, addr, scenario.ctx()), blocklisted_before);
 
         let expected_event = treasury::create_unblocklisted_event<TREASURY_TESTS>(addr);
         assert_eq(event::num_events(), 1);
@@ -964,11 +1088,14 @@ module stablecoin::treasury_tests {
     fun test_pause(scenario: &mut Scenario) {
         let mut deny_list = scenario.take_shared<DenyList>();
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        let paused_before = coin::deny_list_v2_is_global_pause_enabled_current_epoch<TREASURY_TESTS>(&deny_list, scenario.ctx());
 
         treasury.pause(&mut deny_list, scenario.ctx());
-        // TODO(SPG-308): check deny list state
+        assert_eq(coin::deny_list_v2_is_global_pause_enabled_next_epoch<TREASURY_TESTS>(&deny_list), true);
+        assert_eq(coin::deny_list_v2_is_global_pause_enabled_current_epoch<TREASURY_TESTS>(&deny_list, scenario.ctx()), paused_before);
 
-        assert_eq(event::num_events(), 1);
+        let expected_event_count = 1 + event::events_by_type<deny_list::PerTypeConfigCreated>().length();
+        assert_eq(event::num_events() as u64, expected_event_count);
         assert_eq(event::events_by_type<treasury::Pause<TREASURY_TESTS>>().length(), 1);
 
         test_scenario::return_shared(deny_list);
@@ -978,12 +1105,35 @@ module stablecoin::treasury_tests {
     fun test_unpause(scenario: &mut Scenario) {
         let mut deny_list = scenario.take_shared<DenyList>();
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        let paused_before = coin::deny_list_v2_is_global_pause_enabled_current_epoch<TREASURY_TESTS>(&deny_list, scenario.ctx());
 
         treasury.unpause(&mut deny_list, scenario.ctx());
-        // TODO(SPG-308): check deny list state
+
+        assert_eq(coin::deny_list_v2_is_global_pause_enabled_next_epoch<TREASURY_TESTS>(&deny_list), false);
+        assert_eq(coin::deny_list_v2_is_global_pause_enabled_current_epoch<TREASURY_TESTS>(&deny_list, scenario.ctx()), paused_before);
 
         assert_eq(event::num_events(), 1);
         assert_eq(event::events_by_type<treasury::Unpause<TREASURY_TESTS>>().length(), 1);
+
+        test_scenario::return_shared(deny_list);
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_is_blocklisted_current_epoch(scenario: &mut Scenario, addr: address, expected: bool) {
+        let deny_list = scenario.take_shared<DenyList>();
+        let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        assert_eq(coin::deny_list_v2_contains_current_epoch<TREASURY_TESTS>(&deny_list, addr, scenario.ctx()), expected);
+
+        test_scenario::return_shared(deny_list);
+        test_scenario::return_shared(treasury);
+    }
+
+    fun test_is_paused_current_epoch(scenario: &mut Scenario, expected: bool) {
+        let deny_list = scenario.take_shared<DenyList>();
+        let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+
+        assert_eq(coin::deny_list_v2_is_global_pause_enabled_current_epoch<TREASURY_TESTS>(&deny_list, scenario.ctx()), expected);
 
         test_scenario::return_shared(deny_list);
         test_scenario::return_shared(treasury);
