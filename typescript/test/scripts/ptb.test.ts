@@ -181,8 +181,9 @@ describe("Test PTBs", () => {
 
     const treasuryFields = treasury.data.content.fields as any;
     const roleFields = treasuryFields.roles.fields as any;
-    assert.equal(roleFields.owner, deployerAddress);
-    assert.equal(roleFields.pendingOwner, undefined);
+    const ownerFields = roleFields.owner.fields as any;
+    assert.equal(ownerFields.active_address, deployerAddress);
+    assert.equal(ownerFields.pending_address, null);
     assert.equal(roleFields.master_minter, deployerAddress);
     assert.equal(roleFields.blocklister, newAddress);
     assert.equal(roleFields.pauser, newAddress);
