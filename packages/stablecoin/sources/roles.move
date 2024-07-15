@@ -78,14 +78,14 @@ module stablecoin::roles {
         roles.owner_role().active_address()
     }
 
-    /// Check the master minter address
-    public fun master_minter<T>(roles: &Roles<T>): address {
-        *roles.data.borrow<_, address>(MasterMinterRole<T> {})
-    }
-
     /// Check the pending owner address
     public fun pending_owner<T>(roles: &Roles<T>): Option<address> {
         roles.owner_role().pending_address()
+    }
+
+    /// Check the master minter address
+    public fun master_minter<T>(roles: &Roles<T>): address {
+        *roles.data.borrow<_, address>(MasterMinterRole<T> {})
     }
 
     /// Check the blocklister address
