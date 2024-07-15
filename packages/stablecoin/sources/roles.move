@@ -85,22 +85,22 @@ module stablecoin::roles {
 
     /// Check the master minter address
     public fun master_minter<T>(roles: &Roles<T>): address {
-        *roles.data.borrow<_, address>(MasterMinterRole<T> {})
+        *roles.data.borrow(MasterMinterRole<T> {})
     }
 
     /// Check the blocklister address
     public fun blocklister<T>(roles: &Roles<T>): address {
-        *roles.data.borrow<_, address>(BlocklisterRole<T> {})
+        *roles.data.borrow(BlocklisterRole<T> {})
     }
 
     /// Check the pauser address
     public fun pauser<T>(roles: &Roles<T>): address {
-        *roles.data.borrow<_, address>(PauserRole<T> {})
+        *roles.data.borrow(PauserRole<T> {})
     }
 
     /// Check the metadata updater address
     public fun metadata_updater<T>(roles: &Roles<T>): address {
-        *roles.data.borrow<_, address>(MetadataUpdaterRole<T> {})
+        *roles.data.borrow(MetadataUpdaterRole<T> {})
     }
 
     // === Write functions ===
@@ -175,7 +175,7 @@ module stablecoin::roles {
     /// Updates an existing simple address role and returns the previously set address.
     /// Fails if the key does not exist, or if the previously set value is not an address.
     fun update_address<T, K: copy + drop + store>(roles: &mut Roles<T>, key: K, new_address: address): address {
-        let old_address = roles.data.remove<_, address>(key);
+        let old_address = roles.data.remove(key);
         roles.data.add(key, new_address);
         old_address
     }
