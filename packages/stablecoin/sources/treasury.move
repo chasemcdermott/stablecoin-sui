@@ -196,7 +196,7 @@ module stablecoin::treasury {
         metadata_updater: address,
         ctx: &mut TxContext
     ): Treasury<T> {
-        let roles = roles::create_roles<T>(owner, master_minter, blocklister, pauser, metadata_updater);
+        let roles = roles::create_roles<T>(owner, master_minter, blocklister, pauser, metadata_updater, ctx);
         let mut treasury = Treasury {
             id: object::new(ctx),
             controllers: table::new<address, ID>(ctx),

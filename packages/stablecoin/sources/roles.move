@@ -15,6 +15,7 @@
 // limitations under the License.
 
 module stablecoin::roles {
+    use sui::bag::{Self, Bag};
     use sui::event;
     use stablecoin::two_step_role::{Self, TwoStepRole};
 
@@ -23,18 +24,20 @@ module stablecoin::roles {
     public struct Roles<phantom T> has store {
         /// Mutable address of the owner EOA
         owner: TwoStepRole<OwnerRole<T>>,
-        /// Mutable address of the master minter EOA
-        master_minter: address,
-        /// Mutable address of the blocklister EOA, controlled by owner
-        blocklister: address,
-        /// Mutable address of the pauser EOA, controlled by owner
-        pauser: address,
-        /// Mutable address of the metadata updater EOA, controlled by the owner
-        metadata_updater: address,
+        data: Bag
     }
 
     // Type used to specify which TwoStepRole the owner role corresponds to.
     public struct OwnerRole<phantom T> {}
+
+    /// Key used to map to the address of the master minter EOA
+    public struct MasterMinterRole<phantom T> {} has copy, store, drop;
+    /// Key used to map to the address of the blocklister EOA, controlled by owner
+    public struct BlocklisterRole<phantom T> {} has copy, store, drop;
+    /// Key used to map to the address of the pauser EOA, controlled by owner
+    public struct PauserRole<phantom T> {} has copy, store, drop;
+    /// Key used to map to the address of the metadata updater EOA, controlled by the owner
+    public struct MetadataUpdaterRole<phantom T> {} has copy, store, drop;
 
     // === Events ===
 
@@ -77,7 +80,7 @@ module stablecoin::roles {
 
     /// Check the master minter address
     public fun master_minter<T>(roles: &Roles<T>): address {
-        roles.master_minter
+        *roles.data.borrow<_, address>(MasterMinterRole<T> {})
     }
 
     /// Check the pending owner address
@@ -87,17 +90,17 @@ module stablecoin::roles {
 
     /// Check the blocklister address
     public fun blocklister<T>(roles: &Roles<T>): address {
-        roles.blocklister
+        *roles.data.borrow<_, address>(BlocklisterRole<T> {})
     }
 
     /// Check the pauser address
     public fun pauser<T>(roles: &Roles<T>): address {
-        roles.pauser
+        *roles.data.borrow<_, address>(PauserRole<T> {})
     }
 
     /// Check the metadata updater address
     public fun metadata_updater<T>(roles: &Roles<T>): address {
-        roles.metadata_updater
+        *roles.data.borrow<_, address>(MetadataUpdaterRole<T> {})
     }
 
     // === Write functions ===
@@ -108,13 +111,16 @@ module stablecoin::roles {
         blocklister: address, 
         pauser: address,
         metadata_updater: address,
+        ctx: &mut TxContext,
     ): Roles<T> {
+        let mut data = bag::new(ctx);
+        data.add(MasterMinterRole<T> {}, master_minter);
+        data.add(BlocklisterRole<T> {}, blocklister);
+        data.add(PauserRole<T> {}, pauser);
+        data.add(MetadataUpdaterRole<T> {}, metadata_updater);
         Roles {
             owner: two_step_role::new<OwnerRole<T>>(owner),
-            master_minter,
-            blocklister,
-            pauser,
-            metadata_updater,
+            data
         }
     }
 
@@ -122,8 +128,7 @@ module stablecoin::roles {
     public fun update_master_minter<T>(roles: &mut Roles<T>, new_master_minter: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
-        let old_master_minter = roles.master_minter;
-        roles.master_minter = new_master_minter;
+        let old_master_minter = roles.update_address(MasterMinterRole<T> {}, new_master_minter);
 
         event::emit(MasterMinterChanged<T> { 
             old_master_minter, 
@@ -135,8 +140,7 @@ module stablecoin::roles {
     public fun update_blocklister<T>(roles: &mut Roles<T>, new_blocklister: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
-        let old_blocklister = roles.blocklister;
-        roles.blocklister = new_blocklister;
+        let old_blocklister = roles.update_address(BlocklisterRole<T> {}, new_blocklister);
 
         event::emit(BlocklisterChanged<T> {
             old_blocklister,
@@ -148,8 +152,7 @@ module stablecoin::roles {
     public fun update_pauser<T>(roles: &mut Roles<T>, new_pauser: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
-        let old_pauser = roles.pauser;
-        roles.pauser = new_pauser;
+        let old_pauser = roles.update_address(PauserRole<T> {}, new_pauser);
 
         event::emit(PauserChanged<T> {
             old_pauser,
@@ -161,14 +164,23 @@ module stablecoin::roles {
     public fun update_metadata_updater<T>(roles: &mut Roles<T>, new_metadata_updater: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
-        let old_metadata_updater = roles.metadata_updater;
-        roles.metadata_updater = new_metadata_updater;
+        let old_metadata_updater = roles.update_address(MetadataUpdaterRole<T> {}, new_metadata_updater);
 
         event::emit(MetadataUpdaterChanged<T> {
             old_metadata_updater,
             new_metadata_updater
         });
     }
+
+    /// Updates and existing address role and previously set address.
+    /// Fails if the key does not exist, or if the previously set value is not an address.
+    fun update_address<T, K: copy + drop + store>(roles: &mut Roles<T>, key: K, new_address: address): address {
+        let old_address = roles.data.remove<_, address>(key);
+        roles.data.add(key, new_address);
+        old_address
+    }
+
+    /// 
 
     // === Test Only ===
 
