@@ -22,15 +22,15 @@ module stablecoin::roles {
     // === Structs ===
 
     public struct Roles<phantom T> has store {
-        /// Mutable address of the owner EOA
-        owner: TwoStepRole<OwnerRole<T>>,
+        /// A bag that maintains the mapping of privileged roles and their addresses.
+        /// Keys are structs that are suffixed with _Role<T>.
+        /// Values are either addresses or objects containing more complex logic.
         data: Bag
     }
 
-    // Type used to specify which TwoStepRole the owner role corresponds to.
-    public struct OwnerRole<phantom T> {}
-
-    /// Key used to map to the address of the master minter EOA
+    /// Key used to map to the mutable TwoStepRole of the owner EOA
+    public struct OwnerRole<phantom T> {} has copy, store, drop;
+    /// Key used to map to the mutable address of the master minter EOA, controlled by owner
     public struct MasterMinterRole<phantom T> {} has copy, store, drop;
     /// Key used to map to the address of the blocklister EOA, controlled by owner
     public struct BlocklisterRole<phantom T> {} has copy, store, drop;
@@ -63,19 +63,19 @@ module stablecoin::roles {
 
     // === View-only functions ===
 
-    /// Check the owner role object mutably
+    /// Check the owner's TwoStepRole object mutably
     public(package) fun owner_role_mut<T>(roles: &mut Roles<T>): &mut TwoStepRole<OwnerRole<T>> {
-        &mut roles.owner
+        roles.data.borrow_mut(OwnerRole<T> {})
     }
 
-    /// Check the owner role object
+    /// Check the owner's TwoStepRole object
     public(package) fun owner_role<T>(roles: &Roles<T>): &TwoStepRole<OwnerRole<T>> {
-        &roles.owner
+        roles.data.borrow(OwnerRole<T> {})
     }
     
     /// Check the owner address
     public fun owner<T>(roles: &Roles<T>): address {
-        roles.owner.active_address()
+        roles.owner_role().active_address()
     }
 
     /// Check the master minter address
@@ -85,7 +85,7 @@ module stablecoin::roles {
 
     /// Check the pending owner address
     public fun pending_owner<T>(roles: &Roles<T>): Option<address> {
-        roles.owner.pending_address()
+        roles.owner_role().pending_address()
     }
 
     /// Check the blocklister address
@@ -114,12 +114,12 @@ module stablecoin::roles {
         ctx: &mut TxContext,
     ): Roles<T> {
         let mut data = bag::new(ctx);
+        data.add(OwnerRole<T> {}, two_step_role::new<OwnerRole<T>>(owner));
         data.add(MasterMinterRole<T> {}, master_minter);
         data.add(BlocklisterRole<T> {}, blocklister);
         data.add(PauserRole<T> {}, pauser);
         data.add(MetadataUpdaterRole<T> {}, metadata_updater);
         Roles {
-            owner: two_step_role::new<OwnerRole<T>>(owner),
             data
         }
     }
@@ -172,15 +172,13 @@ module stablecoin::roles {
         });
     }
 
-    /// Updates and existing address role and previously set address.
+    /// Updates an existing simple address role and returns the previously set address.
     /// Fails if the key does not exist, or if the previously set value is not an address.
     fun update_address<T, K: copy + drop + store>(roles: &mut Roles<T>, key: K, new_address: address): address {
         let old_address = roles.data.remove<_, address>(key);
         roles.data.add(key, new_address);
         old_address
     }
-
-    /// 
 
     // === Test Only ===
 
