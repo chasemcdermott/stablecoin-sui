@@ -17,20 +17,21 @@
  */
 
 import { SuiClient } from "@mysten/sui/client";
-import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
-import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { Transaction } from "@mysten/sui/transactions";
-import { execSync } from "child_process";
 import { program } from "commander";
-import "dotenv/config";
-import path from "path";
+import {
+  buildPackageHelper,
+  deployPackageHelper,
+  getEd25519KeypairFromPrivateKey,
+  log,
+  writeJsonOutput
+} from "./helpers";
 
 /**
  * Deploys a package and transfers the package UpgradeCap to upgradeCapRecipient
  *
  * @returns Transaction output
  */
-export async function deploy(
+export async function deployCommand(
   packageName: string,
   rpcUrl: string,
   deployerKey: string,
@@ -38,84 +39,51 @@ export async function deploy(
   withUnpublishedDependencies = false
 ) {
   const client = new SuiClient({ url: rpcUrl });
-  console.log(`RPC URL: ${rpcUrl}`);
+  log(`RPC URL: ${rpcUrl}`);
 
-  // Turn private key into keypair format
-  // cuts off 1st byte as it signifies which signature type is used.
-  const deployer = Ed25519Keypair.fromSecretKey(
-    decodeSuiPrivateKey(deployerKey).secretKey
-  );
-  console.log(`Deployer: ${deployer.toSuiAddress()}`);
+  const deployer = getEd25519KeypairFromPrivateKey(deployerKey);
+  log(`Deployer: ${deployer.toSuiAddress()}`);
 
-  console.log("Building packages...");
-  const packagePath = path.join(__dirname, `../../packages/${packageName}`);
-  const withUnpublishedDependenciesArg = withUnpublishedDependencies
-    ? "--with-unpublished-dependencies"
-    : "";
-  const rawCompiledPackages = execSync(
-    `sui move build --dump-bytecode-as-base64 --path ${packagePath} ${withUnpublishedDependenciesArg}`,
-    { encoding: "utf-8" }
-  );
-  const { modules, dependencies } = JSON.parse(rawCompiledPackages);
+  log(`Building package '${packageName}'...`);
+  const { modules, dependencies } = buildPackageHelper({
+    packageName,
+    withUnpublishedDependencies
+  });
 
-  console.log("Deploying packages...");
-  const transaction = new Transaction();
-
-  // Command #1: Publish packages
-  const upgradeCap = transaction.publish({
+  log(`Deploying package '${packageName}'...`);
+  const transactionOutput = await deployPackageHelper({
+    client,
+    deployer,
     modules,
-    dependencies
+    dependencies,
+    upgradeCapRecipient,
+    makeImmutable: false
   });
 
-  // Command #2: Publish Transfer UpgradeCap
-  transaction.transferObjects([upgradeCap], upgradeCapRecipient);
-
-  const initialTxOutput = await client.signAndExecuteTransaction({
-    signer: deployer,
-    transaction
-  });
-
-  // Wait for the transaction to be available over API
-  const txOutput = await client.waitForTransaction({
-    digest: initialTxOutput.digest,
-    options: {
-      showBalanceChanges: true,
-      showEffects: true,
-      showEvents: true,
-      showInput: true,
-      showObjectChanges: true,
-      showRawInput: false // too verbose
-    }
-  });
-
-  console.log(txOutput);
-  console.log("Deploy process complete!");
-  return txOutput;
+  writeJsonOutput(`deploy-${packageName}`, transactionOutput);
+  log("Deploy process complete!");
+  return transactionOutput;
 }
 
-program
-  .name("deploy")
+export default program
+  .createCommand("deploy")
   .description("Deploy a new Sui package")
   .argument("<package_name>", "Name of package to deploy")
+  .requiredOption(
+    "--upgrade-cap-recipient <string>",
+    "The address that will receive the UpgradeCap"
+  )
   .option("-r, --rpc-url <string>", "Network RPC URL", process.env.RPC_URL)
   .option(
     "--deployer-key <string>",
     "Deployer private key",
     process.env.DEPLOYER_PRIVATE_KEY
   )
-  .option(
-    "--upgrade-cap-recipient <string>",
-    "The address that will receive the UpgradeCap"
-  )
   .action((packageName, options) => {
-    deploy(
+    deployCommand(
       packageName, // package name
       options.rpcUrl,
       options.deployerKey,
       options.upgradeCapRecipient
     );
   });
-
-if (process.env.NODE_ENV !== "TESTING") {
-  program.parse();
-}

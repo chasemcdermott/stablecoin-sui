@@ -29,10 +29,12 @@ module stablecoin::treasury {
         deny_list::{DenyList},
         event,
         table::{Self, Table},
-        dynamic_object_field as dof
+        dynamic_object_field as dof,
+        vec_set::{Self, VecSet}
     };
     use stablecoin::mint_allowance::{Self, MintAllowance};
     use stablecoin::roles::{Self, Roles};
+    use stablecoin::version_control::{Self, assert_object_version_is_compatible_with_package};
 
     // === Errors ===
 
@@ -62,6 +64,8 @@ module stablecoin::treasury {
         mint_allowances: Table<ID, MintAllowance<T>>, 
         /// Mutable privileged role addresses
         roles: Roles<T>,
+        /// The set of package version numbers that object is compatible with.
+        compatible_versions: VecSet<u64>
     }
 
     /// An object representing the ability to mint up to an allowance 
@@ -173,6 +177,11 @@ module stablecoin::treasury {
         assert!(dof::exists_with_type<_, DenyCapV2<T>>(&treasury.id, DenyCapKey {}), EDenyCapNotFound);
     }
 
+    /// Returns the set of package versions that the state object is compatible with.
+    public fun compatible_versions<T>(treasury: &Treasury<T>): vector<u64> {
+        *treasury.compatible_versions.keys()
+    }
+
     /// Check if an address is a mint controller
     fun is_controller<T>(treasury: &Treasury<T>, controller_addr: address): bool {
         treasury.controllers.contains(controller_addr)
@@ -202,6 +211,7 @@ module stablecoin::treasury {
             controllers: table::new<address, ID>(ctx),
             mint_allowances: table::new<ID, MintAllowance<T>>(ctx),
             roles,
+            compatible_versions: vec_set::singleton(version_control::current_version())
         };
         dof::add(&mut treasury.id, TreasuryCapKey {}, treasury_cap);
         dof::add(&mut treasury.id, DenyCapKey {}, deny_cap);
@@ -215,6 +225,7 @@ module stablecoin::treasury {
         mint_cap_id: ID,
         ctx: &TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         assert!(!is_controller(treasury, controller), EControllerAlreadyConfigured);
 
@@ -230,6 +241,7 @@ module stablecoin::treasury {
         treasury: &Treasury<T>, 
         ctx: &mut TxContext
     ): MintCap<T> {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         let mint_cap = MintCap { id: object::new(ctx) };
         event::emit(MintCapCreated<T> { 
@@ -259,6 +271,7 @@ module stablecoin::treasury {
         controller: address, 
         ctx: &TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         assert!(is_controller(treasury, controller), ENotController);
 
@@ -276,6 +289,8 @@ module stablecoin::treasury {
         new_allowance: u64, 
         ctx: &TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+
         assert!(!is_paused<T>(deny_list), EPaused);
         let controller = ctx.sender();
         let mint_cap_id = get_worker(treasury, controller);
@@ -299,6 +314,8 @@ module stablecoin::treasury {
         treasury: &mut Treasury<T>, 
         ctx: &TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+
         let controller = ctx.sender();
         let mint_cap_id = get_worker(treasury, controller);
         let mint_allowance = treasury.mint_allowances.remove(mint_cap_id);
@@ -319,6 +336,8 @@ module stablecoin::treasury {
         recipient: address, 
         ctx: &mut TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+
         assert!(!is_paused<T>(deny_list), EPaused);
         assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
         assert!(!is_blocklisted<T>(deny_list, recipient), EDeniedAddress);
@@ -349,6 +368,8 @@ module stablecoin::treasury {
         coin: Coin<T>,
         ctx: &TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+
         assert!(!is_paused<T>(deny_list), EPaused);
         assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
         let mint_cap_id = object::id(mint_cap);
@@ -371,6 +392,7 @@ module stablecoin::treasury {
         addr: address,
         ctx: &mut TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles.blocklister() == ctx.sender(), ENotBlocklister);
 
         if (!is_blocklisted<T>(deny_list, addr)) {
@@ -388,6 +410,7 @@ module stablecoin::treasury {
         addr: address,
         ctx: &mut TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles.blocklister() == ctx.sender(), ENotBlocklister);
 
         if (is_blocklisted<T>(deny_list, addr)) {
@@ -404,6 +427,8 @@ module stablecoin::treasury {
         deny_list: &mut DenyList,
         ctx: &mut TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+
         assert!(treasury.roles.pauser() == ctx.sender(), ENotPauser);
         let deny_cap = treasury.borrow_deny_cap_mut();
 
@@ -419,6 +444,7 @@ module stablecoin::treasury {
         deny_list: &mut DenyList,
         ctx: &mut TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles().pauser() == ctx.sender(), ENotPauser);
         let deny_cap = treasury.borrow_deny_cap_mut();
 
@@ -456,6 +482,7 @@ module stablecoin::treasury {
         icon_url: ascii::String,
         ctx: &TxContext
     ) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles.metadata_updater() == ctx.sender(), ENotMetadataUpdater);
         treasury.borrow_treasury_cap().update_name(metadata, name);
         treasury.borrow_treasury_cap().update_symbol(metadata, symbol);
@@ -494,6 +521,16 @@ module stablecoin::treasury {
     #[test_only]
     public fun remove_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): DenyCapV2<T> {
         dof::remove(&mut treasury.id, DenyCapKey {})
+    }
+
+    #[test_only]
+    public fun create_mint_cap_for_testing<T>(ctx: &mut TxContext): MintCap<T> {
+        MintCap { id: object::new(ctx) }
+    }
+
+    #[test_only]
+    public fun set_compatible_versions_for_testing<T>(treasury: &mut Treasury<T>, compatible_versions: VecSet<u64>) {
+        treasury.compatible_versions = compatible_versions;
     }
 
     #[test_only]

@@ -19,6 +19,7 @@
 import { getFaucetHost, requestSuiFromFaucetV0 } from "@mysten/sui/faucet";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { program } from "commander";
+import { log, writeJsonOutput } from "./helpers";
 
 /**
  * Generates a signer, with the option to prefund with some test SUI from a faucet.
@@ -28,35 +29,40 @@ import { program } from "commander";
  *
  * @returns Ed25519Keypair keypair
  */
-export async function generateKeypair(
+export async function generateKeypairCommand(
   fundSigner: boolean = false,
   faucetUrl: string | undefined = undefined
 ): Promise<Ed25519Keypair> {
   const keypair = Ed25519Keypair.generate();
 
   if (fundSigner) {
-    console.log("Requesting test tokens...");
+    log("Requesting test tokens...");
     await requestSuiFromFaucetV0({
       host: faucetUrl || getFaucetHost("localnet"),
       recipient: keypair.toSuiAddress()
     });
-    console.log(`Funded address ${keypair.toSuiAddress()}`);
+    log(`Funded address ${keypair.toSuiAddress()}`);
   }
+
+  writeJsonOutput("generate-keypair", {
+    publicKey: keypair.getPublicKey().toSuiAddress(),
+    secretKey: keypair.getSecretKey(),
+    funded: fundSigner
+  });
 
   return keypair;
 }
 
-program
-  .name("generate_signer")
+export default program
+  .createCommand("generate-keypair")
   .description("Generate a new Sui keypair")
   .option("--prefund", "Fund generated signer with some test SUI tokens")
   .option("--faucet-url", "Faucet URL", process.env.FAUCET_URL)
   .action(async (options) => {
-    const keypair = await generateKeypair(options.prefund, options.faucetUrl);
-    console.log("Public key: ", keypair?.getPublicKey().toSuiAddress());
-    console.log("Secret key: ", keypair?.getSecretKey());
+    const keypair = await generateKeypairCommand(
+      options.prefund,
+      options.faucetUrl
+    );
+    log("Public key: ", keypair.getPublicKey().toSuiAddress());
+    log("Secret key: ", keypair.getSecretKey());
   });
-
-if (process.env.NODE_ENV !== "TESTING") {
-  program.parse();
-}

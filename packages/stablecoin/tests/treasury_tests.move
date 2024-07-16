@@ -22,13 +22,15 @@ module stablecoin::treasury_tests {
         coin::{Self, Coin, CoinMetadata},
         deny_list::{Self, DenyList},
         event,
+        vec_set,
         test_scenario::{Self, Scenario}, 
-        test_utils::{Self, assert_eq},
+        test_utils::{Self, assert_eq, destroy},
     };
     use stablecoin::{
         entry,
         test_utils::last_event_by_type,
-        treasury::{Self, MintCap, Treasury}
+        treasury::{Self, MintCap, Treasury},
+        version_control
     };
 
     // test addresses
@@ -823,6 +825,113 @@ module stablecoin::treasury_tests {
 
         scenario.end();
     }
+    
+    // === Incompatible Treasury object tests ===
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun configure_controller__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.configure_controller(RANDOM_ADDRESS, object::id_from_address(RANDOM_ADDRESS_2), scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun create_mint_cap__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        destroy(treasury.create_mint_cap(scenario.ctx()));
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun remove_controller__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.remove_controller(RANDOM_ADDRESS, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun configure_minter__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.configure_minter(&deny_list, 100000, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun remove_minter__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.remove_minter(scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun mint__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        let mint_cap = treasury::create_mint_cap_for_testing(scenario.ctx());
+        treasury.mint(
+            &mint_cap,
+            &deny_list,
+            100000,
+            RANDOM_ADDRESS,
+            scenario.ctx()
+        );
+        destroy(mint_cap);
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun burn__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        let mint_cap = treasury::create_mint_cap_for_testing(scenario.ctx());
+        treasury.burn(
+            &mint_cap,
+            &deny_list,
+            coin::zero<TREASURY_TESTS>(scenario.ctx()),
+            scenario.ctx()
+        );
+        destroy(mint_cap);
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun blocklist__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, mut deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.blocklist(&mut deny_list, RANDOM_ADDRESS, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun unblocklist__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, mut deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.unblocklist(&mut deny_list, RANDOM_ADDRESS, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun pause__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, mut deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.pause(&mut deny_list, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun unpause__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, mut deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.unpause(&mut deny_list, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun update_metadata__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, treasury, deny_list, mut metadata) = before_incompatible_treasury_object_scenario();
+        treasury.update_metadata(
+            &mut metadata,
+            string::utf8(b"new name"),
+            ascii::string(b"new symbol"),
+            string::utf8(b"new description"),
+            ascii::string(b"new url"),
+            scenario.ctx()
+        );
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
 
     // === Helpers ===
 
@@ -860,6 +969,7 @@ module stablecoin::treasury_tests {
             assert_eq(treasury.roles().blocklister(), OWNER);
             assert_eq(treasury.roles().pauser(), OWNER);
             assert_eq(treasury.roles().metadata_updater(), OWNER);
+            assert_eq(treasury.compatible_versions(), vector[version_control::current_version()]);
             treasury.assert_treasury_cap_exists();
             treasury.assert_deny_cap_exists();
 
@@ -868,6 +978,29 @@ module stablecoin::treasury_tests {
         };
 
         scenario
+    }
+
+    fun before_incompatible_treasury_object_scenario(): (Scenario, Treasury<TREASURY_TESTS>, DenyList, CoinMetadata<TREASURY_TESTS>) {
+        let mut scenario = setup();
+        
+        // Set compatible_versions to an invalid version.
+        scenario.next_tx(OWNER);
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        treasury.set_compatible_versions_for_testing(vec_set::singleton(version_control::current_version() + 1));
+        test_scenario::return_shared(treasury);
+
+        scenario.next_tx(OWNER);
+        let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        let deny_list = scenario.take_shared<DenyList>();
+        let metadata = scenario.take_shared<CoinMetadata<TREASURY_TESTS>>();
+        (scenario, treasury, deny_list, metadata)
+    }
+
+    fun after_incompatible_treasury_object_scenario(scenario: Scenario, treasury: Treasury<TREASURY_TESTS>, deny_list: DenyList, metadata: CoinMetadata<TREASURY_TESTS>) {
+        test_scenario::return_shared(treasury);
+        test_scenario::return_shared(deny_list);
+        test_scenario::return_shared(metadata);
+        scenario.end();
     }
 
     fun test_configure_new_controller(controller: address, minter: address, scenario: &mut Scenario) {

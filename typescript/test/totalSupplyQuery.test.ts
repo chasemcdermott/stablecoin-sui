@@ -18,8 +18,8 @@
 
 import { SuiClient } from "@mysten/sui/client";
 import { strict as assert } from "assert";
-import { deploy } from "../scripts/deploy";
-import { generateKeypair } from "../scripts/generateKeypair";
+import { deployCommand } from "../scripts/deploy";
+import { generateKeypairCommand } from "../scripts/generateKeypair";
 import { SuiObjectChangePublished } from "@mysten/sui/dist/cjs/client";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
 
@@ -34,10 +34,10 @@ describe("Test total supply query", () => {
   let USDC_TYPE_ID: string;
 
   before("Deploy USDC", async () => {
-    deployerKeys = await generateKeypair(true);
-    upgraderKeys = await generateKeypair(false);
+    deployerKeys = await generateKeypairCommand(true);
+    upgraderKeys = await generateKeypairCommand(false);
 
-    const { objectChanges } = await deploy(
+    const { objectChanges } = await deployCommand(
       "usdc",
       RPC_URL,
       deployerKeys.getSecretKey(),

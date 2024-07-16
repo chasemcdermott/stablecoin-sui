@@ -19,8 +19,8 @@
 import { CoinMetadata, SuiClient, SuiObjectChange } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { strict as assert } from "assert";
-import { deploy } from "../../scripts/deploy";
-import { generateKeypair } from "../../scripts/generateKeypair";
+import { deployCommand } from "../../scripts/deploy";
+import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import {
   SuiObjectChangeCreated,
   SuiObjectChangePublished
@@ -40,10 +40,10 @@ describe("Test PTBs", () => {
   let USDC_TYPE_ID: string;
 
   before("Deploy USDC", async () => {
-    deployerKeys = await generateKeypair(true);
-    upgraderKeys = await generateKeypair(false);
+    deployerKeys = await generateKeypairCommand(true);
+    upgraderKeys = await generateKeypairCommand(false);
 
-    const { objectChanges } = await deploy(
+    const { objectChanges } = await deployCommand(
       "usdc",
       RPC_URL,
       deployerKeys.getSecretKey(),
@@ -129,25 +129,21 @@ describe("Test PTBs", () => {
 
   it("Builds and submits a PTB to update roles via entry functions", async () => {
     const deployerAddress = deployerKeys.getPublicKey().toSuiAddress();
-    const newAddress = (await generateKeypair(false)).getPublicKey().toSuiAddress();
+    const newAddress = (await generateKeypairCommand(false))
+      .getPublicKey()
+      .toSuiAddress();
 
     // Build a PTB to update some roles
     const txb = new Transaction();
     txb.moveCall({
       target: `${PACKAGE_ID}::entry::update_blocklister`,
       typeArguments: [USDC_TYPE_ID],
-      arguments: [
-        txb.object(TREASURY_OBJECT_ID),
-        txb.pure.address(newAddress)
-      ]
+      arguments: [txb.object(TREASURY_OBJECT_ID), txb.pure.address(newAddress)]
     });
     txb.moveCall({
       target: `${PACKAGE_ID}::entry::update_pauser`,
       typeArguments: [USDC_TYPE_ID],
-      arguments: [
-        txb.object(TREASURY_OBJECT_ID),
-        txb.pure.address(newAddress)
-      ]
+      arguments: [txb.object(TREASURY_OBJECT_ID), txb.pure.address(newAddress)]
     });
 
     // Sign and submit transaction, assert success
@@ -186,7 +182,7 @@ describe("Test PTBs", () => {
         showContent: true
       }
     });
-    assert.equal(treasury.data?.content?.dataType, 'moveObject');
+    assert.equal(treasury.data?.content?.dataType, "moveObject");
 
     const treasuryFields = treasury.data.content.fields as any;
     const roleFields = treasuryFields.roles.fields;

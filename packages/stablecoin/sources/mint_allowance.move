@@ -25,7 +25,7 @@ module stablecoin::mint_allowance {
     }
 
     /// Get the amount stored in a `Balance`.
-    public fun value<T>(self: &MintAllowance<T>): u64 {
+    public(package) fun value<T>(self: &MintAllowance<T>): u64 {
         self.value
     }
 
