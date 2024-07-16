@@ -171,7 +171,6 @@ describe("Test PTBs", () => {
     });
 
     // Assert that roles were updated
-
     const roles = await getRoles();
     assert.equal(roles.owner, deployerAddress);
     assert.equal(roles.masterMinter, deployerAddress);
@@ -181,48 +180,48 @@ describe("Test PTBs", () => {
   });
 
   const getRoles = async () => {
-    const readTxb = new Transaction();
-    readTxb.moveCall({
-      target: `${PACKAGE_ID}::entry::owner`,
-      typeArguments: [USDC_TYPE_ID],
-      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
+    const treasury = await client.getObject({
+      id: TREASURY_OBJECT_ID,
+      options: {
+        showContent: true
+      }
     });
-    readTxb.moveCall({
-      target: `${PACKAGE_ID}::entry::master_minter`,
-      typeArguments: [USDC_TYPE_ID],
-      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
-    });
-    readTxb.moveCall({
-      target: `${PACKAGE_ID}::entry::blocklister`,
-      typeArguments: [USDC_TYPE_ID],
-      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
-    });
-    readTxb.moveCall({
-      target: `${PACKAGE_ID}::entry::pauser`,
-      typeArguments: [USDC_TYPE_ID],
-      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
-    });
-    readTxb.moveCall({
-      target: `${PACKAGE_ID}::entry::metadata_updater`,
-      typeArguments: [USDC_TYPE_ID],
-      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
-    });
+    assert.equal(treasury.data?.content?.dataType, 'moveObject');
 
-    const { results } = await client.devInspectTransactionBlock({
-      sender: deployerKeys.getPublicKey().toSuiAddress(),
-      transactionBlock: readTxb
+    const treasuryFields = treasury.data.content.fields as any;
+    const roleFields = treasuryFields.roles.fields;
+    const bagId = roleFields.data.fields.id.id;
+
+    const bagDynamicFields = await client.getDynamicFields({parentId: bagId})
+    const bagObjects = await Promise.all(bagDynamicFields.data.map(field => {
+      return client.getObject({
+        id: field.objectId,
+        options: {
+          showContent: true
+        }
+      })
+    }));
+
+    const roles: any = {};
+    bagObjects.forEach(obj => {
+      assert.equal(obj.data?.content?.dataType, 'moveObject');
+      const df = obj.data.content.fields as any;
+      const type = df.name.type;
+      const value = df.value;
+      if (type.includes('OwnerKey')) {
+        const twoStepOwnerFields = value.fields;
+        roles.owner = twoStepOwnerFields.active_address;
+        roles.pendingOwner = twoStepOwnerFields.pending_address;
+      } else if (type.includes('MasterMinterKey')) {
+        roles.masterMinter = value;
+      } else if (type.includes('BlocklisterKey')) {
+        roles.blocklister = value;
+      } else if (type.includes('PauserKey')) {
+        roles.pauser = value;
+      } else if (type.includes('MetadataUpdaterKey')) {
+        roles.metadataUpdater = value;
+      }
     });
-
-    // each move call returns a [number[], string][]
-    // in this case, all of the calls return a single address represented as a byte array
-    let roles = results!.map(v => `0x${Buffer.from(v.returnValues![0][0]).toString('hex')}`)
-
-    return {
-      owner: roles[0],
-      masterMinter: roles[1],
-      blocklister: roles[2],
-      pauser: roles[3],
-      metadataUpdater: roles[4]
-    }
+    return roles;
   }
 });
