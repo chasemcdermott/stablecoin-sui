@@ -192,36 +192,29 @@ describe("Test PTBs", () => {
     const roleFields = treasuryFields.roles.fields;
     const bagId = roleFields.data.fields.id.id;
 
-    const bagDynamicFields = await client.getDynamicFields({parentId: bagId})
-    const bagObjects = await Promise.all(bagDynamicFields.data.map(field => {
-      return client.getObject({
-        id: field.objectId,
-        options: {
-          showContent: true
-        }
-      })
-    }));
+    const getBagObjectFields = async (keyType: string) => {
+      let dfo = await client.getDynamicFieldObject({
+        parentId: bagId,
+        name: {
+          type: keyType,
+          value: { dummy_field: false }
+      }});
+      assert.equal(dfo.data?.content?.dataType, 'moveObject');
+      return (dfo.data.content.fields as any);
+    };
 
-    const roles: any = {};
-    bagObjects.forEach(obj => {
-      assert.equal(obj.data?.content?.dataType, 'moveObject');
-      const df = obj.data.content.fields as any;
-      const type = df.name.type;
-      const value = df.value;
-      if (type.includes('OwnerKey')) {
-        const twoStepOwnerFields = value.fields;
-        roles.owner = twoStepOwnerFields.active_address;
-        roles.pendingOwner = twoStepOwnerFields.pending_address;
-      } else if (type.includes('MasterMinterKey')) {
-        roles.masterMinter = value;
-      } else if (type.includes('BlocklisterKey')) {
-        roles.blocklister = value;
-      } else if (type.includes('PauserKey')) {
-        roles.pauser = value;
-      } else if (type.includes('MetadataUpdaterKey')) {
-        roles.metadataUpdater = value;
-      }
-    });
-    return roles;
+    const ownerFields = await getBagObjectFields(`${PACKAGE_ID}::roles::OwnerKey`);
+    const masterMinterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::MasterMinterKey`);
+    const blocklisterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::BlocklisterKey`);
+    const pauserFields = await getBagObjectFields(`${PACKAGE_ID}::roles::PauserKey`);
+    const metadataUpdaterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::MetadataUpdaterKey`);
+    return {
+      owner: ownerFields.value.fields.active_address,
+      pendingOwner: ownerFields.value.fields.pending_address,
+      masterMinter: masterMinterFields.value,
+      blocklister: blocklisterFields.value,
+      pauser: pauserFields.value,
+      metadataUpdater: metadataUpdaterFields.value,
+    }
   }
 });
