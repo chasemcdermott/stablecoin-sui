@@ -171,6 +171,15 @@ describe("Test PTBs", () => {
     });
 
     // Assert that roles were updated
+    const roles = await getRoles();
+    assert.equal(roles.owner, deployerAddress);
+    assert.equal(roles.masterMinter, deployerAddress);
+    assert.equal(roles.blocklister, newAddress);
+    assert.equal(roles.pauser, newAddress);
+    assert.equal(roles.metadataUpdater, deployerAddress);
+  });
+
+  const getRoles = async () => {
     const treasury = await client.getObject({
       id: TREASURY_OBJECT_ID,
       options: {
@@ -180,13 +189,32 @@ describe("Test PTBs", () => {
     assert.equal(treasury.data?.content?.dataType, 'moveObject');
 
     const treasuryFields = treasury.data.content.fields as any;
-    const roleFields = treasuryFields.roles.fields as any;
-    const ownerFields = roleFields.owner.fields as any;
-    assert.equal(ownerFields.active_address, deployerAddress);
-    assert.equal(ownerFields.pending_address, null);
-    assert.equal(roleFields.master_minter, deployerAddress);
-    assert.equal(roleFields.blocklister, newAddress);
-    assert.equal(roleFields.pauser, newAddress);
-    assert.equal(roleFields.metadata_updater, deployerAddress);
-  });
+    const roleFields = treasuryFields.roles.fields;
+    const bagId = roleFields.data.fields.id.id;
+
+    const getBagObjectFields = async (keyType: string) => {
+      let dfo = await client.getDynamicFieldObject({
+        parentId: bagId,
+        name: {
+          type: keyType,
+          value: { dummy_field: false }
+      }});
+      assert.equal(dfo.data?.content?.dataType, 'moveObject');
+      return (dfo.data.content.fields as any);
+    };
+
+    const ownerFields = await getBagObjectFields(`${PACKAGE_ID}::roles::OwnerKey`);
+    const masterMinterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::MasterMinterKey`);
+    const blocklisterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::BlocklisterKey`);
+    const pauserFields = await getBagObjectFields(`${PACKAGE_ID}::roles::PauserKey`);
+    const metadataUpdaterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::MetadataUpdaterKey`);
+    return {
+      owner: ownerFields.value.fields.active_address,
+      pendingOwner: ownerFields.value.fields.pending_address,
+      masterMinter: masterMinterFields.value,
+      blocklister: blocklisterFields.value,
+      pauser: pauserFields.value,
+      metadataUpdater: metadataUpdaterFields.value,
+    }
+  }
 });

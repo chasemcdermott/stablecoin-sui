@@ -115,8 +115,8 @@ module stablecoin::roles_tests {
 
     /// Creates a Roles object and assigns all roles to OWNER
     fun setup(): (Scenario, Roles<ROLES_TEST>) {
-        let scenario = test_scenario::begin(DEPLOYER);
-        let roles = roles::create_roles(OWNER, OWNER, OWNER, OWNER, OWNER);
+        let mut scenario = test_scenario::begin(DEPLOYER);
+        let roles = roles::create_roles(OWNER, OWNER, OWNER, OWNER, OWNER, scenario.ctx());
         assert_eq(roles.owner(), OWNER);
         assert_eq(roles.pending_owner().is_none(), true);
         assert_eq(roles.master_minter(), OWNER);
