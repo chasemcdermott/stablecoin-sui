@@ -171,22 +171,58 @@ describe("Test PTBs", () => {
     });
 
     // Assert that roles were updated
-    const treasury = await client.getObject({
-      id: TREASURY_OBJECT_ID,
-      options: {
-        showContent: true
-      }
-    });
-    assert.equal(treasury.data?.content?.dataType, 'moveObject');
 
-    const treasuryFields = treasury.data.content.fields as any;
-    const roleFields = treasuryFields.roles.fields as any;
-    const ownerFields = roleFields.owner.fields as any;
-    assert.equal(ownerFields.active_address, deployerAddress);
-    assert.equal(ownerFields.pending_address, null);
-    assert.equal(roleFields.master_minter, deployerAddress);
-    assert.equal(roleFields.blocklister, newAddress);
-    assert.equal(roleFields.pauser, newAddress);
-    assert.equal(roleFields.metadata_updater, deployerAddress);
+    const roles = await getRoles();
+    assert.equal(roles.owner, deployerAddress);
+    assert.equal(roles.masterMinter, deployerAddress);
+    assert.equal(roles.blocklister, newAddress);
+    assert.equal(roles.pauser, newAddress);
+    assert.equal(roles.metadataUpdater, deployerAddress);
   });
+
+  const getRoles = async () => {
+    const readTxb = new Transaction();
+    readTxb.moveCall({
+      target: `${PACKAGE_ID}::entry::owner`,
+      typeArguments: [USDC_TYPE_ID],
+      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
+    });
+    readTxb.moveCall({
+      target: `${PACKAGE_ID}::entry::master_minter`,
+      typeArguments: [USDC_TYPE_ID],
+      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
+    });
+    readTxb.moveCall({
+      target: `${PACKAGE_ID}::entry::blocklister`,
+      typeArguments: [USDC_TYPE_ID],
+      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
+    });
+    readTxb.moveCall({
+      target: `${PACKAGE_ID}::entry::pauser`,
+      typeArguments: [USDC_TYPE_ID],
+      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
+    });
+    readTxb.moveCall({
+      target: `${PACKAGE_ID}::entry::metadata_updater`,
+      typeArguments: [USDC_TYPE_ID],
+      arguments: [readTxb.object(TREASURY_OBJECT_ID)]
+    });
+
+    const { results } = await client.devInspectTransactionBlock({
+      sender: deployerKeys.getPublicKey().toSuiAddress(),
+      transactionBlock: readTxb
+    });
+
+    // each move call returns a [number[], string][]
+    // in this case, all of the calls return a single address represented as a byte array
+    let roles = results!.map(v => `0x${Buffer.from(v.returnValues![0][0]).toString('hex')}`)
+
+    return {
+      owner: roles[0],
+      masterMinter: roles[1],
+      blocklister: roles[2],
+      pauser: roles[3],
+      metadataUpdater: roles[4]
+    }
+  }
 });

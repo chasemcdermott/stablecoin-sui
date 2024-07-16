@@ -23,6 +23,36 @@ module stablecoin::entry {
 
     // === Entry Functions ===
 
+    /// Check the owner address
+    entry fun owner<T>(treasury: &Treasury<T>): address {
+        treasury.roles().owner_role().active_address()
+    }
+
+    /// Check the pending owner address
+    entry fun pending_owner<T>(treasury: &Treasury<T>): Option<address> {
+        treasury.roles().owner_role().pending_address()
+    }
+
+    /// Check the master minter address
+    entry fun master_minter<T>(treasury: &Treasury<T>): address {
+        treasury.roles().master_minter()
+    }
+
+    /// Check the blocklister address
+    entry fun blocklister<T>(treasury: &Treasury<T>): address {
+        treasury.roles().blocklister()
+    }
+
+    /// Check the pauser address
+    entry fun pauser<T>(treasury: &Treasury<T>): address {
+        treasury.roles().pauser()
+    }
+
+    /// Check the metadata updater address
+    entry fun metadata_updater<T>(treasury: &Treasury<T>): address {
+        treasury.roles().metadata_updater()
+    }
+
     /// Start owner role transfer process.
     entry fun transfer_ownership<T>(treasury: &mut Treasury<T>, new_owner: address, ctx: &TxContext) {
         treasury.roles_mut().owner_role_mut().begin_role_transfer(new_owner, ctx)
