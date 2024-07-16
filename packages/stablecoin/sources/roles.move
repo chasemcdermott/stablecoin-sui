@@ -23,7 +23,7 @@ module stablecoin::roles {
 
     public struct Roles<phantom T> has store {
         /// A bag that maintains the mapping of privileged roles and their addresses.
-        /// Keys are structs that are suffixed with _Role<T>.
+        /// Keys are structs that are suffixed with _Key.
         /// Values are either addresses or objects containing more complex logic.
         data: Bag
     }
