@@ -23,7 +23,7 @@ module stablecoin::mint_allowance_tests {
 
     #[test]
     fun create_and_mutate_mint_allowance__should_succeed() {
-        let mut allowance = mint_allowance::create<MINT_ALLOWANCE_TESTS>();
+        let mut allowance = mint_allowance::new<MINT_ALLOWANCE_TESTS>();
         assert_eq(allowance.value(), 0);
 
         allowance.set(1);
@@ -40,7 +40,7 @@ module stablecoin::mint_allowance_tests {
 
     #[test, expected_failure(abort_code = ::stablecoin::mint_allowance::EOverflow)]
     fun decrease__should_fail_with_overflow() {
-        let mut allowance = mint_allowance::create<MINT_ALLOWANCE_TESTS>();
+        let mut allowance = mint_allowance::new<MINT_ALLOWANCE_TESTS>();
         assert_eq(allowance.value(), 0);
 
         allowance.decrease(1);

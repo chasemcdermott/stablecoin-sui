@@ -151,14 +151,14 @@ module stablecoin::treasury {
     /// Gets the corresponding MintCap ID attached to a controller address.
     /// Errors if input address is not valid controller.
     public fun get_worker<T>(treasury: &Treasury<T>, controller: address): ID {
-        assert!(is_controller(treasury, controller), ENotController);
+        assert!(treasury.is_controller(controller), ENotController);
         *treasury.controllers.borrow(controller)
     }
     
     /// Gets the allowance of a mint cap object.
     /// Returns 0 if the mint cap object is not an authorized mint cap. 
     public fun mint_allowance<T>(treasury: &Treasury<T>, mint_cap: ID): u64 {
-        if (!is_authorized_mint_cap(treasury, mint_cap)) return 0;
+        if (!treasury.is_authorized_mint_cap(mint_cap)) return 0;
         treasury.mint_allowances.borrow(mint_cap).value()
     }
 
@@ -195,7 +195,7 @@ module stablecoin::treasury {
     // === Write functions ===
 
     /// Wrap `TreasuryCap` into a struct, accessible via additional capabilities
-    public fun create_treasury<T>(
+    public fun new<T>(
         treasury_cap: TreasuryCap<T>, 
         deny_cap: DenyCapV2<T>, 
         owner: address,
@@ -205,11 +205,11 @@ module stablecoin::treasury {
         metadata_updater: address,
         ctx: &mut TxContext
     ): Treasury<T> {
-        let roles = roles::create_roles<T>(owner, master_minter, blocklister, pauser, metadata_updater, ctx);
+        let roles = roles::new(owner, master_minter, blocklister, pauser, metadata_updater, ctx);
         let mut treasury = Treasury {
             id: object::new(ctx),
-            controllers: table::new<address, ID>(ctx),
-            mint_allowances: table::new<ID, MintAllowance<T>>(ctx),
+            controllers: table::new(ctx),
+            mint_allowances: table::new(ctx),
             roles,
             compatible_versions: vec_set::singleton(version_control::current_version())
         };
@@ -227,7 +227,7 @@ module stablecoin::treasury {
     ) {
         assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
-        assert!(!is_controller(treasury, controller), EControllerAlreadyConfigured);
+        assert!(!treasury.is_controller(controller), EControllerAlreadyConfigured);
 
         treasury.controllers.add(controller, mint_cap_id);
         event::emit(ControllerConfigured<T> {
@@ -273,7 +273,7 @@ module stablecoin::treasury {
     ) {
         assert_object_version_is_compatible_with_package(treasury.compatible_versions);
         assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
-        assert!(is_controller(treasury, controller), ENotController);
+        assert!(treasury.is_controller(controller), ENotController);
 
         treasury.controllers.remove(controller);
         
@@ -296,7 +296,7 @@ module stablecoin::treasury {
         let mint_cap_id = get_worker(treasury, controller);
 
         if (!treasury.mint_allowances.contains(mint_cap_id)) {
-            let mut allowance = mint_allowance::create();
+            let mut allowance = mint_allowance::new();
             allowance.set(new_allowance);
             treasury.mint_allowances.add(mint_cap_id, allowance);
         } else {
@@ -342,7 +342,7 @@ module stablecoin::treasury {
         assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
         assert!(!is_blocklisted<T>(deny_list, recipient), EDeniedAddress);
         let mint_cap_id = object::id(mint_cap);
-        assert!(is_authorized_mint_cap(treasury, mint_cap_id), ENotMinter);
+        assert!(treasury.is_authorized_mint_cap(mint_cap_id), ENotMinter);
         assert!(amount > 0, EZeroAmount);
 
         let mint_allowance = treasury.mint_allowances.borrow_mut(mint_cap_id);
@@ -373,7 +373,7 @@ module stablecoin::treasury {
         assert!(!is_paused<T>(deny_list), EPaused);
         assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
         let mint_cap_id = object::id(mint_cap);
-        assert!(is_authorized_mint_cap(treasury, mint_cap_id), ENotMinter);
+        assert!(treasury.is_authorized_mint_cap(mint_cap_id), ENotMinter);
 
         let amount = coin.value();
         assert!(amount > 0, EZeroAmount);

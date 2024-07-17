@@ -383,8 +383,8 @@ module sui_extensions::typed_upgrade_cap_tests {
         // Ensure that the correct event was emitted.
         assert_eq(event::num_events(), 1);
         assert_eq(
-            last_event_by_type<typed_upgrade_cap::SuiUpgradeCapDeposited<T>>(),
-            typed_upgrade_cap::create_sui_upgrade_cap_deposited_event(expected_upgrade_cap_id)
+            last_event_by_type(),
+            typed_upgrade_cap::create_sui_upgrade_cap_deposited_event<T>(expected_upgrade_cap_id)
         );
 
         scenario.return_to_sender(typed_upgrade_cap);
@@ -413,8 +413,8 @@ module sui_extensions::typed_upgrade_cap_tests {
         // Ensure that the correct event was emitted.
         assert_eq(event::num_events(), 1);
         assert_eq(
-            last_event_by_type<typed_upgrade_cap::SuiUpgradeCapExtracted<T>>(),
-            typed_upgrade_cap::create_sui_upgrade_cap_extracted_event(upgrade_cap_id)
+            last_event_by_type(),
+            typed_upgrade_cap::create_sui_upgrade_cap_extracted_event<T>(upgrade_cap_id)
         );
 
         scenario.return_to_sender(typed_upgrade_cap);
@@ -463,7 +463,7 @@ module sui_extensions::typed_upgrade_cap_tests {
         // Ensure that the correct events were emitted.
         assert_eq(event::num_events(), 1);
         assert_eq(
-            last_event_by_type<typed_upgrade_cap::AuthorizeUpgrade<T>>(), 
+            last_event_by_type(), 
             typed_upgrade_cap::create_authorize_upgrade_event<T>(prev_upgrade_cap_package, policy)
         );
 
@@ -490,7 +490,7 @@ module sui_extensions::typed_upgrade_cap_tests {
         // Ensure that the correct events were emitted.
         assert_eq(event::num_events(), 1);
         assert_eq(
-            last_event_by_type<typed_upgrade_cap::CommitUpgrade<T>>(), 
+            last_event_by_type(), 
             typed_upgrade_cap::create_commit_upgrade_event<T>(new_upgrade_cap_package)
         );
         

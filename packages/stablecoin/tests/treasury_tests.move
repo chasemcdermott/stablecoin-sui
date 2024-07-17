@@ -71,7 +71,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(MINT_RECIPIENT);
         {
             let coin = scenario.take_from_sender<Coin<TREASURY_TESTS>>();
-            assert_eq(coin::value(&coin), 1000000);
+            assert_eq(coin.value(), 1000000);
             transfer::public_transfer(coin, MINTER);
         };
 
@@ -123,7 +123,7 @@ module stablecoin::treasury_tests {
             let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
             let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();
 
-            treasury::configure_controller(&mut treasury, RANDOM_ADDRESS, object::id(&mint_cap), scenario.ctx());
+            treasury.configure_controller(RANDOM_ADDRESS, object::id(&mint_cap), scenario.ctx());
             assert_eq(treasury.get_controllers_for_testing().contains(RANDOM_ADDRESS), true);
             assert_eq(treasury.get_controllers_for_testing().contains(CONTROLLER), true); 
             let mint_cap_id = treasury.get_worker(RANDOM_ADDRESS);
@@ -951,7 +951,7 @@ module stablecoin::treasury_tests {
                 scenario.ctx()
             );
 
-            let treasury = treasury::create_treasury(
+            let treasury = treasury::new(
                 treasury_cap,
                 deny_cap,
                 OWNER,
@@ -1006,7 +1006,7 @@ module stablecoin::treasury_tests {
     fun test_configure_new_controller(controller: address, minter: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
-        treasury::configure_new_controller(&mut treasury, controller, minter, scenario.ctx());
+        treasury.configure_new_controller(controller, minter, scenario.ctx());
         let mint_cap_id = treasury.get_worker(controller);
         assert_eq(treasury.get_controllers_for_testing().contains(controller), true);
         assert_eq(treasury.mint_allowance(treasury.get_worker(controller)), 0);
@@ -1014,8 +1014,8 @@ module stablecoin::treasury_tests {
         let expected_event1 = treasury::create_mint_cap_created_event<TREASURY_TESTS>(mint_cap_id);
         let expected_event2 = treasury::create_controller_configured_event<TREASURY_TESTS>(controller, mint_cap_id);
         assert_eq(event::num_events(), 2);
-        assert_eq(last_event_by_type<treasury::MintCapCreated<TREASURY_TESTS>>(), expected_event1);
-        assert_eq(last_event_by_type<treasury::ControllerConfigured<TREASURY_TESTS>>(), expected_event2);
+        assert_eq(last_event_by_type(), expected_event1);
+        assert_eq(last_event_by_type(), expected_event2);
 
         test_scenario::return_shared(treasury);
 
@@ -1029,13 +1029,13 @@ module stablecoin::treasury_tests {
     fun test_configure_controller(controller: address, mint_cap_id: ID, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
-        treasury::configure_controller(&mut treasury, controller, mint_cap_id, scenario.ctx());
+        treasury.configure_controller(controller, mint_cap_id, scenario.ctx());
         assert_eq(treasury.get_controllers_for_testing().contains(controller), true);
         assert_eq(treasury.mint_allowance(treasury.get_worker(controller)), 0);
 
         let expected_event = treasury::create_controller_configured_event<TREASURY_TESTS>(controller, mint_cap_id);
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<treasury::ControllerConfigured<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         test_scenario::return_shared(treasury);
     }
@@ -1043,28 +1043,28 @@ module stablecoin::treasury_tests {
     fun test_remove_controller(controller: address, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
-        treasury::remove_controller(&mut treasury, controller, scenario.ctx());
+        treasury.remove_controller(controller, scenario.ctx());
         assert_eq(treasury.get_controllers_for_testing().contains(controller), false);
 
         let expected_event = treasury::create_controller_removed_event<TREASURY_TESTS>(controller);
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<treasury::ControllerRemoved<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         test_scenario::return_shared(treasury);
     }
 
     fun test_configure_minter(allowance: u64, scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-        let deny_list = scenario.take_shared<DenyList>();
+        let deny_list = scenario.take_shared();
 
-        treasury::configure_minter(&mut treasury, &deny_list, allowance, scenario.ctx());
+        treasury.configure_minter(&deny_list, allowance, scenario.ctx());
 
-        let mint_cap_id = treasury::get_worker(&treasury, scenario.sender());
-        assert_eq(treasury::mint_allowance(&treasury, mint_cap_id), allowance);
+        let mint_cap_id = treasury.get_worker(scenario.sender());
+        assert_eq(treasury.mint_allowance(mint_cap_id), allowance);
 
         let expected_event = treasury::create_minter_configured_event<TREASURY_TESTS>(scenario.ctx().sender(), mint_cap_id, allowance);
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<treasury::MinterConfigured<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         test_scenario::return_shared(treasury);
         test_scenario::return_shared(deny_list);
@@ -1073,32 +1073,32 @@ module stablecoin::treasury_tests {
     fun test_remove_minter(scenario: &mut Scenario) {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
-        treasury::remove_minter(&mut treasury, scenario.ctx());
+        treasury.remove_minter(scenario.ctx());
 
-        let mint_cap_id = treasury::get_worker(&treasury, scenario.sender());
+        let mint_cap_id = treasury.get_worker(scenario.sender());
         assert_eq(treasury.mint_allowance(mint_cap_id), 0);  
         assert_eq(treasury.get_mint_allowances_for_testing().contains(mint_cap_id), false);  
 
         let expected_event = treasury::create_minter_removed_event<TREASURY_TESTS>(scenario.ctx().sender(), mint_cap_id);
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<treasury::MinterRemoved<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         test_scenario::return_shared(treasury);
     }
 
     fun test_mint(mint_amount: u64, recipient: address, scenario: &mut Scenario) {
-        let deny_list = scenario.take_shared<DenyList>();
+        let deny_list = scenario.take_shared();
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
         let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();
 
         let allowance_before = treasury.mint_allowance(object::id(&mint_cap));
-        treasury::mint(&mut treasury, &mint_cap, &deny_list, mint_amount, recipient, scenario.ctx());
+        treasury.mint(&mint_cap, &deny_list, mint_amount, recipient, scenario.ctx());
         assert_eq(treasury.total_supply(), mint_amount);
         assert_eq(treasury.mint_allowance(object::id(&mint_cap)), allowance_before - mint_amount);
 
         let expected_event = treasury::create_mint_event<TREASURY_TESTS>(object::id(&mint_cap), recipient, mint_amount);
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<treasury::Mint<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         scenario.return_to_sender(mint_cap);
         test_scenario::return_shared(treasury);
@@ -1113,7 +1113,7 @@ module stablecoin::treasury_tests {
 
     fun test_burn(scenario: &mut Scenario) {
         let sender = scenario.ctx().sender();
-        let deny_list = scenario.take_shared<DenyList>();
+        let deny_list = scenario.take_shared();
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
         let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();
         let coin = scenario.take_from_sender<Coin<TREASURY_TESTS>>();
@@ -1122,13 +1122,13 @@ module stablecoin::treasury_tests {
         let allowance_before = treasury.mint_allowance(object::id(&mint_cap));
         let amount_before = treasury.total_supply();
         let burn_amount = coin.value();
-        treasury::burn(&mut treasury, &mint_cap, &deny_list, coin, scenario.ctx());
+        treasury.burn(&mint_cap, &deny_list, coin, scenario.ctx());
         assert_eq(treasury.total_supply(), amount_before - burn_amount);
         assert_eq(treasury.mint_allowance(object::id(&mint_cap)), allowance_before);
 
         let expected_event = treasury::create_burn_event<TREASURY_TESTS>(object::id(&mint_cap), burn_amount);
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<treasury::Burn<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         scenario.return_to_sender(mint_cap);
         test_scenario::return_shared(treasury);
@@ -1151,7 +1151,7 @@ module stablecoin::treasury_tests {
         let expected_event = treasury::create_blocklisted_event<TREASURY_TESTS>(addr);
         let expected_event_count = 1 + event::events_by_type<deny_list::PerTypeConfigCreated>().length();
         assert_eq(event::num_events() as u64, expected_event_count);
-        assert_eq(last_event_by_type<treasury::Blocklisted<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         test_scenario::return_shared(deny_list);
         test_scenario::return_shared(treasury);
@@ -1168,7 +1168,7 @@ module stablecoin::treasury_tests {
 
         let expected_event = treasury::create_unblocklisted_event<TREASURY_TESTS>(addr);
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<treasury::Unblocklisted<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         test_scenario::return_shared(deny_list);
         test_scenario::return_shared(treasury);
@@ -1253,7 +1253,7 @@ module stablecoin::treasury_tests {
     }
 
     fun test_is_blocklisted_current_epoch(scenario: &mut Scenario, addr: address, expected: bool) {
-        let deny_list = scenario.take_shared<DenyList>();
+        let deny_list = scenario.take_shared();
         let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
         assert_eq(coin::deny_list_v2_contains_current_epoch<TREASURY_TESTS>(&deny_list, addr, scenario.ctx()), expected);
@@ -1263,7 +1263,7 @@ module stablecoin::treasury_tests {
     }
 
     fun test_is_paused_current_epoch(scenario: &mut Scenario, expected: bool) {
-        let deny_list = scenario.take_shared<DenyList>();
+        let deny_list = scenario.take_shared();
         let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
         assert_eq(coin::deny_list_v2_is_global_pause_enabled_current_epoch<TREASURY_TESTS>(&deny_list, scenario.ctx()), expected);
@@ -1290,7 +1290,7 @@ module stablecoin::treasury_tests {
 
         let expected_event = treasury::create_metadata_updated_event<TREASURY_TESTS>(name, symbol, description, url);
         assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type<treasury::MetadataUpdated<TREASURY_TESTS>>(), expected_event);
+        assert_eq(last_event_by_type(), expected_event);
 
         test_scenario::return_shared(treasury);
         test_scenario::return_shared(metadata);

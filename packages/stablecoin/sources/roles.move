@@ -108,7 +108,7 @@ module stablecoin::roles {
 
     // === Write functions ===
 
-    public(package) fun create_roles<T>(
+    public(package) fun new<T>(
         owner: address, 
         master_minter: address,
         blocklister: address, 

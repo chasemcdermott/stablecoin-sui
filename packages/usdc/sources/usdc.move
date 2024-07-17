@@ -43,7 +43,7 @@ module usdc::usdc {
       ctx
     );
 
-    let treasury = treasury::create_treasury(
+    let treasury = treasury::new(
       treasury_cap, 
       deny_cap,
       ctx.sender(), // owner

@@ -30,7 +30,7 @@ module stablecoin::mint_allowance {
     }
 
     /// Create a new MintAllowance for type T.
-    public(package) fun create<T>(): MintAllowance<T> {
+    public(package) fun new<T>(): MintAllowance<T> {
         MintAllowance { value: 0 }
     }
 

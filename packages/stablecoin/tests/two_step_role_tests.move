@@ -69,14 +69,9 @@ module stablecoin::two_step_role_tests {
         assert_eq(role.active_address(), ADMIN);
         assert_eq(role.pending_address(), option::some(NEW_ADMIN));
 
-        let expected_event = two_step_role::create_role_transfer_started_event(
-            ADMIN, NEW_ADMIN
-        );
+        let expected_event = two_step_role::create_role_transfer_started_event<TWO_STEP_ROLE_TESTS>(ADMIN, NEW_ADMIN);
         assert_eq(event::num_events(), 1);
-        assert_eq(
-            last_event_by_type<two_step_role::RoleTransferStarted<TWO_STEP_ROLE_TESTS>>(), 
-            expected_event
-        );
+        assert_eq(last_event_by_type(), expected_event);
 
         destroy(role);
         scenario.end();
@@ -88,10 +83,7 @@ module stablecoin::two_step_role_tests {
         let (mut scenario, mut role) = setup();
         
         scenario.next_tx(INVALID_ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.begin_role_transfer(NEW_ADMIN, ctx);
-        };
+        role.begin_role_transfer(NEW_ADMIN, scenario.ctx());
         
         destroy(role);
         scenario.end();
@@ -104,28 +96,17 @@ module stablecoin::two_step_role_tests {
         let (mut scenario, mut role) = setup();
 
         scenario.next_tx(ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.begin_role_transfer(NEW_ADMIN, ctx);
-        };
+        role.begin_role_transfer(NEW_ADMIN, scenario.ctx());
 
-        test_scenario::next_tx(&mut scenario, NEW_ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.accept_role(ctx);
-        };
+        scenario.next_tx(NEW_ADMIN);
+        role.accept_role(scenario.ctx());
         
         assert_eq(role.active_address(), NEW_ADMIN);
         assert_eq(role.pending_address(), option::none());
 
-        let expected_event = two_step_role::create_role_transferred_event(
-            ADMIN, NEW_ADMIN
-        );
+        let expected_event = two_step_role::create_role_transferred_event<TWO_STEP_ROLE_TESTS>(ADMIN, NEW_ADMIN);
         assert_eq(event::num_events(), 1);
-        assert_eq(
-            last_event_by_type<two_step_role::RoleTransferred<TWO_STEP_ROLE_TESTS>>(), 
-            expected_event
-        );
+        assert_eq(last_event_by_type(), expected_event);
 
         destroy(role);
         scenario.end();
@@ -136,11 +117,8 @@ module stablecoin::two_step_role_tests {
     fun accept_role__should_fail_if_pending_address_not_set() {
         let (mut scenario, mut role) = setup();
 
-        test_scenario::next_tx(&mut scenario, NEW_ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.accept_role(ctx);
-        };
+        scenario.next_tx(NEW_ADMIN);
+        role.accept_role(scenario.ctx());
 
         destroy(role);
         scenario.end();
@@ -152,16 +130,10 @@ module stablecoin::two_step_role_tests {
         let (mut scenario, mut role) = setup();
 
         scenario.next_tx(ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.begin_role_transfer(NEW_ADMIN, ctx);
-        };
+        role.begin_role_transfer(NEW_ADMIN, scenario.ctx());
 
-        test_scenario::next_tx(&mut scenario, INVALID_ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.accept_role(ctx);
-        };
+        scenario.next_tx(INVALID_ADMIN);
+        role.accept_role(scenario.ctx());
 
         destroy(role);
         scenario.end();
@@ -174,10 +146,7 @@ module stablecoin::two_step_role_tests {
         let (mut scenario, role) = setup();
 
         scenario.next_tx(ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.assert_sender_is_active_role(ctx);
-        };
+        role.assert_sender_is_active_role(scenario.ctx());
 
         destroy(role);
         scenario.end();
@@ -189,10 +158,7 @@ module stablecoin::two_step_role_tests {
         let (mut scenario, role) = setup();
 
         scenario.next_tx(INVALID_ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.assert_sender_is_active_role(ctx);
-        };
+        role.assert_sender_is_active_role(scenario.ctx());
         
         destroy(role);
         scenario.end();
