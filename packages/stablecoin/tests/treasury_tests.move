@@ -825,6 +825,20 @@ module stablecoin::treasury_tests {
 
         scenario.end();
     }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EObjectMigrated)]
+    fun start_migration__should_fail_when_calling_from_current_version() {
+        let mut scenario = setup();
+        
+        scenario.next_tx(OWNER);
+        {
+            let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+            treasury.start_migration(scenario.ctx());
+            test_scenario::return_shared(treasury);
+        };
+
+        scenario.end();
+    }
     
     // === Incompatible Treasury object tests ===
     #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]

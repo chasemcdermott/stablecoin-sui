@@ -17,6 +17,7 @@
 module stablecoin::treasury {
     use std::string;
     use std::ascii;
+    use std::u64::{min, max};
     use sui::{
         coin::{
             Self, Coin, CoinMetadata, DenyCapV2, TreasuryCap, 
@@ -47,10 +48,17 @@ module stablecoin::treasury {
     const ENotMasterMinter: u64 = 6;
     const ENotMetadataUpdater: u64 = 7;
     const ENotMinter: u64 = 8;
-    const ENotPauser: u64 = 9;
-    const EPaused: u64 = 10;
-    const ETreasuryCapNotFound: u64 = 11;
-    const EZeroAmount: u64 = 12;
+    const ENotOwner: u64 = 9;
+    const ENotPauser: u64 = 10;
+    const EPaused: u64 = 11;
+    const ETreasuryCapNotFound: u64 = 12;
+    const EZeroAmount: u64 = 13;
+
+    /// Migration related error codes, starting at 100.
+    const EMigrationStarted: u64 = 100;
+    const EMigrationNotStarted: u64 = 101;
+    const EObjectMigrated: u64 = 102;
+    const ENotPendingVersion: u64 = 103;
 
     // === Structs ===
 
@@ -134,6 +142,18 @@ module stablecoin::treasury {
         symbol: ascii::String,
         description: string::String,
         icon_url: ascii::String
+    }
+
+    public struct MigrationStarted<phantom T> has copy, drop {
+        compatible_versions: vector<u64>
+    }
+
+    public struct MigrationAborted<phantom T> has copy, drop {
+        compatible_versions: vector<u64>
+    }
+
+    public struct MigrationCompleted<phantom T> has copy, drop {
+        compatible_versions: vector<u64>
     }
 
     // === View-only functions ===
@@ -496,6 +516,59 @@ module stablecoin::treasury {
         })
     }
 
+    /// Starts the migration process, making the Treasury object be
+    /// additionally compatible with this package's version.
+    entry fun start_migration<T>(treasury: &mut Treasury<T>, ctx: &TxContext) {
+        assert!(treasury.roles.owner() == ctx.sender(), ENotOwner);
+        assert!(treasury.compatible_versions.size() == 1, EMigrationStarted);
+
+        let active_version = treasury.compatible_versions.keys()[0];
+        assert!(active_version < version_control::current_version(), EObjectMigrated);
+
+        treasury.compatible_versions.insert(version_control::current_version());
+        
+        event::emit(MigrationStarted<T> {
+            compatible_versions: *treasury.compatible_versions.keys()
+        });
+    }
+
+    /// Aborts the migration process, reverting the Treasury object's compatibility
+    /// to the previous version.
+    entry fun abort_migration<T>(treasury: &mut Treasury<T>, ctx: &TxContext) {
+        assert!(treasury.roles.owner() == ctx.sender(), ENotOwner);
+        assert!(treasury.compatible_versions.size() == 2, EMigrationNotStarted);
+
+        let pending_version = max(
+            treasury.compatible_versions.keys()[0],
+            treasury.compatible_versions.keys()[1]
+        );
+        assert!(pending_version == version_control::current_version(), ENotPendingVersion);
+
+        treasury.compatible_versions.remove(&pending_version);
+
+        event::emit(MigrationAborted<T> {
+            compatible_versions: *treasury.compatible_versions.keys()
+        });
+    }
+
+    /// Completes the migration process, making the Treasury object be
+    /// only compatible with this package's version.
+    entry fun complete_migration<T>(treasury: &mut Treasury<T>, ctx: &TxContext) {
+        assert!(treasury.roles.owner() == ctx.sender(), ENotOwner);
+        assert!(treasury.compatible_versions.size() == 2, EMigrationNotStarted);
+
+        let (version_a, version_b) = (treasury.compatible_versions.keys()[0], treasury.compatible_versions.keys()[1]);
+        let (active_version, pending_version) = (min(version_a, version_b), max(version_a, version_b));
+
+        assert!(pending_version == version_control::current_version(), ENotPendingVersion);
+
+        treasury.compatible_versions.remove(&active_version);
+
+        event::emit(MigrationCompleted<T> {
+            compatible_versions: *treasury.compatible_versions.keys()
+        });
+    }
+
     // === Test Only ===
 
     #[test_only]
@@ -576,6 +649,21 @@ module stablecoin::treasury {
     #[test_only]
     public(package) fun create_unblocklisted_event<T>(`address`: address): Unblocklisted<T> {
         Unblocklisted { `address` }
+    }
+
+    #[test_only]
+    public(package) fun create_migration_started_event<T>(compatible_versions: vector<u64>): MigrationStarted<T> {
+        MigrationStarted { compatible_versions }
+    }
+
+    #[test_only]
+    public(package) fun create_migration_aborted_event<T>(compatible_versions: vector<u64>): MigrationAborted<T> {
+        MigrationAborted { compatible_versions }
+    }
+
+    #[test_only]
+    public(package) fun create_migration_completed_event<T>(compatible_versions: vector<u64>): MigrationCompleted<T> {
+        MigrationCompleted { compatible_versions }
     }
 
     #[test_only]

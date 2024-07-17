@@ -26,11 +26,21 @@ import _ from "lodash";
 import fs from "fs";
 import path from "path";
 import readline from "readline/promises";
+import util from "util";
 
 export function log(...[message, ...args]: Parameters<typeof console.log>) {
   if (process.env.NODE_ENV !== "TESTING") {
     console.log(">>> " + message, ...args);
   }
+}
+
+export function inspectObject(object: any) {
+  return util.inspect(
+    object,
+    false /* showHidden */,
+    8 /* depth */,
+    true /* color */
+  );
 }
 
 export async function waitForUserConfirmation() {
@@ -163,6 +173,11 @@ export async function executeTransactionHelper(args: {
       showRawInput: false // too verbose
     }
   });
+
+  if (txOutput.effects?.status.status === "failure") {
+    console.log(inspectObject(txOutput));
+    throw new Error("Transaction failed!");
+  }
 
   return txOutput;
 }

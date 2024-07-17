@@ -59,6 +59,11 @@ function stop_network() {
   docker kill sui-network && docker rm sui-network
 }
 
+function create_patch() {
+  GIT_DIFF=$(git diff)
+  echo "$GIT_DIFF" > $1
+}
+
 function _get_packages() {
   find "packages" -type d -mindepth 1 -maxdepth 1
 }

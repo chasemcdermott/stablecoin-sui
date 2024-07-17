@@ -1,0 +1,43 @@
+diff --git a/packages/stablecoin/sources/roles.move b/packages/stablecoin/sources/roles.move
+index e38c753..4fc7d02 100644
+--- a/packages/stablecoin/sources/roles.move
++++ b/packages/stablecoin/sources/roles.move
+@@ -127,6 +127,11 @@ module stablecoin::roles {
+         }
+     }
+ 
++    /// Initializes version 2 of Roles.
++    public(package) fun init_v2<T>(_: &mut Roles<T>) {
++        // == Add any logic related to initializating a v2 roles below this line ==
++    }
++
+     /// Change the master minter address.
+     public fun update_master_minter<T>(roles: &mut Roles<T>, new_master_minter: address, ctx: &TxContext) {
+         roles.owner_role().assert_sender_is_active_role(ctx);
+diff --git a/packages/stablecoin/sources/treasury.move b/packages/stablecoin/sources/treasury.move
+index b8a272a..ba48d0e 100644
+--- a/packages/stablecoin/sources/treasury.move
++++ b/packages/stablecoin/sources/treasury.move
+@@ -567,6 +567,9 @@ module stablecoin::treasury {
+         event::emit(MigrationCompleted<T> {
+             compatible_versions: *treasury.compatible_versions.keys()
+         });
++
++        // == Add any additional migration logic below this line ==
++        treasury.roles.init_v2();
+     }
+ 
+     // === Test Only ===
+diff --git a/packages/stablecoin/sources/version_control.move b/packages/stablecoin/sources/version_control.move
+index 503ddc0..67d09e1 100644
+--- a/packages/stablecoin/sources/version_control.move
++++ b/packages/stablecoin/sources/version_control.move
+@@ -18,7 +18,7 @@ module stablecoin::version_control {
+     use sui::vec_set::VecSet;
+ 
+     /// The current version of the package.
+-    const VERSION: u64 = 1;
++    const VERSION: u64 = 2;
+ 
+     // === Errors ===
+     const EIncompatibleVersion: u64 = 0;
