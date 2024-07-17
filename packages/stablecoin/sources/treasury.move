@@ -499,37 +499,37 @@ module stablecoin::treasury {
     // === Test Only ===
 
     #[test_only]
-    public fun get_controllers_for_testing<T>(treasury: &Treasury<T>): &Table<address, ID> {
+    public(package) fun get_controllers_for_testing<T>(treasury: &Treasury<T>): &Table<address, ID> {
         &treasury.controllers
     }
 
     #[test_only]
-    public fun get_mint_allowances_for_testing<T>(treasury: &Treasury<T>): &Table<ID, MintAllowance<T>> {
+    public(package) fun get_mint_allowances_for_testing<T>(treasury: &Treasury<T>): &Table<ID, MintAllowance<T>> {
         &treasury.mint_allowances
     }
 
     #[test_only]
-    public fun get_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): &mut DenyCapV2<T> {
+    public(package) fun get_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): &mut DenyCapV2<T> {
         treasury.borrow_deny_cap_mut()
     }
 
     #[test_only]
-    public fun remove_treasury_cap_for_testing<T>(treasury: &mut Treasury<T>): TreasuryCap<T> {
+    public(package) fun remove_treasury_cap_for_testing<T>(treasury: &mut Treasury<T>): TreasuryCap<T> {
         dof::remove(&mut treasury.id, TreasuryCapKey {})
     }
 
     #[test_only]
-    public fun remove_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): DenyCapV2<T> {
+    public(package) fun remove_deny_cap_for_testing<T>(treasury: &mut Treasury<T>): DenyCapV2<T> {
         dof::remove(&mut treasury.id, DenyCapKey {})
     }
 
     #[test_only]
-    public fun create_mint_cap_for_testing<T>(ctx: &mut TxContext): MintCap<T> {
+    public(package) fun create_mint_cap_for_testing<T>(ctx: &mut TxContext): MintCap<T> {
         MintCap { id: object::new(ctx) }
     }
 
     #[test_only]
-    public fun set_compatible_versions_for_testing<T>(treasury: &mut Treasury<T>, compatible_versions: VecSet<u64>) {
+    public(package) fun set_compatible_versions_for_testing<T>(treasury: &mut Treasury<T>, compatible_versions: VecSet<u64>) {
         treasury.compatible_versions = compatible_versions;
     }
 

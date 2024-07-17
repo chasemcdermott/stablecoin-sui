@@ -15,52 +15,52 @@
 // limitations under the License.
 
 module usdc::usdc {
-  use std::ascii::string;
-  use sui::coin;
-  use sui::url;
-  use stablecoin::treasury;
-  use sui_extensions::typed_upgrade_cap;
+    use std::ascii::string;
+    use sui::coin;
+    use sui::url;
+    use stablecoin::treasury;
+    use sui_extensions::typed_upgrade_cap;
 
-  /// The One-Time Witness struct for the USDC coin.
-  public struct USDC has drop {}
+    /// The One-Time Witness struct for the USDC coin.
+    public struct USDC has drop {}
 
-  /// Constants
-  const DESCRIPTION: vector<u8> = b"USDC is a US dollar-backed stablecoin issued by Circle. USDC is designed to provide a faster, safer, and more efficient way to send, spend, and exchange money around the world.";
-  const ICON_URL: vector<u8> = b"https://www.circle.com/hubfs/Brand/USDC/USDC_icon_32x32.png";
+    /// Constants
+    const DESCRIPTION: vector<u8> = b"USDC is a US dollar-backed stablecoin issued by Circle. USDC is designed to provide a faster, safer, and more efficient way to send, spend, and exchange money around the world.";
+    const ICON_URL: vector<u8> = b"https://www.circle.com/hubfs/Brand/USDC/USDC_icon_32x32.png";
 
-  #[allow(lint(share_owned))]
-  fun init(witness: USDC, ctx: &mut TxContext) {
-    let (typed_upgrade_cap, witness) = typed_upgrade_cap::empty(witness, ctx);
+    #[allow(lint(share_owned))]
+    fun init(witness: USDC, ctx: &mut TxContext) {
+        let (typed_upgrade_cap, witness) = typed_upgrade_cap::empty(witness, ctx);
 
-    let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency_v2(
-      witness,
-      6,               // decimals
-      b"USDC",         // symbol
-      b"USDC",         // name
-      DESCRIPTION,
-      option::some(url::new_unsafe(string(ICON_URL))),
-      true,            // allow global pause
-      ctx
-    );
+        let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency_v2(
+            witness,
+            6,               // decimals
+            b"USDC",         // symbol
+            b"USDC",         // name
+            DESCRIPTION,
+            option::some(url::new_unsafe(string(ICON_URL))),
+            true,            // allow global pause
+            ctx
+        );
 
-    let treasury = treasury::new(
-      treasury_cap, 
-      deny_cap,
-      ctx.sender(), // owner
-      ctx.sender(), // master minter
-      ctx.sender(), // blocklister
-      ctx.sender(), // pauser
-      ctx.sender(), // metadata updater
-      ctx
-    );
-    
-    transfer::public_share_object(metadata);
-    transfer::public_share_object(treasury);
-    transfer::public_transfer(typed_upgrade_cap, ctx.sender());
-  }
+        let treasury = treasury::new(
+            treasury_cap, 
+            deny_cap,
+            ctx.sender(), // owner
+            ctx.sender(), // master minter
+            ctx.sender(), // blocklister
+            ctx.sender(), // pauser
+            ctx.sender(), // metadata updater
+            ctx
+        );
+            
+        transfer::public_share_object(metadata);
+        transfer::public_share_object(treasury);
+        transfer::public_transfer(typed_upgrade_cap, ctx.sender());
+    }
 
-  #[test_only]
-  public fun init_for_testing(ctx: &mut TxContext) {
-    init(USDC {}, ctx)
-  }
+    #[test_only]
+    public(package) fun init_for_testing(ctx: &mut TxContext) {
+        init(USDC {}, ctx)
+    }
 }

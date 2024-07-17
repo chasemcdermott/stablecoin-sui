@@ -31,7 +31,7 @@ import {
   writePublishedAddressToPackageManifest
 } from "../utils";
 
-describe.only("Test deposit-upgrade-cap script", () => {
+describe("Test deposit-upgrade-cap script", () => {
   const RPC_URL = process.env.RPC_URL as string;
 
   let deployerKeys: Ed25519Keypair;
@@ -108,7 +108,7 @@ describe.only("Test deposit-upgrade-cap script", () => {
     stablecoinTypedUpgradeCapId = createdTypedUpgradeCap[0].objectId;
   });
 
-  it.only("Deposits an UpgradeCap into an UpgradeCap<T> for the 'stablecoin' package correctly", async () => {
+  it("Deposits an UpgradeCap into an UpgradeCap<T> for the 'stablecoin' package correctly", async () => {
     const { objectChanges } = (await depositUpgradeCapCommand(
       RPC_URL,
       suiExtensionsPackageId,
