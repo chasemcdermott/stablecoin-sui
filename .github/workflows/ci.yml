@@ -35,9 +35,9 @@ jobs:
 
       - name: Run tests on v2
         run: |
-          git apply -3 packages/stablecoin/examples/v2_base.patch
+          git apply packages/stablecoin/examples/v2_base.patch
           bash run.sh test
-          git apply -3 -R packages/stablecoin/examples/v2_base.patch
+          git apply -R packages/stablecoin/examples/v2_base.patch
 
   run_typescript_tests:
     name: "Run typescript tests"
