@@ -81,12 +81,12 @@ module stablecoin::two_step_role {
         }
     }
 
-    /// Start the role transfer. Must be followed by an accept_role call by the new_address EOA.
+    /// [Package private] Start the role transfer. Must be followed by an accept_role call by the new_address EOA.
     /// A transfer can be aborted by starting another role transfer process
     /// to the current active address and accepting the role.
     /// 
     /// - Only callable by the active address.
-    public fun begin_role_transfer<T>(
+    public(package) fun begin_role_transfer<T>(
         role: &mut TwoStepRole<T>,
         new_address: address,
         ctx: &TxContext
@@ -101,20 +101,22 @@ module stablecoin::two_step_role {
         });
     }
 
-    /// Complete the role transfer by accepting the role.
+    /// [Package private] Complete the role transfer by accepting the role.
     /// - Only callable by the pending address.
-    public fun accept_role<T>(
+    public(package) fun accept_role<T>(
         role: &mut TwoStepRole<T>,
         ctx: &TxContext
     ) {
         assert!(role.pending_address.is_some(), EPendingAddressNotSet);
         assert!(role.pending_address.contains(&ctx.sender()), ESenderNotPendingAddress);
 
-
         let old_address = role.active_address;
         role.active_address = role.pending_address.extract();
 
-        event::emit(RoleTransferred<T> { old_address, new_address: role.active_address });
+        event::emit(RoleTransferred<T> {
+            old_address,
+            new_address: role.active_address
+        });
     }
 
     // === Test Only ===

@@ -947,6 +947,48 @@ module stablecoin::treasury_tests {
         after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun transfer_ownership__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        entry::transfer_ownership(&mut treasury, RANDOM_ADDRESS, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun accept_ownership__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        entry::accept_ownership(&mut treasury, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun update_master_minter__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        entry::update_master_minter(&mut treasury, RANDOM_ADDRESS, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun update_blocklister__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        entry::update_blocklister(&mut treasury, RANDOM_ADDRESS, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun update_pauser__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        entry::update_pauser(&mut treasury, RANDOM_ADDRESS, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun update_metadata_updater__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        entry::update_metadata_updater(&mut treasury, RANDOM_ADDRESS, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
     // === Helpers ===
 
     fun setup(): Scenario {

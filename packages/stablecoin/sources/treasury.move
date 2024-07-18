@@ -251,7 +251,7 @@ module stablecoin::treasury {
         mint_cap_id: ID,
         ctx: &TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
         assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         assert!(!treasury.is_controller(controller), EControllerAlreadyConfigured);
 
@@ -269,7 +269,7 @@ module stablecoin::treasury {
         treasury: &Treasury<T>, 
         ctx: &mut TxContext
     ): MintCap<T> {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
         assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         let mint_cap = MintCap { id: object::new(ctx) };
         event::emit(MintCapCreated<T> { 
@@ -304,7 +304,7 @@ module stablecoin::treasury {
         controller: address, 
         ctx: &TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
         assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         assert!(treasury.is_controller(controller), ENotController);
 
@@ -325,7 +325,7 @@ module stablecoin::treasury {
         new_allowance: u64, 
         ctx: &TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
 
         assert!(!is_paused<T>(deny_list), EPaused);
         let controller = ctx.sender();
@@ -352,7 +352,7 @@ module stablecoin::treasury {
         treasury: &mut Treasury<T>, 
         ctx: &TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
 
         let controller = ctx.sender();
         let mint_cap_id = get_worker(treasury, controller);
@@ -379,7 +379,7 @@ module stablecoin::treasury {
         recipient: address, 
         ctx: &mut TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
 
         assert!(!is_paused<T>(deny_list), EPaused);
         assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
@@ -414,7 +414,7 @@ module stablecoin::treasury {
         coin: Coin<T>,
         ctx: &TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
 
         assert!(!is_paused<T>(deny_list), EPaused);
         assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
@@ -440,7 +440,7 @@ module stablecoin::treasury {
         addr: address,
         ctx: &mut TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
         assert!(treasury.roles.blocklister() == ctx.sender(), ENotBlocklister);
 
         if (!is_blocklisted<T>(deny_list, addr)) {
@@ -460,7 +460,7 @@ module stablecoin::treasury {
         addr: address,
         ctx: &mut TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
         assert!(treasury.roles.blocklister() == ctx.sender(), ENotBlocklister);
 
         if (is_blocklisted<T>(deny_list, addr)) {
@@ -479,7 +479,7 @@ module stablecoin::treasury {
         deny_list: &mut DenyList,
         ctx: &mut TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
 
         assert!(treasury.roles.pauser() == ctx.sender(), ENotPauser);
         let deny_cap = treasury.borrow_deny_cap_mut();
@@ -498,7 +498,7 @@ module stablecoin::treasury {
         deny_list: &mut DenyList,
         ctx: &mut TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
         assert!(treasury.roles().pauser() == ctx.sender(), ENotPauser);
         let deny_cap = treasury.borrow_deny_cap_mut();
 
@@ -538,7 +538,7 @@ module stablecoin::treasury {
         icon_url: ascii::String,
         ctx: &TxContext
     ) {
-        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
+        treasury.assert_is_compatible();
         assert!(treasury.roles.metadata_updater() == ctx.sender(), ENotMetadataUpdater);
         treasury.borrow_treasury_cap().update_name(metadata, name);
         treasury.borrow_treasury_cap().update_symbol(metadata, symbol);
@@ -603,6 +603,14 @@ module stablecoin::treasury {
         event::emit(MigrationCompleted<T> {
             compatible_versions: *treasury.compatible_versions.keys()
         });
+    }
+
+    // === Assertions ===
+    
+    /// [Package private] Asserts that the Treasury object 
+    /// is compatible with the package's version.
+    public(package) fun assert_is_compatible<T>(treasury: &Treasury<T>) {
+        assert_object_version_is_compatible_with_package(treasury.compatible_versions);
     }
 
     // === Test Only ===

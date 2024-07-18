@@ -128,9 +128,9 @@ module stablecoin::roles {
         }
     }
 
-    /// Change the master minter address.
+    /// [Package private] Change the master minter address.
     /// - Only callable by the owner.
-    public fun update_master_minter<T>(roles: &mut Roles<T>, new_master_minter: address, ctx: &TxContext) {
+    public(package) fun update_master_minter<T>(roles: &mut Roles<T>, new_master_minter: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
         let old_master_minter = roles.update_address(MasterMinterKey {}, new_master_minter);
@@ -141,9 +141,9 @@ module stablecoin::roles {
         });
     }
 
-    /// Change the blocklister address.
+    /// [Package private] Change the blocklister address.
     /// - Only callable by the owner.
-    public fun update_blocklister<T>(roles: &mut Roles<T>, new_blocklister: address, ctx: &TxContext) {
+    public(package) fun update_blocklister<T>(roles: &mut Roles<T>, new_blocklister: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
         let old_blocklister = roles.update_address(BlocklisterKey {}, new_blocklister);
@@ -154,9 +154,9 @@ module stablecoin::roles {
         });
     }
 
-    /// Change the pauser address.
+    /// [Package private] Change the pauser address.
     /// - Only callable by the owner.
-    public fun update_pauser<T>(roles: &mut Roles<T>, new_pauser: address, ctx: &TxContext) {
+    public(package) fun update_pauser<T>(roles: &mut Roles<T>, new_pauser: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
         let old_pauser = roles.update_address(PauserKey {}, new_pauser);
@@ -167,9 +167,9 @@ module stablecoin::roles {
         });
     }
 
-    /// Change the metadata updater address.
+    /// [Package private] Change the metadata updater address.
     /// - Only callable by the owner.
-    public fun update_metadata_updater<T>(roles: &mut Roles<T>, new_metadata_updater: address, ctx: &TxContext) {
+    public(package) fun update_metadata_updater<T>(roles: &mut Roles<T>, new_metadata_updater: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
         let old_metadata_updater = roles.update_address(MetadataUpdaterKey {}, new_metadata_updater);
