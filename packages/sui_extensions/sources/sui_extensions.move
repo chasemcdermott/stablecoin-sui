@@ -18,7 +18,9 @@ module sui_extensions::sui_extensions {
     use sui_extensions::typed_upgrade_cap;
 
     public struct SUI_EXTENSIONS has drop {}
-
+    
+    /// Initializes an UpgradeCap<SUI_EXTENSIONS> and transfers the UpgradeCap
+    /// to the transaction's sender.
     fun init(witness: SUI_EXTENSIONS, ctx: &mut TxContext) {
         let (typed_upgrade_cap, _) = typed_upgrade_cap::empty(witness, ctx);
         transfer::public_transfer(typed_upgrade_cap, ctx.sender());

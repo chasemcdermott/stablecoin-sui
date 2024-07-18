@@ -38,8 +38,8 @@ module stablecoin::mint_allowance_tests {
         allowance.destroy();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::mint_allowance::EOverflow)]
-    fun decrease__should_fail_with_overflow() {
+    #[test, expected_failure(abort_code = ::stablecoin::mint_allowance::EInsufficientAllowance)]
+    fun decrease__should_fail_if_allowance_is_insufficient() {
         let mut allowance = mint_allowance::new<MINT_ALLOWANCE_TESTS>();
         assert_eq(allowance.value(), 0);
 

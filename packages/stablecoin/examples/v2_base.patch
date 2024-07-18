@@ -1,8 +1,8 @@
 diff --git a/packages/stablecoin/sources/roles.move b/packages/stablecoin/sources/roles.move
-index e38c753..4fc7d02 100644
+index 3f40cae..dafec05 100644
 --- a/packages/stablecoin/sources/roles.move
 +++ b/packages/stablecoin/sources/roles.move
-@@ -127,6 +127,11 @@ module stablecoin::roles {
+@@ -128,6 +128,11 @@ module stablecoin::roles {
          }
      }
  
@@ -12,13 +12,13 @@ index e38c753..4fc7d02 100644
 +    }
 +
      /// Change the master minter address.
+     /// - Only callable by the owner.
      public fun update_master_minter<T>(roles: &mut Roles<T>, new_master_minter: address, ctx: &TxContext) {
-         roles.owner_role().assert_sender_is_active_role(ctx);
 diff --git a/packages/stablecoin/sources/treasury.move b/packages/stablecoin/sources/treasury.move
-index b8a272a..ba48d0e 100644
+index b329e70..ee4b31b 100644
 --- a/packages/stablecoin/sources/treasury.move
 +++ b/packages/stablecoin/sources/treasury.move
-@@ -567,6 +567,9 @@ module stablecoin::treasury {
+@@ -603,6 +603,9 @@ module stablecoin::treasury {
          event::emit(MigrationCompleted<T> {
              compatible_versions: *treasury.compatible_versions.keys()
          });
@@ -29,7 +29,7 @@ index b8a272a..ba48d0e 100644
  
      // === Test Only ===
 diff --git a/packages/stablecoin/sources/version_control.move b/packages/stablecoin/sources/version_control.move
-index 503ddc0..67d09e1 100644
+index 7fa2c47..e3e94a7 100644
 --- a/packages/stablecoin/sources/version_control.move
 +++ b/packages/stablecoin/sources/version_control.move
 @@ -18,7 +18,7 @@ module stablecoin::version_control {

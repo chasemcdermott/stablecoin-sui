@@ -24,11 +24,15 @@ module usdc::usdc {
     /// The One-Time Witness struct for the USDC coin.
     public struct USDC has drop {}
 
-    /// Constants
+    // === Constants ===
+
     const DESCRIPTION: vector<u8> = b"USDC is a US dollar-backed stablecoin issued by Circle. USDC is designed to provide a faster, safer, and more efficient way to send, spend, and exchange money around the world.";
     const ICON_URL: vector<u8> = b"https://www.circle.com/hubfs/Brand/USDC/USDC_icon_32x32.png";
 
     #[allow(lint(share_owned))]
+    /// Initializes
+    /// - A shared Treasury<USDC> object
+    /// - An owned UpgradeCap<USDC>, transferred to the transaction's sender.
     fun init(witness: USDC, ctx: &mut TxContext) {
         let (typed_upgrade_cap, witness) = typed_upgrade_cap::empty(witness, ctx);
 

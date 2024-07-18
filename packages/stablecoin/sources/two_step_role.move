@@ -54,15 +54,18 @@ module stablecoin::two_step_role {
 
     // === View-only functions ===
 
+    /// Gets the active address of the TwoStepRole.
     public fun active_address<T>(role: &TwoStepRole<T>): address {
         role.active_address
     }
 
+    /// Gets the optional, pending address of the TwoStepRole. May be
+    /// empty if there is no ongoing role transfer.
     public fun pending_address<T>(role: &TwoStepRole<T>): Option<address> {
         role.pending_address
     }
 
-    /// Asserts that the transaction sender EOA is the active_address stored on the Role.
+    /// [Package private] Asserts that the transaction sender EOA is the active_address stored on the Role.
     /// Aborts with error otherwise.
     public(package) fun assert_sender_is_active_role<T>(role: &TwoStepRole<T>, ctx: &TxContext) {
         assert!(role.active_address == ctx.sender(), ESenderNotActiveRole);
@@ -70,6 +73,7 @@ module stablecoin::two_step_role {
 
     // === Write functions ===
 
+    /// [Package private] Creates and initializes a TwoStepRole object.
     public(package) fun new<T>(active_address: address): TwoStepRole<T> {
         TwoStepRole<T> {
             active_address,
@@ -78,10 +82,10 @@ module stablecoin::two_step_role {
     }
 
     /// Start the role transfer. Must be followed by an accept_role call by the new_address EOA.
-    /// A transfer can be aborted by transferring back to the current active address and accepting the role.
-    /// Reverts if:
-    /// - Tx sender is not the active address
-    /// - new_address is already the active_address
+    /// A transfer can be aborted by starting another role transfer process
+    /// to the current active address and accepting the role.
+    /// 
+    /// - Only callable by the active address.
     public fun begin_role_transfer<T>(
         role: &mut TwoStepRole<T>,
         new_address: address,
@@ -98,9 +102,7 @@ module stablecoin::two_step_role {
     }
 
     /// Complete the role transfer by accepting the role.
-    /// Reverts if:
-    /// - No pending_address is set (can be set via a begin_role_transfer call)
-    /// - Tx sender is not the pending address
+    /// - Only callable by the pending address.
     public fun accept_role<T>(
         role: &mut TwoStepRole<T>,
         ctx: &TxContext

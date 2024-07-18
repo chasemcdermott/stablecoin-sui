@@ -24,12 +24,13 @@ module stablecoin::version_control {
     const EIncompatibleVersion: u64 = 0;
 
     // === Methods ===
-    /// Public accessor for the current package's version.
+
+    /// Gets the current package's version.
     public fun current_version(): u64 {
         VERSION
     }
 
-    /// [Package Private] Helper function to check that the object is
+    /// [Package private] Asserts that an object's compatible version set is
     /// compatible with the current package's version.
     public(package) fun assert_object_version_is_compatible_with_package(compatible_versions: VecSet<u64>) {
         assert!(compatible_versions.contains(&current_version()), EIncompatibleVersion);

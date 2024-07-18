@@ -19,6 +19,8 @@ module stablecoin::stablecoin {
 
     public struct STABLECOIN has drop {}
 
+    /// Initializes an UpgradeCap<STABLECOIN> and transfers the UpgradeCap
+    /// to the transaction's sender.
     fun init(witness: STABLECOIN, ctx: &mut TxContext) {
         let (typed_upgrade_cap, _) = typed_upgrade_cap::empty(witness, ctx);
         transfer::public_transfer(typed_upgrade_cap, ctx.sender());

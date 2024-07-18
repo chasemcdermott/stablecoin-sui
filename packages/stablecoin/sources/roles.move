@@ -66,48 +66,49 @@ module stablecoin::roles {
 
     // === View-only functions ===
 
-    /// Check the owner's TwoStepRole object mutably
+    /// [Package private] Gets a mutable reference to the owner's TwoStepRole object.
     public(package) fun owner_role_mut<T>(roles: &mut Roles<T>): &mut TwoStepRole<OwnerRole<T>> {
         roles.data.borrow_mut(OwnerKey {})
     }
 
-    /// Check the owner's TwoStepRole object
+    /// [Package private] Gets an immutable reference to the owner's TwoStepRole object.
     public(package) fun owner_role<T>(roles: &Roles<T>): &TwoStepRole<OwnerRole<T>> {
         roles.data.borrow(OwnerKey {})
     }
     
-    /// Check the owner address
+    /// Gets the current owner address.
     public fun owner<T>(roles: &Roles<T>): address {
         roles.owner_role().active_address()
     }
 
-    /// Check the pending owner address
+    /// Gets the pending owner address.
     public fun pending_owner<T>(roles: &Roles<T>): Option<address> {
         roles.owner_role().pending_address()
     }
 
-    /// Check the master minter address
+    /// Gets the master minter address.
     public fun master_minter<T>(roles: &Roles<T>): address {
         *roles.data.borrow(MasterMinterKey {})
     }
 
-    /// Check the blocklister address
+    /// Gets the blocklister address.
     public fun blocklister<T>(roles: &Roles<T>): address {
         *roles.data.borrow(BlocklisterKey {})
     }
 
-    /// Check the pauser address
+    /// Gets the pauser address.
     public fun pauser<T>(roles: &Roles<T>): address {
         *roles.data.borrow(PauserKey {})
     }
 
-    /// Check the metadata updater address
+    /// Gets the metadata updater address.
     public fun metadata_updater<T>(roles: &Roles<T>): address {
         *roles.data.borrow(MetadataUpdaterKey {})
     }
 
     // === Write functions ===
 
+    /// [Package private] Creates and initializes a Roles object.
     public(package) fun new<T>(
         owner: address, 
         master_minter: address,
@@ -128,6 +129,7 @@ module stablecoin::roles {
     }
 
     /// Change the master minter address.
+    /// - Only callable by the owner.
     public fun update_master_minter<T>(roles: &mut Roles<T>, new_master_minter: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
@@ -140,6 +142,7 @@ module stablecoin::roles {
     }
 
     /// Change the blocklister address.
+    /// - Only callable by the owner.
     public fun update_blocklister<T>(roles: &mut Roles<T>, new_blocklister: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
@@ -152,6 +155,7 @@ module stablecoin::roles {
     }
 
     /// Change the pauser address.
+    /// - Only callable by the owner.
     public fun update_pauser<T>(roles: &mut Roles<T>, new_pauser: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 
@@ -164,6 +168,7 @@ module stablecoin::roles {
     }
 
     /// Change the metadata updater address.
+    /// - Only callable by the owner.
     public fun update_metadata_updater<T>(roles: &mut Roles<T>, new_metadata_updater: address, ctx: &TxContext) {
         roles.owner_role().assert_sender_is_active_role(ctx);
 

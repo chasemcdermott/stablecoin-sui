@@ -62,15 +62,18 @@ module stablecoin::treasury {
 
     // === Structs ===
 
-    /// A Treasury of type `T` that stores a TreasuryCap object 
-    /// and additional configurations related to minting and burning.
+    /// A versioned Treasury of type `T` that stores:
+    /// - a TreasuryCap object
+    /// - a DenyCap object
+    /// - a set of privileged roles that manages different parts of this object's data
+    /// - additional configurations related to minting and burning
     public struct Treasury<phantom T> has key, store {
         id: UID,
-        /// Mapping between controllers and mint cap IDs
+        /// A map of { controller address => MintCap ID that it controls }.
         controllers: Table<address, ID>,
-        /// Mapping between mint cap IDs and mint allowances
+        /// A map of { authorized MintCap ID => its MintAllowance }.
         mint_allowances: Table<ID, MintAllowance<T>>, 
-        /// Mutable privileged role addresses
+        /// Mutable privileged role addresses.
         roles: Roles<T>,
         /// The set of package version numbers that object is compatible with.
         compatible_versions: VecSet<u64>
@@ -158,12 +161,12 @@ module stablecoin::treasury {
 
     // === View-only functions ===
 
-    /// Get immutable reference to the roles
+    /// Gets an immutable reference to the Roles object.
     public fun roles<T>(treasury: &Treasury<T>): &Roles<T> {
         &treasury.roles
     }
 
-    /// [Package private] Get mutable reference to the roles
+    /// [Package private] Gets a mutable reference to the Roles object.
     public(package) fun roles_mut<T>(treasury: &mut Treasury<T>): &mut Roles<T> {
         &mut treasury.roles
     }
@@ -175,46 +178,47 @@ module stablecoin::treasury {
         *treasury.controllers.borrow(controller)
     }
     
-    /// Gets the allowance of a mint cap object.
-    /// Returns 0 if the mint cap object is not an authorized mint cap. 
+    /// Gets the allowance of a MintCap object.
+    /// Returns 0 if the MintCap object is unauthorized.
     public fun mint_allowance<T>(treasury: &Treasury<T>, mint_cap: ID): u64 {
         if (!treasury.is_authorized_mint_cap(mint_cap)) return 0;
         treasury.mint_allowances.borrow(mint_cap).value()
     }
 
-    /// Return the total number of `T`'s in circulation.
+    /// Returns the total amount of Coin<T> in circulation.
     public fun total_supply<T>(treasury: &Treasury<T>): u64 {
         treasury.borrow_treasury_cap().total_supply()
     }
 
-    /// [Package private] ensure treasury cap exists
+    /// [Package private] Ensures that TreasuryCap exists.
     public(package) fun assert_treasury_cap_exists<T>(treasury: &Treasury<T>) {
         assert!(dof::exists_with_type<_, TreasuryCap<T>>(&treasury.id, TreasuryCapKey {}), ETreasuryCapNotFound);
     }
 
-    /// [Package private] ensure deny cap exists
+    /// [Package private] Ensures that DenyCap exists.
     public(package) fun assert_deny_cap_exists<T>(treasury: &Treasury<T>) {
         assert!(dof::exists_with_type<_, DenyCapV2<T>>(&treasury.id, DenyCapKey {}), EDenyCapNotFound);
     }
 
-    /// Returns the set of package versions that the state object is compatible with.
+    /// Gets the set of package versions that the Treasury object is compatible with.
     public fun compatible_versions<T>(treasury: &Treasury<T>): vector<u64> {
         *treasury.compatible_versions.keys()
     }
 
-    /// Check if an address is a mint controller
+    /// Checks if an address is a mint controller.
     fun is_controller<T>(treasury: &Treasury<T>, controller_addr: address): bool {
         treasury.controllers.contains(controller_addr)
     }
 
-    /// Check if a mint cap ID is authorized to mint
+    /// Checks if a MintCap object is authorized to mint.
     fun is_authorized_mint_cap<T>(treasury: &Treasury<T>, id: ID): bool {
         treasury.mint_allowances.contains(id)
     }
 
     // === Write functions ===
 
-    /// Wrap `TreasuryCap` into a struct, accessible via additional capabilities
+    /// Creates and initializes a Treasury object of type T, wrapping a 
+    /// TreasuryCap and DenyCapV2 of the same type into it.
     public fun new<T>(
         treasury_cap: TreasuryCap<T>, 
         deny_cap: DenyCapV2<T>, 
@@ -238,7 +242,9 @@ module stablecoin::treasury {
         treasury
     }
 
-    /// Configure a controller by adding it to the controller mapping, 
+    /// Configures a controller of a MintCap object.
+    /// - Only callable by the master minter.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun configure_controller<T>(
         treasury: &mut Treasury<T>, 
         controller: address, 
@@ -256,7 +262,9 @@ module stablecoin::treasury {
         });
     }
 
-    /// Create new MintCap object 
+    /// Creates a MintCap object.
+    /// - Only callable by the master minter.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun create_mint_cap<T>(
         treasury: &Treasury<T>, 
         ctx: &mut TxContext
@@ -271,9 +279,12 @@ module stablecoin::treasury {
     }
 
     /// Convenience function that 
-    /// 1. creates a new MintCap, 
-    /// 2. configures controller worker pair
-    /// 3. transfer mint cap object to the intended recipient
+    /// 1. creates a MintCap
+    /// 2. configures the controller for this MintCap object
+    /// 3. transfers the MintCap object to a minter
+    /// 
+    /// - Only callable by the master minter.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun configure_new_controller<T>(
         treasury: &mut Treasury<T>, 
         controller: address, 
@@ -285,7 +296,9 @@ module stablecoin::treasury {
         transfer::transfer(mint_cap, minter)
     }
 
-    /// Disable a controller by removing it from the controller table
+    /// Removes a controller.
+    /// - Only callable by the master minter.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun remove_controller<T>(
         treasury: &mut Treasury<T>, 
         controller: address, 
@@ -302,7 +315,10 @@ module stablecoin::treasury {
         });
     }
 
-    /// Enables the minter and sets its allowance.
+    /// Authorizes a MintCap object to mint and burn, and sets its allowance.
+    /// - Only callable by the MintCap's controller.
+    /// - Only callable if not paused.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun configure_minter<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &DenyList, 
@@ -329,7 +345,9 @@ module stablecoin::treasury {
         });
     }
 
-    /// De-authorizes the controller's corresponding mint cap
+    /// Deauthorizes a MintCap object.
+    /// - Only callable by the MintCap's controller.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun remove_minter<T>(
         treasury: &mut Treasury<T>, 
         ctx: &TxContext
@@ -346,8 +364,13 @@ module stablecoin::treasury {
         });
     }
     
-    /// Mints coins to a recipient address.
-    /// The caller must own a MintCap, and can only mint up to its allowance
+    /// Mints a Coin object with a specified amount (limited to the MintCap's allowance)
+    /// to a recipient address, increasing the total supply.
+    /// - Only callable by a minter.
+    /// - Only callable if not paused.
+    /// - Only callable if minter is not blocklisted.
+    /// - Only callable if recipient is not blocklisted.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun mint<T>(
         treasury: &mut Treasury<T>, 
         mint_cap: &MintCap<T>, 
@@ -379,8 +402,11 @@ module stablecoin::treasury {
         });
     }
 
-    /// Allows a minter to burn some of its own coins.
-    /// The caller must own a MintCap
+    /// Burns a Coin object, decreasing the total supply.
+    /// - Only callable by a minter.
+    /// - Only callable if not paused.
+    /// - Only callable if minter is not blocklisted.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun burn<T>(
         treasury: &mut Treasury<T>, 
         mint_cap: &MintCap<T>, 
@@ -405,7 +431,9 @@ module stablecoin::treasury {
         });
     }
 
-    /// Blocklists an address
+    /// Blocklists an address.
+    /// - Only callable by the blocklister.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun blocklist<T>(
         treasury: &mut Treasury<T>,
         deny_list: &mut DenyList,
@@ -423,7 +451,9 @@ module stablecoin::treasury {
         })
     }
 
-    /// Unblocklists an address
+    /// Unblocklists an address.
+    /// - Only callable by the blocklister.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun unblocklist<T>(
         treasury: &mut Treasury<T>,
         deny_list: &mut DenyList,
@@ -441,7 +471,9 @@ module stablecoin::treasury {
         })
     }
 
-    /// Triggers stopped state; pause all transfers
+    /// Triggers stopped state; pause all transfers.
+    /// - Only callable by the pauser.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun pause<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &mut DenyList,
@@ -458,7 +490,9 @@ module stablecoin::treasury {
         event::emit(Pause<T> {});
     }
 
-    /// Restores normal state; unpause all transfers
+    /// Restores normal state; unpause all transfers.
+    /// - Only callable by the pauser.
+    /// - Only callable if the Treasury object is compatible with this package.
     public fun unpause<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &mut DenyList,
@@ -474,25 +508,27 @@ module stablecoin::treasury {
         event::emit(Unpause<T> {});
     }
    
-    /// Returns an immutable reference of the TreasuryCap
+    /// Returns an immutable reference of the TreasuryCap.
     fun borrow_treasury_cap<T>(treasury: &Treasury<T>): &TreasuryCap<T> {
         treasury.assert_treasury_cap_exists();
         dof::borrow(&treasury.id, TreasuryCapKey {})
     }
 
-    /// Returns a mutable reference of the TreasuryCap
+    /// Returns a mutable reference of the TreasuryCap.
     fun borrow_treasury_cap_mut<T>(treasury: &mut Treasury<T>): &mut TreasuryCap<T> {
         treasury.assert_treasury_cap_exists();
         dof::borrow_mut(&mut treasury.id, TreasuryCapKey {})
     }
 
-    /// Returns a mutable reference of the DenyCap
+    /// Returns a mutable reference of the DenyCap.
     fun borrow_deny_cap_mut<T>(treasury: &mut Treasury<T>): &mut DenyCapV2<T> {
         treasury.assert_deny_cap_exists();
         dof::borrow_mut(&mut treasury.id, DenyCapKey {})
     }
 
-    /// Update coin metadata
+    /// Updates the CoinMetadata<T> object of the same type as the Treasury<T>.
+    /// - Only callable by the metadata updater.
+    /// - Only callable if the Treasury object is compatible with this package.
     public entry fun update_metadata<T>(
         treasury: &Treasury<T>,
         metadata: &mut CoinMetadata<T>,
