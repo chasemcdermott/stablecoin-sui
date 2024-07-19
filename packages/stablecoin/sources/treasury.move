@@ -47,11 +47,11 @@ module stablecoin::treasury {
     const ENotController: u64 = 5;
     const ENotMasterMinter: u64 = 6;
     const ENotMetadataUpdater: u64 = 7;
-    const ENotMinter: u64 = 8;
-    const ENotOwner: u64 = 9;
-    const ENotPauser: u64 = 10;
-    const EPaused: u64 = 11;
-    const ETreasuryCapNotFound: u64 = 12;
+    const ENotOwner: u64 = 8;
+    const ENotPauser: u64 = 9;
+    const EPaused: u64 = 10;
+    const ETreasuryCapNotFound: u64 = 11;
+    const EUnauthorizedMintCap: u64 = 12;
     const EZeroAmount: u64 = 13;
 
     /// Migration related error codes, starting at 100.
@@ -117,6 +117,13 @@ module stablecoin::treasury {
         mint_cap: ID,
     }
 
+    public struct MinterAllowanceIncremented<phantom T> has copy, drop {
+        controller: address,
+        mint_cap: ID,
+        allowance_increment: u64,
+        new_allowance: u64,
+    }
+
     public struct Mint<phantom T> has copy, drop {
         mint_cap: ID,
         recipient: address,
@@ -172,10 +179,10 @@ module stablecoin::treasury {
     }
 
     /// Gets the corresponding MintCap ID attached to a controller address.
-    /// Errors if input address is not valid controller.
-    public fun get_worker<T>(treasury: &Treasury<T>, controller: address): ID {
-        assert!(treasury.is_controller(controller), ENotController);
-        *treasury.controllers.borrow(controller)
+    /// Returns option::none() when input is not a valid controller
+    public fun get_mint_cap_id<T>(treasury: &Treasury<T>, controller: address): Option<ID> {
+        if (!treasury.controllers.contains(controller)) return option::none();
+        option::some(*treasury.controllers.borrow(controller))
     }
     
     /// Gets the allowance of a MintCap object.
@@ -317,7 +324,7 @@ module stablecoin::treasury {
 
     /// Authorizes a MintCap object to mint and burn, and sets its allowance.
     /// - Only callable by the MintCap's controller.
-    /// - Only callable if not paused.
+    /// - Only callable when not paused.
     /// - Only callable if the Treasury object is compatible with this package.
     public fun configure_minter<T>(
         treasury: &mut Treasury<T>, 
@@ -328,9 +335,11 @@ module stablecoin::treasury {
         treasury.assert_is_compatible();
 
         assert!(!is_paused<T>(deny_list), EPaused);
-        let controller = ctx.sender();
-        let mint_cap_id = get_worker(treasury, controller);
 
+        let controller = ctx.sender();
+        assert!(treasury.is_controller(controller), ENotController);
+
+        let mint_cap_id = *get_mint_cap_id(treasury, controller).borrow();
         if (!treasury.mint_allowances.contains(mint_cap_id)) {
             let mut allowance = mint_allowance::new();
             allowance.set(new_allowance);
@@ -345,6 +354,38 @@ module stablecoin::treasury {
         });
     }
 
+    /// Increment allowance for a MintCap
+    /// - Only callable by the MintCap's controller.
+    /// - Only callable when not paused.
+    /// - Only callable if the Treasury object is compatible with this package.
+    public fun increment_mint_allowance<T>(
+        treasury: &mut Treasury<T>, 
+        deny_list: &DenyList, 
+        allowance_increment: u64, 
+        ctx: &TxContext
+    ) {
+        treasury.assert_is_compatible();
+        
+        assert!(!is_paused<T>(deny_list), EPaused);
+        assert!(allowance_increment > 0, EZeroAmount);
+
+        let controller = ctx.sender();
+        assert!(treasury.is_controller(controller), ENotController);
+
+        let mint_cap_id = *get_mint_cap_id(treasury, controller).borrow();
+        assert!(treasury.is_authorized_mint_cap(mint_cap_id), EUnauthorizedMintCap);
+
+        treasury.mint_allowances.borrow_mut(mint_cap_id).increase(allowance_increment);
+        let new_allowance = treasury.mint_allowances.borrow(mint_cap_id).value();
+
+        event::emit(MinterAllowanceIncremented<T> {
+            controller,
+            mint_cap: mint_cap_id,
+            allowance_increment,
+            new_allowance,
+        });
+    }
+
     /// Deauthorizes a MintCap object.
     /// - Only callable by the MintCap's controller.
     /// - Only callable if the Treasury object is compatible with this package.
@@ -355,7 +396,9 @@ module stablecoin::treasury {
         treasury.assert_is_compatible();
 
         let controller = ctx.sender();
-        let mint_cap_id = get_worker(treasury, controller);
+        assert!(treasury.is_controller(controller), ENotController);
+
+        let mint_cap_id = *get_mint_cap_id(treasury, controller).borrow();
         let mint_allowance = treasury.mint_allowances.remove(mint_cap_id);
         mint_allowance.destroy();
         event::emit(MinterRemoved<T> {
@@ -367,7 +410,7 @@ module stablecoin::treasury {
     /// Mints a Coin object with a specified amount (limited to the MintCap's allowance)
     /// to a recipient address, increasing the total supply.
     /// - Only callable by a minter.
-    /// - Only callable if not paused.
+    /// - Only callable when not paused.
     /// - Only callable if minter is not blocklisted.
     /// - Only callable if recipient is not blocklisted.
     /// - Only callable if the Treasury object is compatible with this package.
@@ -385,7 +428,7 @@ module stablecoin::treasury {
         assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
         assert!(!is_blocklisted<T>(deny_list, recipient), EDeniedAddress);
         let mint_cap_id = object::id(mint_cap);
-        assert!(treasury.is_authorized_mint_cap(mint_cap_id), ENotMinter);
+        assert!(treasury.is_authorized_mint_cap(mint_cap_id), EUnauthorizedMintCap);
         assert!(amount > 0, EZeroAmount);
 
         let mint_allowance = treasury.mint_allowances.borrow_mut(mint_cap_id);
@@ -404,7 +447,7 @@ module stablecoin::treasury {
 
     /// Burns a Coin object, decreasing the total supply.
     /// - Only callable by a minter.
-    /// - Only callable if not paused.
+    /// - Only callable when not paused.
     /// - Only callable if minter is not blocklisted.
     /// - Only callable if the Treasury object is compatible with this package.
     public fun burn<T>(
@@ -419,7 +462,7 @@ module stablecoin::treasury {
         assert!(!is_paused<T>(deny_list), EPaused);
         assert!(!is_blocklisted<T>(deny_list, ctx.sender()), EDeniedAddress);
         let mint_cap_id = object::id(mint_cap);
-        assert!(treasury.is_authorized_mint_cap(mint_cap_id), ENotMinter);
+        assert!(treasury.is_authorized_mint_cap(mint_cap_id), EUnauthorizedMintCap);
 
         let amount = coin.value();
         assert!(amount > 0, EZeroAmount);
@@ -668,6 +711,16 @@ module stablecoin::treasury {
     #[test_only]
     public(package) fun create_minter_configured_event<T>(controller: address, mint_cap: ID, allowance: u64): MinterConfigured<T> {
         MinterConfigured { controller, mint_cap, allowance }
+    }
+
+    #[test_only]
+    public(package) fun create_minter_allowance_incremented_event<T>(
+        controller: address, 
+        mint_cap: ID, 
+        allowance_increment: u64, 
+        new_allowance: u64
+    ): MinterAllowanceIncremented<T> {
+        MinterAllowanceIncremented { controller, mint_cap, allowance_increment, new_allowance }
     }
 
     #[test_only]

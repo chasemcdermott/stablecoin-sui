@@ -126,8 +126,8 @@ module stablecoin::treasury_tests {
             treasury.configure_controller(RANDOM_ADDRESS, object::id(&mint_cap), scenario.ctx());
             assert_eq(treasury.get_controllers_for_testing().contains(RANDOM_ADDRESS), true);
             assert_eq(treasury.get_controllers_for_testing().contains(CONTROLLER), true); 
-            let mint_cap_id = treasury.get_worker(RANDOM_ADDRESS);
-            assert_eq(treasury.get_worker(CONTROLLER), mint_cap_id);
+            let mint_cap_id = *treasury.get_mint_cap_id(RANDOM_ADDRESS).borrow();
+            assert_eq(*treasury.get_mint_cap_id(CONTROLLER).borrow(), mint_cap_id);
             assert_eq(treasury.mint_allowance(mint_cap_id), 10);
 
             scenario.return_to_sender(mint_cap);
@@ -224,6 +224,84 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test]
+    fun increment_mint_allowance__should_increment_allowance() {
+        let mut scenario = setup();
+
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(CONTROLLER); 
+        test_configure_minter(1, &mut scenario);
+
+        scenario.next_tx(CONTROLLER); 
+        test_increment_mint_allowance(2, 3 /* expected_allowance */, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EPaused)]
+    fun increment_mint_allowance__should_fail_when_paused() {
+        let mut scenario = setup();
+
+        scenario.next_tx(OWNER);
+        test_pause(&mut scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_increment_mint_allowance(10, 10 /* expected_allowance */, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EZeroAmount)]
+    fun increment_mint_allowance__should_fail_when_incrementing_by_zero() {
+        let mut scenario = setup();
+
+        scenario.next_tx(CONTROLLER);
+        test_increment_mint_allowance(0, 0 /* expected_allowance */, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotController)]
+    fun increment_mint_allowance__should_fail_from_non_controller() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS); 
+        test_increment_mint_allowance(10, 10 /* expected_allowance */, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EUnauthorizedMintCap)]
+    fun increment_mint_allowance__should_fail_with_unauthorized_mint_cap() {
+        let mut scenario = setup();
+
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_increment_mint_allowance(10, 10 /* expected_allowance */, &mut scenario);
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::mint_allowance::EOverflow)]
+    fun increment_mint_allowance__should_fail_when_allowance_increment_causes_overflow() {
+        let mut scenario = setup();
+
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(CONTROLLER); 
+        test_configure_minter(1, &mut scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_increment_mint_allowance(18446744073709551615u64, 0 /* expected_allowance */, &mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotController)]
     fun remove_minter__should_fail_from_non_controller() {
         let mut scenario = setup();
@@ -250,7 +328,7 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMinter)]
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EUnauthorizedMintCap)]
     fun mint__should_fail_from_deauthorized_mint_cap() {
         let mut scenario = setup();
 
@@ -342,7 +420,7 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMinter)]
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EUnauthorizedMintCap)]
     fun burn__should_fail_from_deauthorized_mint_cap() {
         let mut scenario = setup();
 
@@ -826,6 +904,20 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test]
+    fun get_mint_cap_id__should_return_empty_when_input_is_not_controller() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        {
+            let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+            assert_eq(treasury.get_mint_cap_id(RANDOM_ADDRESS), option::none());
+            test_scenario::return_shared(treasury);
+        };
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::EObjectMigrated)]
     fun start_migration__should_fail_when_calling_from_current_version() {
         let mut scenario = setup();
@@ -866,6 +958,13 @@ module stablecoin::treasury_tests {
     fun configure_minter__should_fail_if_treasury_object_is_incompatible() {
         let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
         treasury.configure_minter(&deny_list, 100000, scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun increment_mint_allowance__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.increment_mint_allowance(&deny_list, 100000, scenario.ctx());
         after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
     }
 
@@ -1063,9 +1162,9 @@ module stablecoin::treasury_tests {
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
 
         treasury.configure_new_controller(controller, minter, scenario.ctx());
-        let mint_cap_id = treasury.get_worker(controller);
+        let mint_cap_id = *treasury.get_mint_cap_id(controller).borrow();
         assert_eq(treasury.get_controllers_for_testing().contains(controller), true);
-        assert_eq(treasury.mint_allowance(treasury.get_worker(controller)), 0);
+        assert_eq(treasury.mint_allowance(*treasury.get_mint_cap_id(controller).borrow()), 0);
 
         let expected_event1 = treasury::create_mint_cap_created_event<TREASURY_TESTS>(mint_cap_id);
         let expected_event2 = treasury::create_controller_configured_event<TREASURY_TESTS>(controller, mint_cap_id);
@@ -1087,7 +1186,7 @@ module stablecoin::treasury_tests {
 
         treasury.configure_controller(controller, mint_cap_id, scenario.ctx());
         assert_eq(treasury.get_controllers_for_testing().contains(controller), true);
-        assert_eq(treasury.mint_allowance(treasury.get_worker(controller)), 0);
+        assert_eq(treasury.mint_allowance(*treasury.get_mint_cap_id(controller).borrow()), 0);
 
         let expected_event = treasury::create_controller_configured_event<TREASURY_TESTS>(controller, mint_cap_id);
         assert_eq(event::num_events(), 1);
@@ -1115,10 +1214,27 @@ module stablecoin::treasury_tests {
 
         treasury.configure_minter(&deny_list, allowance, scenario.ctx());
 
-        let mint_cap_id = treasury.get_worker(scenario.sender());
+        let mint_cap_id = *treasury.get_mint_cap_id(scenario.sender()).borrow();
         assert_eq(treasury.mint_allowance(mint_cap_id), allowance);
 
-        let expected_event = treasury::create_minter_configured_event<TREASURY_TESTS>(scenario.ctx().sender(), mint_cap_id, allowance);
+        let expected_event = treasury::create_minter_configured_event<TREASURY_TESTS>(scenario.sender(), mint_cap_id, allowance);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type(), expected_event);
+
+        test_scenario::return_shared(treasury);
+        test_scenario::return_shared(deny_list);
+    }
+
+    fun test_increment_mint_allowance(allowance_increment: u64, expected_allowance: u64, scenario: &mut Scenario) {
+        let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+        let deny_list = scenario.take_shared<DenyList>();
+        
+        treasury.increment_mint_allowance(&deny_list, allowance_increment, scenario.ctx());
+
+        let mint_cap_id = *treasury.get_controllers_for_testing().borrow(scenario.sender());
+        assert_eq(treasury.mint_allowance(mint_cap_id), expected_allowance);
+
+        let expected_event = treasury::create_minter_allowance_incremented_event<TREASURY_TESTS>(scenario.sender(), mint_cap_id, allowance_increment, expected_allowance);
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type(), expected_event);
 
@@ -1131,11 +1247,11 @@ module stablecoin::treasury_tests {
 
         treasury.remove_minter(scenario.ctx());
 
-        let mint_cap_id = treasury.get_worker(scenario.sender());
+        let mint_cap_id = *treasury.get_mint_cap_id(scenario.sender()).borrow();
         assert_eq(treasury.mint_allowance(mint_cap_id), 0);  
         assert_eq(treasury.get_mint_allowances_for_testing().contains(mint_cap_id), false);  
 
-        let expected_event = treasury::create_minter_removed_event<TREASURY_TESTS>(scenario.ctx().sender(), mint_cap_id);
+        let expected_event = treasury::create_minter_removed_event<TREASURY_TESTS>(scenario.sender(), mint_cap_id);
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type(), expected_event);
 
@@ -1168,7 +1284,7 @@ module stablecoin::treasury_tests {
     }
 
     fun test_burn(scenario: &mut Scenario) {
-        let sender = scenario.ctx().sender();
+        let sender = scenario.sender();
         let deny_list = scenario.take_shared();
         let mut treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
         let mint_cap = scenario.take_from_sender<MintCap<TREASURY_TESTS>>();

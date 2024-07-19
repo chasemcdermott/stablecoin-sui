@@ -16,7 +16,8 @@
 
 module stablecoin::mint_allowance {
 
-    const EInsufficientAllowance: u64 = 0;
+    const EOverflow: u64 = 0;
+    const EInsufficientAllowance: u64 = 1;
 
     /// A MintAllowance for a coin of type T. 
     /// Used for minting and burning.
@@ -37,6 +38,12 @@ module stablecoin::mint_allowance {
     /// [Package private] Set allowance to `value`
     public(package) fun set<T>(self: &mut MintAllowance<T>, value: u64) {
        self.value = value;
+    }
+
+    /// [Package private] Increase the allowance by `value`
+    public(package) fun increase<T>(self: &mut MintAllowance<T>, value: u64) {
+        assert!(value < (18446744073709551615u64 - self.value), EOverflow);
+        self.value = self.value + value;
     }
 
     /// [Package private] Decrease the allowance by `value`
