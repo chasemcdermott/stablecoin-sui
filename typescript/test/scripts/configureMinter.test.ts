@@ -179,5 +179,5 @@ async function testConfigureMinter(args: {
   const hotControllerMintCapId = await args.treasuryClient.getMintCapId(
     args.hotController.toSuiAddress()
   );
-  assert.equal(hotControllerMintCapId, undefined);
+  assert.equal(hotControllerMintCapId, null);
 }
