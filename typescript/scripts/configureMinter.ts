@@ -38,7 +38,7 @@ export async function configureMinterHelper(
   hotMasterMinterKey: string,
   hotControllerKey: string,
   minterAddress: string,
-  mintAllowance: number, // TODO, add more specific units
+  mintAllowance: number,
   coldControllerAddress: string
 ): Promise<string | undefined> {
   const hotMasterMinter = getEd25519KeypairFromPrivateKey(hotMasterMinterKey);

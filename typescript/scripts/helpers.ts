@@ -479,27 +479,22 @@ export class SuiTreasuryClient {
     return Number(allowance);
   }
 
-  async getMintCapId(controllerAddress: string): Promise<string | undefined> {
+  async getMintCapId(controllerAddress: string): Promise<string | null | undefined> {
     const getControllerTx = new Transaction();
     getControllerTx.moveCall({
-      target: `${this.stablecoinPackageId}::treasury::get_worker`,
+      target: `${this.stablecoinPackageId}::treasury::get_mint_cap_id`,
       typeArguments: [this.coinOtwType],
       arguments: [
         getControllerTx.object(this.treasuryObjectId),
         getControllerTx.pure.address(controllerAddress)
       ]
     });
-    try {
-      const [controllerMintCapId] = await callViewFunction({
-        client: this.suiClient,
-        transaction: getControllerTx,
-        returnTypes: [bcs.Address]
-      });
-      return controllerMintCapId;
-    } catch (err) {
-      // TODO, remove this once get_worker returns an optional instead of throwing
-      return undefined;
-    }
+    const [controllerMintCapId] = await callViewFunction({
+      client: this.suiClient,
+      transaction: getControllerTx,
+      returnTypes: [bcs.option(bcs.Address)]
+    });
+    return controllerMintCapId;
   }
 
   async getRoles() {
