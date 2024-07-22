@@ -22,10 +22,12 @@ import { program } from "commander";
 import deploy from "./deploy";
 import generateKeypair from "./generateKeypair";
 import depositUpgradeCap from "./depositUpgradeCap";
+import configureMinter from "./configureMinter";
 
 program
   .name("scripts")
   .description("Scripts related to SUI development")
+  .addCommand(configureMinter)
   .addCommand(deploy)
   .addCommand(generateKeypair)
   .addCommand(depositUpgradeCap);
