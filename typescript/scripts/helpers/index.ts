@@ -128,6 +128,54 @@ export function buildPackageHelper(args: {
   return JSON.parse(rawCompiledPackages);
 }
 
+export function writePublishedAddressToPackageManifest(
+  packageName: string,
+  address: string
+) {
+  const moveTomlFilepath = getMoveTomlFilepath(packageName);
+  let existingContent = fs.readFileSync(moveTomlFilepath, "utf-8");
+
+  // Add published-at field.
+  existingContent = existingContent.replace(
+    "[package]",
+    `[package]\npublished-at = "${address}"`
+  );
+
+  // Set package alias to address.
+  existingContent = existingContent.replace(
+    `${packageName} = "0x0"`,
+    `${packageName} = "${address}"`
+  );
+
+  fs.writeFileSync(moveTomlFilepath, existingContent);
+
+  // Run a build to update the Move.lock file.
+  buildPackageHelper({ packageName, withUnpublishedDependencies: false });
+}
+
+export function resetPublishedAddressInPackageManifest(packageName: string) {
+  const moveTomlFilepath = getMoveTomlFilepath(packageName);
+  let existingContent = fs.readFileSync(moveTomlFilepath, "utf-8");
+
+  // Remove published-at field.
+  existingContent = existingContent.replace(/\npublished-at.*\w{66}.*/, "");
+
+  // Reset package alias to 0x0.
+  existingContent = existingContent.replace(
+    new RegExp(`\\n${packageName}.*\\w{66}.*`),
+    `\n${packageName} = "0x0"`
+  );
+
+  fs.writeFileSync(moveTomlFilepath, existingContent);
+
+  // Run a build to update the Move.lock file.
+  buildPackageHelper({ packageName, withUnpublishedDependencies: false });
+}
+
+function getMoveTomlFilepath(packageName: string) {
+  return path.join(__dirname, "..", "..", "packages", packageName, "Move.toml");
+}
+
 export async function deployPackageHelper(args: {
   client: SuiClient;
   deployer: Ed25519Keypair;

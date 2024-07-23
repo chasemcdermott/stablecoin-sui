@@ -24,9 +24,9 @@ import {
   getEd25519KeypairFromPrivateKey,
   getPublishedPackages,
   log,
-  writeJsonOutput
+  writeJsonOutput,
+  writePublishedAddressToPackageManifest
 } from "./helpers";
-import { writePublishedAddressToPackageManifest } from "../test/utils";
 
 /**
  * Deploys a package and transfers the package UpgradeCap to upgradeCapRecipient
