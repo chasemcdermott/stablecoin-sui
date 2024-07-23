@@ -331,7 +331,7 @@ export default class SuiTreasuryClient {
     const createdMintCap = getCreatedObjects(txOutput, mintCapType);
     if (createdMintCap.length != 1) {
       throw new Error(
-        `Expected only one UpgradeCap to be created, got ${createdMintCap.length}`
+        `Expected only one MintCap to be created, got ${createdMintCap.length}`
       );
     }
     const mintCapId = createdMintCap[0].objectId;
