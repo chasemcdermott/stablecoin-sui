@@ -38,7 +38,7 @@ export async function configureMinterHelper(
   hotMasterMinterKey: string,
   hotControllerKey: string,
   minterAddress: string,
-  mintAllowance: number,
+  mintAllowanceInDollars: number,
   coldControllerAddress: string
 ): Promise<string | undefined> {
   const hotMasterMinter = getEd25519KeypairFromPrivateKey(hotMasterMinterKey);
@@ -118,10 +118,12 @@ export async function configureMinterHelper(
 
   // Check if the mint allowance has already been set. If so, continue to STEP 3.
   let skipSetMintAllowance = false;
+  const decimals = (await treasuryClient.getMetadata()).decimals;
+  const mintAllowance = mintAllowanceInDollars * (10 ** decimals);
   const currentMintAllowance = await treasuryClient.getMintAllowance(mintCapId);
   if (currentMintAllowance == mintAllowance) {
     log(
-      `The current mint allowance is already ${mintAllowance}. Skipping mint allowance configuration...`
+      `The current mint allowance is already $${mintAllowanceInDollars}. Skipping mint allowance configuration...`
     );
     skipSetMintAllowance = true;
   }
@@ -129,7 +131,7 @@ export async function configureMinterHelper(
   // Set the mint allowance, using the configured hot controller
   if (!skipSetMintAllowance) {
     log(
-      `Going to set the mint allowance to ${mintAllowance} for MintCap ${mintCapId} currently held by ${minterAddress}`
+      `Going to set the mint allowance to $${mintAllowanceInDollars} for MintCap ${mintCapId} currently held by ${minterAddress}`
     );
     if (!(await waitForUserConfirmation())) {
       throw new Error("Terminating...");
@@ -185,7 +187,10 @@ export default program
     "--minter-address <string>",
     "The address of the minter to be configured"
   )
-  .requiredOption("--mint-allowance <number>", "The mint allowance to set")
+  .requiredOption(
+    "--mint-allowance <number>",
+    "The mint allowance to set, in whole units (Dollars, Euros, etc). E.g 1000 = $1,000.00"
+  )
   .requiredOption(
     "--cold-controller-address <string>",
     "The address that the final controller should be set to"

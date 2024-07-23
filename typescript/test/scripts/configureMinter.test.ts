@@ -25,6 +25,8 @@ import { configureMinterHelper } from "../../scripts/configureMinter";
 import { SuiTreasuryClient } from "../../scripts/helpers";
 import { random } from "lodash";
 
+const USDC_DECIMALS = 6;
+
 describe("Test configure minter script", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
   const client = new SuiClient({ url: RPC_URL });
@@ -61,7 +63,7 @@ describe("Test configure minter script", () => {
       masterMinter: deployerKeys,
       hotController: deployerKeys,
       minter: minterKeys,
-      mintAllowance: initialAllowance,
+      mintAllowanceInDollars: initialAllowance,
       coldController: coldControllerKeys
     });
     currentControllerKeys = coldControllerKeys;
@@ -77,7 +79,7 @@ describe("Test configure minter script", () => {
           masterMinter: deployerKeys,
           hotController: randomKeys,
           minter: currentMinter,
-          mintAllowance: 12345,
+          mintAllowanceInDollars: 12345,
           coldController: currentControllerKeys
         }),
       (err: any) => {
@@ -96,7 +98,7 @@ describe("Test configure minter script", () => {
           masterMinter: randomKeys,
           hotController: randomKeys,
           minter: currentMinter,
-          mintAllowance: 12345,
+          mintAllowanceInDollars: 12345,
           coldController: randomKeys
         }),
       (err: any) => {
@@ -115,7 +117,7 @@ describe("Test configure minter script", () => {
           masterMinter: deployerKeys,
           hotController: currentControllerKeys,
           minter: randomKeys,
-          mintAllowance: 12345,
+          mintAllowanceInDollars: 12345,
           coldController: randomKeys
         }),
       (err: any) => {
@@ -136,7 +138,7 @@ describe("Test configure minter script", () => {
       masterMinter: deployerKeys,
       hotController: currentControllerKeys,
       minter: currentMinter,
-      mintAllowance: random(100_000_000, 200_000_000),
+      mintAllowanceInDollars: random(100_000_000, 200_000_000),
       coldController: newColdController
     });
   });
@@ -147,7 +149,7 @@ async function testConfigureMinter(args: {
   masterMinter: Ed25519Keypair;
   hotController: Ed25519Keypair;
   minter: Ed25519Keypair;
-  mintAllowance: number;
+  mintAllowanceInDollars: number;
   coldController: Ed25519Keypair;
 }) {
   let mintCapId = await configureMinterHelper(
@@ -155,7 +157,7 @@ async function testConfigureMinter(args: {
     args.masterMinter.getSecretKey(),
     args.hotController.getSecretKey(),
     args.minter.toSuiAddress(),
-    args.mintAllowance,
+    args.mintAllowanceInDollars,
     args.coldController.toSuiAddress()
   );
   assert.notEqual(mintCapId, undefined);
@@ -172,8 +174,9 @@ async function testConfigureMinter(args: {
   assert.equal(mintCapHolder, args.minter.toSuiAddress());
 
   // assert that the mint allowance was correctly configured
+  const expectedAllowance = args.mintAllowanceInDollars * (10 ** USDC_DECIMALS);
   const allowance = await args.treasuryClient.getMintAllowance(mintCapId);
-  assert.equal(allowance, args.mintAllowance);
+  assert.equal(allowance, expectedAllowance);
 
   // assert that the hot controller is no longer a controller
   const hotControllerMintCapId = await args.treasuryClient.getMintCapId(

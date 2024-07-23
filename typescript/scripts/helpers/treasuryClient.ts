@@ -268,6 +268,16 @@ export default class SuiTreasuryClient {
     return controllerMintCapId;
   }
 
+  async getMetadata() {
+    const maybeMetadata = await this.suiClient.getCoinMetadata({
+      coinType: this.coinOtwType
+    });
+    if (!maybeMetadata) {
+      throw new Error(`Could not find metadata for coin with type ${this.coinOtwType}`);
+    }
+    return maybeMetadata;
+  }
+
   async getRoles() {
     const treasury = await this.suiClient.getObject({
       id: this.treasuryObjectId,
