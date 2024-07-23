@@ -174,7 +174,7 @@ async function testConfigureMinter(args: {
   assert.equal(mintCapHolder, args.minter.toSuiAddress());
 
   // assert that the mint allowance was correctly configured
-  const expectedAllowance = args.mintAllowanceInDollars * (10 ** USDC_DECIMALS);
+  const expectedAllowance = args.mintAllowanceInDollars * 10 ** USDC_DECIMALS;
   const allowance = await args.treasuryClient.getMintAllowance(mintCapId);
   assert.equal(allowance, expectedAllowance);
 

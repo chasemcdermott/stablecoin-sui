@@ -20,7 +20,12 @@ import { bcs } from "@mysten/sui/bcs";
 import { SuiClient, SuiTransactionBlockResponse } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
-import { getCreatedObjects, executeTransactionHelper, DENY_LIST_OBJECT_ID, callViewFunction } from ".";
+import {
+  getCreatedObjects,
+  executeTransactionHelper,
+  DENY_LIST_OBJECT_ID,
+  callViewFunction
+} from ".";
 
 export default class SuiTreasuryClient {
   suiClient: SuiClient;
@@ -250,7 +255,9 @@ export default class SuiTreasuryClient {
     return Number(allowance);
   }
 
-  async getMintCapId(controllerAddress: string): Promise<string | null | undefined> {
+  async getMintCapId(
+    controllerAddress: string
+  ): Promise<string | null | undefined> {
     const getControllerTx = new Transaction();
     getControllerTx.moveCall({
       target: `${this.stablecoinPackageId}::treasury::get_mint_cap_id`,
@@ -273,7 +280,9 @@ export default class SuiTreasuryClient {
       coinType: this.coinOtwType
     });
     if (!maybeMetadata) {
-      throw new Error(`Could not find metadata for coin with type ${this.coinOtwType}`);
+      throw new Error(
+        `Could not find metadata for coin with type ${this.coinOtwType}`
+      );
     }
     return maybeMetadata;
   }

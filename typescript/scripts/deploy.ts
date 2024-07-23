@@ -39,7 +39,7 @@ export async function deployCommand(
   deployerKey: string,
   upgradeCapRecipient: string,
   withUnpublishedDependencies = false,
-  writePackageId = false,
+  writePackageId = false
 ) {
   const client = new SuiClient({ url: rpcUrl });
   log(`RPC URL: ${rpcUrl}`);

@@ -119,7 +119,7 @@ export async function configureMinterHelper(
   // Check if the mint allowance has already been set. If so, continue to STEP 3.
   let skipSetMintAllowance = false;
   const decimals = (await treasuryClient.getMetadata()).decimals;
-  const mintAllowance = mintAllowanceInDollars * (10 ** decimals);
+  const mintAllowance = mintAllowanceInDollars * 10 ** decimals;
   const currentMintAllowance = await treasuryClient.getMintAllowance(mintCapId);
   if (currentMintAllowance == mintAllowance) {
     log(

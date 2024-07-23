@@ -173,7 +173,15 @@ export function resetPublishedAddressInPackageManifest(packageName: string) {
 }
 
 function getMoveTomlFilepath(packageName: string) {
-  return path.join(__dirname, "..", "..", "..", "packages", packageName, "Move.toml");
+  return path.join(
+    __dirname,
+    "..",
+    "..",
+    "..",
+    "packages",
+    packageName,
+    "Move.toml"
+  );
 }
 
 export async function deployPackageHelper(args: {
