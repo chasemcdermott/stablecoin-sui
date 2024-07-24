@@ -38,7 +38,7 @@ module stablecoin::treasury_migration_tests {
 
     public struct TREASURY_MIGRATION_TESTS has drop {}
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotOwner)]
+    #[test, expected_failure(abort_code = ::stablecoin::two_step_role::ESenderNotActiveRole)]
     fun start_migration__should_fail_is_caller_is_not_owner() {
         let mut scenario = setup();
 
@@ -94,7 +94,7 @@ module stablecoin::treasury_migration_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotOwner)]
+    #[test, expected_failure(abort_code = ::stablecoin::two_step_role::ESenderNotActiveRole)]
     fun abort_migration__should_fail_is_caller_is_not_owner() {
         let mut scenario = setup();
 
@@ -146,7 +146,7 @@ module stablecoin::treasury_migration_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotOwner)]
+    #[test, expected_failure(abort_code = ::stablecoin::two_step_role::ESenderNotActiveRole)]
     fun complete_migration__should_fail_is_caller_is_not_owner() {
         let mut scenario = setup();
 

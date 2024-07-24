@@ -28,6 +28,18 @@ import path from "path";
 import readline from "readline/promises";
 import util from "util";
 
+export class TransactionError extends Error {
+  transactionOutput: SuiTransactionBlockResponse;
+
+  constructor(
+    message: string | undefined,
+    transactionOutput: SuiTransactionBlockResponse
+  ) {
+    super(message);
+    this.transactionOutput = transactionOutput;
+  }
+}
+
 export function log(...[message, ...args]: Parameters<typeof console.log>) {
   if (process.env.NODE_ENV !== "TESTING") {
     console.log(">>> " + message, ...args);
@@ -175,8 +187,7 @@ export async function executeTransactionHelper(args: {
   });
 
   if (txOutput.effects?.status.status === "failure") {
-    console.log(inspectObject(txOutput));
-    throw new Error("Transaction failed!");
+    throw new TransactionError(txOutput.effects.status.error, txOutput);
   }
 
   return txOutput;
