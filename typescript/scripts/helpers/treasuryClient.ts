@@ -227,14 +227,38 @@ export default class SuiTreasuryClient {
     });
   }
 
-  async getMintCapOwner(mintCapId: string) {
+  async getObjectOwner(objectId: string): Promise<{
+    type: string,
+    address: string | undefined
+  }> {
     const mintCap = await this.suiClient.getObject({
-      id: mintCapId,
+      id: objectId,
       options: {
         showOwner: true
       }
     });
-    return (mintCap.data?.owner as any).AddressOwner;
+    const owner = (mintCap.data?.owner) as any;
+
+    let type = "unknown";
+    let address = undefined;
+    if(!owner) {
+      // continue
+    } else if (owner === "Immutable") {
+      type = 'immutable';
+    } else if (owner.AddressOwner) {
+      type = 'address';
+      address = owner.AddressOwner
+    } else if (owner.ObjectOwner) {
+      type = 'object';
+      address = owner.ObjectOwner
+    } else if (owner.Shared) {
+      type = 'shared';
+    }
+
+    return {
+      type: type,
+      address: address
+    };
   }
 
   async getMintAllowance(mintCapId: string) {

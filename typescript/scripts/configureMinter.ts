@@ -23,7 +23,8 @@ import {
   log,
   waitForUserConfirmation,
   SuiTreasuryClient,
-  readTransactionOutput
+  readTransactionOutput,
+  inspectObject
 } from "./helpers";
 import { SuiClient } from "@mysten/sui/client";
 
@@ -75,15 +76,15 @@ export async function configureMinterHelper(
     tempController.toSuiAddress()
   );
   if (mintCapId) {
-    const mintCapOwner = await treasuryClient.getMintCapOwner(mintCapId);
-    if (mintCapOwner === minterAddress) {
+    const mintCapOwner = await treasuryClient.getObjectOwner(mintCapId);
+    if (mintCapOwner.address === minterAddress) {
       log(
         `The temp controller/minter pair (${tempController.toSuiAddress()}/${minterAddress}) already exists. Skipping temp controller configuration...`
       );
       skipConfigureNewController = true;
     } else {
       throw new Error(
-        `Temp controller was already configured, but the MintCap ${mintCapId} is held by ${mintCapOwner}, not ${minterAddress}`
+        `Temp controller was already configured, but the MintCap ${mintCapId} is held by ${inspectObject(mintCapOwner)}, not ${minterAddress}`
       );
     }
   }
