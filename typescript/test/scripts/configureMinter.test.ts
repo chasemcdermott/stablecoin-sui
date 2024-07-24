@@ -55,35 +55,35 @@ describe("Test configure minter script", () => {
       deployTxOutput
     );
 
-    const coldControllerKeys = await generateKeypairCommand(true);
+    const finalControllerKeys = await generateKeypairCommand(true);
     const minterKeys = await generateKeypairCommand(false);
     const initialAllowance = 12345;
     await testConfigureMinter({
       treasuryClient,
       masterMinter: deployerKeys,
-      hotController: deployerKeys,
+      tempController: deployerKeys,
       minter: minterKeys,
       mintAllowanceInDollars: initialAllowance,
-      coldController: coldControllerKeys
+      finalController: finalControllerKeys
     });
-    currentControllerKeys = coldControllerKeys;
+    currentControllerKeys = finalControllerKeys;
     currentMinter = minterKeys;
   });
 
-  it("Fails when the cold controller already exists", async () => {
+  it("Fails when the final controller already exists", async () => {
     const randomKeys = await generateKeypairCommand(false);
     await assert.rejects(
       () =>
         testConfigureMinter({
           treasuryClient,
           masterMinter: deployerKeys,
-          hotController: randomKeys,
+          tempController: randomKeys,
           minter: currentMinter,
           mintAllowanceInDollars: 12345,
-          coldController: currentControllerKeys
+          finalController: currentControllerKeys
         }),
       (err: any) => {
-        assert(err.message.includes("Cold controller is already configured"));
+        assert(err.message.includes("Final controller is already configured"));
         return true;
       }
     );
@@ -96,10 +96,10 @@ describe("Test configure minter script", () => {
         testConfigureMinter({
           treasuryClient,
           masterMinter: randomKeys,
-          hotController: randomKeys,
+          tempController: randomKeys,
           minter: currentMinter,
           mintAllowanceInDollars: 12345,
-          coldController: randomKeys
+          finalController: randomKeys
         }),
       (err: any) => {
         assert(err.message.includes("Incorrect master minter key"));
@@ -108,22 +108,22 @@ describe("Test configure minter script", () => {
     );
   });
 
-  it("Fails when the hot controller exists and the minter is different", async () => {
+  it("Fails when the temp controller exists and the minter is different", async () => {
     const randomKeys = await generateKeypairCommand(false);
     await assert.rejects(
       () =>
         testConfigureMinter({
           treasuryClient,
           masterMinter: deployerKeys,
-          hotController: currentControllerKeys,
+          tempController: currentControllerKeys,
           minter: randomKeys,
           mintAllowanceInDollars: 12345,
-          coldController: randomKeys
+          finalController: randomKeys
         }),
       (err: any) => {
         assert(
           err.message.match(
-            /Hot controller was already configured, but the MintCap \w* is held by \w*/
+            /Temp controller was already configured, but the MintCap \w* is held by \w*/
           )
         );
         return true;
@@ -131,15 +131,15 @@ describe("Test configure minter script", () => {
     );
   });
 
-  it("Successfully updates the allowance and rotates the keys when the hot controller already exists", async () => {
-    const newColdController = await generateKeypairCommand(false);
+  it("Successfully updates the allowance and rotates the keys when the temp controller already exists", async () => {
+    const newFinalController = await generateKeypairCommand(false);
     await testConfigureMinter({
       treasuryClient,
       masterMinter: deployerKeys,
-      hotController: currentControllerKeys,
+      tempController: currentControllerKeys,
       minter: currentMinter,
       mintAllowanceInDollars: random(100_000_000, 200_000_000),
-      coldController: newColdController
+      finalController: newFinalController
     });
   });
 });
@@ -147,25 +147,25 @@ describe("Test configure minter script", () => {
 async function testConfigureMinter(args: {
   treasuryClient: SuiTreasuryClient;
   masterMinter: Ed25519Keypair;
-  hotController: Ed25519Keypair;
+  tempController: Ed25519Keypair;
   minter: Ed25519Keypair;
   mintAllowanceInDollars: number;
-  coldController: Ed25519Keypair;
+  finalController: Ed25519Keypair;
 }) {
   let mintCapId = await configureMinterHelper(
     args.treasuryClient,
     args.masterMinter.getSecretKey(),
-    args.hotController.getSecretKey(),
+    args.tempController.getSecretKey(),
     args.minter.toSuiAddress(),
     args.mintAllowanceInDollars,
-    args.coldController.toSuiAddress()
+    args.finalController.toSuiAddress()
   );
   assert.notEqual(mintCapId, undefined);
   mintCapId = mintCapId as string;
 
-  // assert that cold address is controller of the MintCap
+  // assert that final controller address is controller of the MintCap
   const controllerMintCapId = await args.treasuryClient.getMintCapId(
-    args.coldController.toSuiAddress()
+    args.finalController.toSuiAddress()
   );
   assert.equal(controllerMintCapId, mintCapId);
 
@@ -178,9 +178,9 @@ async function testConfigureMinter(args: {
   const allowance = await args.treasuryClient.getMintAllowance(mintCapId);
   assert.equal(allowance, expectedAllowance);
 
-  // assert that the hot controller is no longer a controller
-  const hotControllerMintCapId = await args.treasuryClient.getMintCapId(
-    args.hotController.toSuiAddress()
+  // assert that the temp controller is no longer a controller
+  const tempControllerMintCapId = await args.treasuryClient.getMintCapId(
+    args.tempController.toSuiAddress()
   );
-  assert.equal(hotControllerMintCapId, null);
+  assert.equal(tempControllerMintCapId, null);
 }

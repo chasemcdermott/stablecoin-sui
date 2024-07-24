@@ -28,32 +28,32 @@ import {
 import { SuiClient } from "@mysten/sui/client";
 
 /**
- * Configures a new minter using a hot controller key.
- * After configuration, rotate the hot controller to a cold controller address.
+ * Configures a new minter using a temporary controller key.
+ * After configuration, rotate the temp controller to a final controller address.
  *
  * @returns Transaction output
  */
 export async function configureMinterHelper(
   treasuryClient: SuiTreasuryClient,
   hotMasterMinterKey: string,
-  hotControllerKey: string,
+  tempControllerKey: string,
   minterAddress: string,
   mintAllowanceInDollars: number,
-  coldControllerAddress: string
+  finalControllerAddress: string
 ): Promise<string | undefined> {
   const hotMasterMinter = getEd25519KeypairFromPrivateKey(hotMasterMinterKey);
-  const hotController = getEd25519KeypairFromPrivateKey(hotControllerKey);
+  const tempController = getEd25519KeypairFromPrivateKey(tempControllerKey);
 
   // === STEP 0: VALIDATION ===
 
-  // Ensure that the cold controller has not already been configured
-  // Fail early so that we don't unintentionally create more hot controllers
-  const coldControllerMintCapId = await treasuryClient.getMintCapId(
-    coldControllerAddress
+  // Ensure that the final controller has not already been configured
+  // Fail early so that we don't unintentionally create more temp controllers
+  const finalControllerMintCapId = await treasuryClient.getMintCapId(
+    finalControllerAddress
   );
-  if (coldControllerMintCapId) {
+  if (finalControllerMintCapId) {
     throw new Error(
-      `Cold controller is already configured with MintCap ${coldControllerMintCapId}`
+      `Final controller is already configured with MintCap ${finalControllerMintCapId}`
     );
   }
 
@@ -65,40 +65,40 @@ export async function configureMinterHelper(
     );
   }
 
-  // === STEP 1: HOT CONTROLLER CONFIGURATION ===
+  // === STEP 1: TEMP CONTROLLER CONFIGURATION ===
 
-  // Check if hot controller/minter pair already exists. If so, continue to STEP 2.
-  // If the hot controller key exists but the mint cap is not held by the expected minter,
+  // Check if temp controller/minter pair already exists. If so, continue to STEP 2.
+  // If the temp controller key exists but the mint cap is not held by the expected minter,
   // fail early to avoid confusion around which minter is being configured.
   let skipConfigureNewController = false;
   let mintCapId = await treasuryClient.getMintCapId(
-    hotController.toSuiAddress()
+    tempController.toSuiAddress()
   );
   if (mintCapId) {
     const mintCapOwner = await treasuryClient.getMintCapOwner(mintCapId);
     if (mintCapOwner === minterAddress) {
       log(
-        `The hot controller/minter pair (${hotController.toSuiAddress()}/${minterAddress}) already exists. Skipping hot controller configuration...`
+        `The temp controller/minter pair (${tempController.toSuiAddress()}/${minterAddress}) already exists. Skipping temp controller configuration...`
       );
       skipConfigureNewController = true;
     } else {
       throw new Error(
-        `Hot controller was already configured, but the MintCap ${mintCapId} is held by ${mintCapOwner}, not ${minterAddress}`
+        `Temp controller was already configured, but the MintCap ${mintCapId} is held by ${mintCapOwner}, not ${minterAddress}`
       );
     }
   }
 
-  // Configure a hot controller and transfer the MintCap to the minter, using the hotMasterMinter
+  // Configure a temp controller and transfer the MintCap to the minter, using the hotMasterMinter
   if (!skipConfigureNewController) {
     log(
-      `Going to create a new hot controller ${hotController.toSuiAddress()} and transfer its MintCap to ${minterAddress}`
+      `Going to create a new temp controller ${tempController.toSuiAddress()} and transfer its MintCap to ${minterAddress}`
     );
     if (!(await waitForUserConfirmation())) {
       throw new Error("Terminating...");
     }
     const txOutput = await treasuryClient.configureNewController(
       hotMasterMinter,
-      hotController.toSuiAddress(),
+      tempController.toSuiAddress(),
       minterAddress
     );
     writeJsonOutput("configure-new-controller", txOutput);
@@ -128,7 +128,7 @@ export async function configureMinterHelper(
     skipSetMintAllowance = true;
   }
 
-  // Set the mint allowance, using the configured hot controller
+  // Set the mint allowance, using the configured temp controller
   if (!skipSetMintAllowance) {
     log(
       `Going to set the mint allowance to $${mintAllowanceInDollars} for MintCap ${mintCapId} currently held by ${minterAddress}`
@@ -137,7 +137,7 @@ export async function configureMinterHelper(
       throw new Error("Terminating...");
     }
     const txOutput = await treasuryClient.setMintAllowance(
-      hotController,
+      tempController,
       mintAllowance
     );
     writeJsonOutput("set-mint-allowance", txOutput);
@@ -145,17 +145,17 @@ export async function configureMinterHelper(
 
   // === STEP 3: CONTROLLER KEY ROTATION ===
 
-  // Rotate the controller to the cold controller address, using the hot master minter
+  // Rotate the controller to the final controller address, using the hot master minter
   log(
-    `Going to rotate the hot controller key from ${hotController.toSuiAddress()} to ${coldControllerAddress}}`
+    `Going to rotate the temp controller key from ${tempController.toSuiAddress()} to ${finalControllerAddress}}`
   );
   if (!(await waitForUserConfirmation())) {
     throw new Error("Terminating...");
   }
   const txOutput = await treasuryClient.rotateController(
     hotMasterMinter,
-    coldControllerAddress,
-    hotController.toSuiAddress(),
+    finalControllerAddress,
+    tempController.toSuiAddress(),
     mintCapId
   );
   writeJsonOutput("rotate-controller", txOutput);
@@ -168,7 +168,7 @@ export async function configureMinterHelper(
 export default program
   .createCommand("configure-minter")
   .description(
-    "Configures a new minter using a hot controller key and rotates to a cold controller address"
+    "Configures a new minter using a temporary controller key and rotates to a final controller address"
   )
   .option(
     "--treasury-deploy-file <string>",
@@ -180,7 +180,7 @@ export default program
     "The private key of the treasury object's master minter"
   )
   .requiredOption(
-    "--hot-controller-key <string>",
+    "--temp-controller-key <string>",
     "The private key of a funded address to use as a temporary controller"
   )
   .requiredOption(
@@ -192,7 +192,7 @@ export default program
     "The mint allowance to set, in whole units (Dollars, Euros, etc). E.g 1000 = $1,000.00"
   )
   .requiredOption(
-    "--cold-controller-address <string>",
+    "--final-controller-address <string>",
     "The address that the final controller should be set to"
   )
   .option("-r, --rpc-url <string>", "Network RPC URL", process.env.RPC_URL)
@@ -229,9 +229,9 @@ export default program
     configureMinterHelper(
       treasuryClient,
       options.hotMasterMinterKey,
-      options.hotControllerKey,
+      options.tempControllerKey,
       options.minterAddress,
       options.mintAllowance,
-      options.coldControllerAddress
+      options.finalControllerAddress
     );
   });
