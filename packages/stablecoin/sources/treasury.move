@@ -47,12 +47,11 @@ module stablecoin::treasury {
     const ENotController: u64 = 5;
     const ENotMasterMinter: u64 = 6;
     const ENotMetadataUpdater: u64 = 7;
-    const ENotOwner: u64 = 8;
-    const ENotPauser: u64 = 9;
-    const EPaused: u64 = 10;
-    const ETreasuryCapNotFound: u64 = 11;
-    const EUnauthorizedMintCap: u64 = 12;
-    const EZeroAmount: u64 = 13;
+    const ENotPauser: u64 = 8;
+    const EPaused: u64 = 9;
+    const ETreasuryCapNotFound: u64 = 10;
+    const EUnauthorizedMintCap: u64 = 11;
+    const EZeroAmount: u64 = 12;
 
     /// Migration related error codes, starting at 100.
     const EMigrationStarted: u64 = 100;
@@ -86,9 +85,9 @@ module stablecoin::treasury {
         id: UID,
     }
 
-    /// Key for retrieving TreasuryCap stored in dynamic field
+    /// Key for retrieving the `TreasuryCap` stored in a `Treasury<T>` dynamic object field
     public struct TreasuryCapKey has copy, store, drop {}
-    /// Key for retrieving DenyCap stored in dynamic field
+    /// Key for retrieving `DenyCap` stored in a `Treasury<T>` dynamic object field
     public struct DenyCapKey has copy, store, drop {}
 
     // === Events ===
@@ -598,7 +597,7 @@ module stablecoin::treasury {
     /// Starts the migration process, making the Treasury object be
     /// additionally compatible with this package's version.
     entry fun start_migration<T>(treasury: &mut Treasury<T>, ctx: &TxContext) {
-        assert!(treasury.roles.owner() == ctx.sender(), ENotOwner);
+        treasury.roles.owner_role().assert_sender_is_active_role(ctx);
         assert!(treasury.compatible_versions.size() == 1, EMigrationStarted);
 
         let active_version = treasury.compatible_versions.keys()[0];
@@ -614,7 +613,7 @@ module stablecoin::treasury {
     /// Aborts the migration process, reverting the Treasury object's compatibility
     /// to the previous version.
     entry fun abort_migration<T>(treasury: &mut Treasury<T>, ctx: &TxContext) {
-        assert!(treasury.roles.owner() == ctx.sender(), ENotOwner);
+        treasury.roles.owner_role().assert_sender_is_active_role(ctx);
         assert!(treasury.compatible_versions.size() == 2, EMigrationNotStarted);
 
         let pending_version = max(
@@ -633,7 +632,7 @@ module stablecoin::treasury {
     /// Completes the migration process, making the Treasury object be
     /// only compatible with this package's version.
     entry fun complete_migration<T>(treasury: &mut Treasury<T>, ctx: &TxContext) {
-        assert!(treasury.roles.owner() == ctx.sender(), ENotOwner);
+        treasury.roles.owner_role().assert_sender_is_active_role(ctx);
         assert!(treasury.compatible_versions.size() == 2, EMigrationNotStarted);
 
         let (version_a, version_b) = (treasury.compatible_versions.keys()[0], treasury.compatible_versions.keys()[1]);

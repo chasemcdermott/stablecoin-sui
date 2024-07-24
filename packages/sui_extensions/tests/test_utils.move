@@ -14,20 +14,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-module sui_extensions::sui_extensions {
-    use sui_extensions::typed_upgrade_cap;
+#[test_only]
+module sui_extensions::test_utils {
+    use sui::event;
+    use sui::test_utils::assert_eq;
 
-    public struct SUI_EXTENSIONS has drop {}
-    
-    /// Initializes an UpgradeCap<SUI_EXTENSIONS> and transfers the UpgradeCap
-    /// to the transaction's sender.
-    fun init(witness: SUI_EXTENSIONS, ctx: &mut TxContext) {
-        let (typed_upgrade_cap, _) = typed_upgrade_cap::empty(witness, ctx);
-        transfer::public_transfer(typed_upgrade_cap, ctx.sender());
-    }
-
-    #[test_only]
-    public(package) fun init_for_testing(ctx: &mut TxContext) {
-        init(SUI_EXTENSIONS {}, ctx)
+    public fun last_event_by_type<T: copy + drop>(): T {
+        let events_by_type = event::events_by_type();
+        assert_eq(events_by_type.is_empty(), false);
+        *events_by_type.borrow(events_by_type.length() - 1)
     }
 }

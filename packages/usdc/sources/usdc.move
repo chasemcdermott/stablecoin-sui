@@ -19,7 +19,7 @@ module usdc::usdc {
     use sui::coin;
     use sui::url;
     use stablecoin::treasury;
-    use sui_extensions::typed_upgrade_cap;
+    use sui_extensions::upgrade_service;
 
     /// The One-Time Witness struct for the USDC coin.
     public struct USDC has drop {}
@@ -32,9 +32,13 @@ module usdc::usdc {
     #[allow(lint(share_owned))]
     /// Initializes
     /// - A shared Treasury<USDC> object
-    /// - An owned UpgradeCap<USDC>, transferred to the transaction's sender.
+    /// - A shared UpgradeService<USDC> object
     fun init(witness: USDC, ctx: &mut TxContext) {
-        let (typed_upgrade_cap, witness) = typed_upgrade_cap::empty(witness, ctx);
+        let (upgrade_service, witness) = upgrade_service::new(
+            witness,
+            ctx.sender() /* admin */,
+            ctx
+        );
 
         let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency_v2(
             witness,
@@ -60,7 +64,7 @@ module usdc::usdc {
             
         transfer::public_share_object(metadata);
         transfer::public_share_object(treasury);
-        transfer::public_transfer(typed_upgrade_cap, ctx.sender());
+        transfer::public_share_object(upgrade_service);
     }
 
     #[test_only]

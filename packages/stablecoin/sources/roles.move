@@ -17,7 +17,7 @@
 module stablecoin::roles {
     use sui::bag::{Self, Bag};
     use sui::event;
-    use stablecoin::two_step_role::{Self, TwoStepRole};
+    use sui_extensions::two_step_role::{Self, TwoStepRole};
 
     // === Structs ===
 
@@ -28,7 +28,7 @@ module stablecoin::roles {
         data: Bag
     }
 
-    // Type used to specify which TwoStepRole the owner role corresponds to.
+    /// Type used to specify which TwoStepRole the owner role corresponds to.
     public struct OwnerRole<phantom T> {}
 
     /// Key used to map to the mutable TwoStepRole of the owner EOA

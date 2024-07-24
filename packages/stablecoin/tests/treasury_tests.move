@@ -28,10 +28,10 @@ module stablecoin::treasury_tests {
     };
     use stablecoin::{
         entry,
-        test_utils::last_event_by_type,
         treasury::{Self, MintCap, Treasury},
         version_control
     };
+    use sui_extensions::test_utils::last_event_by_type;
 
     // test addresses
     const DEPLOYER: address = @0x0;
