@@ -104,7 +104,7 @@ export async function configureMinterHelper(
     );
     writeJsonOutput("configure-new-controller", txOutput);
 
-    mintCapId = treasuryClient.parseMintCapId(txOutput);
+    mintCapId = await treasuryClient.getMintCapId(tempController.toSuiAddress());
     log(`Created new MintCap with ID ${mintCapId}`);
   }
 
@@ -156,8 +156,7 @@ export async function configureMinterHelper(
   const txOutput = await treasuryClient.rotateController(
     hotMasterMinter,
     finalControllerAddress,
-    tempController.toSuiAddress(),
-    mintCapId
+    tempController.toSuiAddress()
   );
   writeJsonOutput("rotate-controller", txOutput);
 

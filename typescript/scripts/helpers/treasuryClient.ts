@@ -168,9 +168,13 @@ export default class SuiTreasuryClient {
   async rotateController(
     masterMinter: Ed25519Keypair,
     newControllerAddress: string,
-    oldControllerAddress: string,
-    mintCapId: string
+    oldControllerAddress: string
   ) {
+    const mintCapId = await this.getMintCapId(oldControllerAddress);
+    if (!mintCapId) {
+      throw new Error(`Could not find Mint Cap for controller address ${oldControllerAddress}`);
+    }
+
     const txb = new Transaction();
     txb.moveCall({
       target: `${this.stablecoinPackageId}::treasury::configure_controller`,
@@ -367,20 +371,5 @@ export default class SuiTreasuryClient {
       pauser: pauserFields.value,
       metadataUpdater: metadataUpdaterFields.value
     };
-  }
-
-  parseMintCapId(txOutput: SuiTransactionBlockResponse) {
-    const mintCapType = `${this.stablecoinPackageId}::treasury::MintCap<${this.coinOtwType}>`;
-    const createdMintCap = getCreatedObjects(txOutput, mintCapType);
-    if (createdMintCap.length != 1) {
-      throw new Error(
-        `Expected only one MintCap to be created, got ${createdMintCap.length}`
-      );
-    }
-    const mintCapId = createdMintCap[0].objectId;
-    if (!mintCapId) {
-      throw new Error("Could not find mint cap id");
-    }
-    return mintCapId;
   }
 }
