@@ -17,7 +17,7 @@
 module stablecoin::roles {
     use sui::bag::{Self, Bag};
     use sui::event;
-    use stablecoin::two_step_role::{Self, TwoStepRole};
+    use sui_extensions::two_step_role::{Self, TwoStepRole};
 
     // === Structs ===
 

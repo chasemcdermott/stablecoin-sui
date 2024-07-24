@@ -25,7 +25,7 @@ module usdc::usdc_tests {
         url
     };
     use stablecoin::treasury::Treasury;
-    use sui_extensions::typed_upgrade_cap::UpgradeCap;
+    use sui_extensions::upgrade_service::UpgradeService;
     use usdc::usdc::{Self, USDC};
 
     const DEPLOYER: address = @0x0;
@@ -39,8 +39,7 @@ module usdc::usdc_tests {
         let previous_tx_effects = scenario.next_tx(DEPLOYER);
         assert_eq(previous_tx_effects.created().length(), 4);
         assert_eq(previous_tx_effects.frozen().length(), 1);
-        assert_eq(previous_tx_effects.shared().length(), 2); // Shared metadata and treasury objects
-        assert_eq(previous_tx_effects.transferred_to_account().size(), 1); // UpgradeCap<T> object
+        assert_eq(previous_tx_effects.shared().length(), 3); // Shared metadata, treasury and upgrade service objects
 
         scenario.end();
     }
@@ -106,15 +105,17 @@ module usdc::usdc_tests {
 
         scenario.end();
     }
-    
+
     #[test]
-    fun init__should_create_typed_upgrade_cap() {   
+    fun init__should_create_shared_upgrade_service() {   
         let mut scenario = test_scenario::begin(DEPLOYER);
         usdc::init_for_testing(scenario.ctx());
 
         scenario.next_tx(DEPLOYER);
-        assert_eq(scenario.has_most_recent_for_sender<UpgradeCap<USDC>>(), true);
-        
+        let upgrade_service = scenario.take_shared<UpgradeService<USDC>>();
+        assert_eq(upgrade_service.admin(), DEPLOYER);
+        test_scenario::return_shared(upgrade_service);
+
         scenario.end();
     }
 }

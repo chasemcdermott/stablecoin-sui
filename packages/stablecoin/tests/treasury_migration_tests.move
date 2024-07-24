@@ -26,10 +26,10 @@ module stablecoin::treasury_migration_tests {
         test_utils::{assert_eq, destroy, create_one_time_witness},
     };
     use stablecoin::{
-        test_utils::{last_event_by_type},
         treasury::{Self, Treasury},
         version_control
     };
+    use sui_extensions::test_utils::last_event_by_type;
 
     // Test addresses
     const DEPLOYER: address = @0x0;

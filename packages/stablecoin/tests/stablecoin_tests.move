@@ -20,18 +20,20 @@ module stablecoin::stablecoin_tests {
         test_utils::{assert_eq}
     };
     use stablecoin::stablecoin::{Self, STABLECOIN};
-    use sui_extensions::typed_upgrade_cap::UpgradeCap;
+    use sui_extensions::upgrade_service::UpgradeService;
 
     const DEPLOYER: address = @0x10;
 
     #[test]
-    fun init__should_create_typed_upgrade_cap() {   
+    fun init__should_create_shared_upgrade_service() {   
         let mut scenario = test_scenario::begin(DEPLOYER);
         stablecoin::init_for_testing(scenario.ctx());
 
         scenario.next_tx(DEPLOYER);
-        assert_eq(scenario.has_most_recent_for_sender<UpgradeCap<STABLECOIN>>(), true);
-        
+        let upgrade_service = scenario.take_shared<UpgradeService<STABLECOIN>>();
+        assert_eq(upgrade_service.admin(), DEPLOYER);
+        test_scenario::return_shared(upgrade_service);
+
         scenario.end();
     }
 }

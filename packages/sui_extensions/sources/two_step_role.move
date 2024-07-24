@@ -24,7 +24,7 @@
 /// 
 /// Inspired by OpenZeppelin's Ownable2Step in Solidity: 
 /// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable2Step.sol.
-module stablecoin::two_step_role {
+module sui_extensions::two_step_role {
     use sui::event;
 
     // === Errors ===
@@ -65,28 +65,28 @@ module stablecoin::two_step_role {
         role.pending_address
     }
 
-    /// [Package private] Asserts that the transaction sender EOA is the active_address stored on the Role.
+    /// Asserts that the transaction sender EOA is the active_address stored on the Role.
     /// Aborts with error otherwise.
-    public(package) fun assert_sender_is_active_role<T>(role: &TwoStepRole<T>, ctx: &TxContext) {
+    public fun assert_sender_is_active_role<T>(role: &TwoStepRole<T>, ctx: &TxContext) {
         assert!(role.active_address == ctx.sender(), ESenderNotActiveRole);
     }
 
     // === Write functions ===
 
-    /// [Package private] Creates and initializes a TwoStepRole object.
-    public(package) fun new<T>(active_address: address): TwoStepRole<T> {
+    /// Creates and initializes a TwoStepRole object.
+    public fun new<T>(active_address: address): TwoStepRole<T> {
         TwoStepRole<T> {
             active_address,
             pending_address: option::none(),
         }
     }
 
-    /// [Package private] Start the role transfer. Must be followed by an accept_role call by the new_address EOA.
+    /// Start the role transfer. Must be followed by an accept_role call by the new_address EOA.
     /// A transfer can be aborted by starting another role transfer process
     /// to the current active address and accepting the role.
     /// 
     /// - Only callable by the active address.
-    public(package) fun begin_role_transfer<T>(
+    public fun begin_role_transfer<T>(
         role: &mut TwoStepRole<T>,
         new_address: address,
         ctx: &TxContext
@@ -101,9 +101,9 @@ module stablecoin::two_step_role {
         });
     }
 
-    /// [Package private] Complete the role transfer by accepting the role.
+    /// Complete the role transfer by accepting the role.
     /// - Only callable by the pending address.
-    public(package) fun accept_role<T>(
+    public fun accept_role<T>(
         role: &mut TwoStepRole<T>,
         ctx: &TxContext
     ) {
@@ -119,15 +119,20 @@ module stablecoin::two_step_role {
         });
     }
 
+    /// Destroys a TwoStepRole object.
+    public fun destroy<T>(role: TwoStepRole<T>) {
+        let TwoStepRole<T> { active_address: _, pending_address: _ } = role;
+    }
+
     // === Test Only ===
 
     #[test_only]
-    public(package) fun create_role_transfer_started_event<T>(old_address: address, new_address: address): RoleTransferStarted<T> {
+    public fun create_role_transfer_started_event<T>(old_address: address, new_address: address): RoleTransferStarted<T> {
         RoleTransferStarted { old_address, new_address }
     }
 
     #[test_only]
-    public(package) fun create_role_transferred_event<T>(old_address: address, new_address: address): RoleTransferred<T> {
+    public fun create_role_transferred_event<T>(old_address: address, new_address: address): RoleTransferred<T> {
         RoleTransferred { old_address, new_address }
     }
 }

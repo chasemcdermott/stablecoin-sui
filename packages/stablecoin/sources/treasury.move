@@ -86,9 +86,9 @@ module stablecoin::treasury {
         id: UID,
     }
 
-    /// Key for retrieving TreasuryCap stored in dynamic field
+    /// Key for retrieving the `TreasuryCap` stored in a `Treasury<T>` dynamic object field
     public struct TreasuryCapKey has copy, store, drop {}
-    /// Key for retrieving DenyCap stored in dynamic field
+    /// Key for retrieving `DenyCap` stored in a `Treasury<T>` dynamic object field
     public struct DenyCapKey has copy, store, drop {}
 
     // === Events ===

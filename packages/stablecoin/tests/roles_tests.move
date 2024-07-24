@@ -22,10 +22,10 @@ module stablecoin::roles_tests {
         test_utils::assert_eq,
         test_utils::destroy,
     };
-    use stablecoin::{
-        roles::{Self, Roles, OwnerRole},
-        test_utils::last_event_by_type,
-        two_step_role
+    use stablecoin::roles::{Self, Roles, OwnerRole};
+    use sui_extensions::{
+        two_step_role,
+        test_utils::last_event_by_type
     };
 
     public struct ROLES_TEST has drop {}

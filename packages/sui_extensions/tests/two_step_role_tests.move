@@ -15,13 +15,13 @@
 // limitations under the License.
 
 #[test_only]
-module stablecoin::two_step_role_tests {
+module sui_extensions::two_step_role_tests {
     use sui::{
         event,
         test_scenario::{Self, Scenario},
-        test_utils::{destroy, assert_eq}
+        test_utils::{assert_eq}
     };
-    use stablecoin::{
+    use sui_extensions::{
         test_utils::last_event_by_type,
         two_step_role::{Self, TwoStepRole}
     };
@@ -51,7 +51,7 @@ module stablecoin::two_step_role_tests {
         assert_eq(role.active_address(), ADMIN);
         assert_eq(role.pending_address(), option::none());
 
-        destroy(role);
+        role.destroy();
         scenario.end();
     }
 
@@ -73,7 +73,7 @@ module stablecoin::two_step_role_tests {
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type(), expected_event);
 
-        destroy(role);
+        role.destroy();
         scenario.end();
     }
 
@@ -85,7 +85,7 @@ module stablecoin::two_step_role_tests {
         scenario.next_tx(INVALID_ADMIN);
         role.begin_role_transfer(NEW_ADMIN, scenario.ctx());
         
-        destroy(role);
+        role.destroy();
         scenario.end();
     }
 
@@ -108,7 +108,7 @@ module stablecoin::two_step_role_tests {
         assert_eq(event::num_events(), 1);
         assert_eq(last_event_by_type(), expected_event);
 
-        destroy(role);
+        role.destroy();
         scenario.end();
     }
 
@@ -120,7 +120,7 @@ module stablecoin::two_step_role_tests {
         scenario.next_tx(NEW_ADMIN);
         role.accept_role(scenario.ctx());
 
-        destroy(role);
+        role.destroy();
         scenario.end();
     }
 
@@ -135,7 +135,7 @@ module stablecoin::two_step_role_tests {
         scenario.next_tx(INVALID_ADMIN);
         role.accept_role(scenario.ctx());
 
-        destroy(role);
+        role.destroy();
         scenario.end();
     }
 
@@ -148,7 +148,7 @@ module stablecoin::two_step_role_tests {
         scenario.next_tx(ADMIN);
         role.assert_sender_is_active_role(scenario.ctx());
 
-        destroy(role);
+        role.destroy();
         scenario.end();
     }
 
@@ -160,7 +160,7 @@ module stablecoin::two_step_role_tests {
         scenario.next_tx(INVALID_ADMIN);
         role.assert_sender_is_active_role(scenario.ctx());
         
-        destroy(role);
+        role.destroy();
         scenario.end();
     }
 }

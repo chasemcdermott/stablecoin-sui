@@ -15,15 +15,20 @@
 // limitations under the License.
 
 module stablecoin::stablecoin {
-    use sui_extensions::typed_upgrade_cap;
+    use sui_extensions::upgrade_service;
 
     public struct STABLECOIN has drop {}
 
-    /// Initializes an UpgradeCap<STABLECOIN> and transfers the UpgradeCap
-    /// to the transaction's sender.
+    #[allow(lint(share_owned))]
+    /// Initializes a shared UpgradeService<STABLECOIN> and sets the
+    /// transaction's sender as the initial admin.
     fun init(witness: STABLECOIN, ctx: &mut TxContext) {
-        let (typed_upgrade_cap, _) = typed_upgrade_cap::empty(witness, ctx);
-        transfer::public_transfer(typed_upgrade_cap, ctx.sender());
+        let (upgrade_service, _) = upgrade_service::new(
+            witness,
+            ctx.sender() /* admin */,
+            ctx
+        );
+        transfer::public_share_object(upgrade_service);
     }
 
     #[test_only]
