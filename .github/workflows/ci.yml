@@ -39,16 +39,16 @@ jobs:
           bash run.sh test
           git apply -R packages/stablecoin/examples/v2_base.patch
 
-  # run_typescript_tests:
-  #   name: "Run typescript tests"
-  #   uses: circlefin/github-shared-pipelines/.github/workflows/yarn-ci.yaml@v1
-  #   if: ${{ github.repository_owner == 'circlefin' && github.ref != 'refs/heads/master' }}
-  #   with:
-  #     repository: ${{ github.repository }}
-  #     branch: ${{ github.ref }}
-  #     node_version: "20.14.0"
-  #     install_dependencies_command: bash setup.sh && cd typescript && cp .env.example .env && yarn install --frozen-lockfile
-  #     start_containers: true
-  #     start_containers_command: bash run.sh start_network
-  #     run_command: cd typescript && yarn test
-  #     runner: large-dind-spot
+  run_typescript_tests:
+    name: "Run typescript tests"
+    uses: circlefin/github-shared-pipelines/.github/workflows/yarn-ci.yaml@v1
+    if: ${{ github.repository_owner == 'circlefin' && github.ref != 'refs/heads/master' }}
+    with:
+      repository: ${{ github.repository }}
+      branch: ${{ github.ref }}
+      node_version: "20.14.0"
+      install_dependencies_command: bash setup.sh && cd typescript && cp .env.example .env && yarn install --frozen-lockfile
+      start_containers: true
+      start_containers_command: bash run.sh start_network
+      run_command: cd typescript && yarn test
+      runner: large-dind-spot

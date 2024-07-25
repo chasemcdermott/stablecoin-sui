@@ -16,19 +16,16 @@
  * limitations under the License.
  */
 
-import {
-  SuiObjectChangeCreated,
-  SuiObjectChangeMutated,
-  SuiObjectChangePublished
-} from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { strict as assert } from "assert";
 import { deployCommand } from "../../scripts/deploy";
-import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { depositUpgradeCapCommand } from "../../scripts/depositUpgradeCap";
+import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import {
-  resetPublishedAddressInPackageManifest,
-  writePublishedAddressToPackageManifest
+  getCreatedObjects,
+  getMutatedObjects,
+  getPublishedPackages,
+  resetPublishedAddressInPackageManifest
 } from "../../scripts/helpers";
 
 describe("Test deposit-upgrade-cap script", () => {
@@ -39,30 +36,23 @@ describe("Test deposit-upgrade-cap script", () => {
   let suiExtensionsPackageId: string;
   let stablecoinPackageId: string;
   let stablecoinUpgradeCapId: string;
-  let stablecoinTypedUpgradeCapId: string;
   let stablecoinUpgradeCapOwner: Ed25519Keypair;
+  let stablecoinUpgradeServiceId: string;
 
   before("Deploy 'sui_extensions' package", async () => {
-    deployerKeys = await generateKeypairCommand(true);
+    deployerKeys = await generateKeypairCommand({ prefund: true });
 
-    const { objectChanges } = await deployCommand(
-      "sui_extensions",
-      RPC_URL,
-      deployerKeys.getSecretKey(),
-      deployerKeys.toSuiAddress()
-    );
+    const deployTx = await deployCommand("sui_extensions", {
+      rpcUrl: RPC_URL,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: deployerKeys.toSuiAddress(),
+      writePackageId: true
+    });
 
     // Parse the transaction output to get the published package id
-    const published =
-      objectChanges?.filter(
-        (c): c is SuiObjectChangePublished => c.type === "published"
-      ) || [];
+    const published = getPublishedPackages(deployTx);
     assert.equal(published.length, 1);
     suiExtensionsPackageId = published[0].packageId;
-    writePublishedAddressToPackageManifest(
-      "sui_extensions",
-      suiExtensionsPackageId
-    );
   });
 
   after(() => {
@@ -72,58 +62,49 @@ describe("Test deposit-upgrade-cap script", () => {
   beforeEach("Deploy 'stablecoin' package", async () => {
     stablecoinUpgradeCapOwner = deployerKeys;
 
-    const { objectChanges } = await deployCommand(
-      "stablecoin",
-      RPC_URL,
-      deployerKeys.getSecretKey(),
-      stablecoinUpgradeCapOwner.toSuiAddress()
-    );
+    const deployTx = await deployCommand("stablecoin", {
+      rpcUrl: RPC_URL,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: stablecoinUpgradeCapOwner.toSuiAddress()
+    });
 
     // Parse the transaction output to get the published package id
-    const published =
-      objectChanges?.filter(
-        (c): c is SuiObjectChangePublished => c.type === "published"
-      ) || [];
+    const published = getPublishedPackages(deployTx);
     assert.equal(published.length, 1);
     stablecoinPackageId = published[0].packageId;
 
     // Parse the transaction output to get the UpgradeCap's object id
-    const createdUpgradeCap =
-      objectChanges
-        ?.filter((c): c is SuiObjectChangeCreated => c.type === "created")
-        .filter((c) => c.objectType === "0x2::package::UpgradeCap") || [];
+    const createdUpgradeCap = getCreatedObjects(deployTx, {
+      objectType: "0x2::package::UpgradeCap"
+    });
     assert.equal(createdUpgradeCap.length, 1);
     stablecoinUpgradeCapId = createdUpgradeCap[0].objectId;
 
-    // Parse the transaction output to get the UpgradeCap<T>'s object id
-    const createdTypedUpgradeCap =
-      objectChanges
-        ?.filter((c): c is SuiObjectChangeCreated => c.type === "created")
-        .filter(
-          (c) =>
-            c.objectType ===
-            `${suiExtensionsPackageId}::typed_upgrade_cap::UpgradeCap<${stablecoinPackageId}::stablecoin::STABLECOIN>`
-        ) || [];
-    assert.equal(createdTypedUpgradeCap.length, 1);
-    stablecoinTypedUpgradeCapId = createdTypedUpgradeCap[0].objectId;
+    // Parse the transaction output to get the UpgradeService<T>'s object id
+    const createdUpgradeService = getCreatedObjects(deployTx, {
+      objectType: `${suiExtensionsPackageId}::upgrade_service::UpgradeService<${stablecoinPackageId}::stablecoin::STABLECOIN>`
+    });
+    assert.equal(createdUpgradeService.length, 1);
+    stablecoinUpgradeServiceId = createdUpgradeService[0].objectId;
   });
 
-  it("Deposits an UpgradeCap into an UpgradeCap<T> for the 'stablecoin' package correctly", async () => {
-    const { objectChanges } = (await depositUpgradeCapCommand(
-      RPC_URL,
+  it("Deposits an UpgradeCap into an UpgradeService<T> for the 'stablecoin' package correctly", async () => {
+    const depositUpgradeCapTx = await depositUpgradeCapCommand({
+      rpcUrl: RPC_URL,
       suiExtensionsPackageId,
-      stablecoinUpgradeCapId,
-      stablecoinTypedUpgradeCapId,
-      stablecoinUpgradeCapOwner.getSecretKey()
-    ))!;
+      upgradeCapObjectId: stablecoinUpgradeCapId,
+      upgradeCapOwnerKey: stablecoinUpgradeCapOwner.getSecretKey(),
+      upgradeServiceObjectId: stablecoinUpgradeServiceId
+    });
+    assert(depositUpgradeCapTx, "Missing depositUpgradeCapTx!");
 
     // Figure out the new owner of the UpgradeCap.
     let newStablecoinUpgradeCapOwner: string;
     {
-      const stablecoinUpgradeCapChanges =
-        objectChanges
-          ?.filter((c): c is SuiObjectChangeMutated => c.type === "mutated")
-          .filter((c) => c.objectId === stablecoinUpgradeCapId) || [];
+      const stablecoinUpgradeCapChanges = getMutatedObjects(
+        depositUpgradeCapTx,
+        { objectId: stablecoinUpgradeCapId }
+      );
       assert.equal(stablecoinUpgradeCapChanges.length, 1);
 
       newStablecoinUpgradeCapOwner = (
@@ -140,10 +121,10 @@ describe("Test deposit-upgrade-cap script", () => {
     // Figure out the owner of the dynamic field object that owns the UpgradeCap.
     let dynamicFieldOwner: string;
     {
-      const newStablecoinUpgradeCapOwnerChanges =
-        objectChanges
-          ?.filter((c): c is SuiObjectChangeCreated => c.type === "created")
-          .filter((c) => c.objectId === newStablecoinUpgradeCapOwner) || [];
+      const newStablecoinUpgradeCapOwnerChanges = getCreatedObjects(
+        depositUpgradeCapTx,
+        { objectId: newStablecoinUpgradeCapOwner }
+      );
       assert.equal(newStablecoinUpgradeCapOwnerChanges.length, 1);
       assert.equal(
         newStablecoinUpgradeCapOwnerChanges[0].objectType.includes(
@@ -156,7 +137,7 @@ describe("Test deposit-upgrade-cap script", () => {
         .ObjectOwner;
     }
 
-    // Ensure that the owner of the dynamic field is the UpgradeCap<T> itself.
-    assert.equal(dynamicFieldOwner, stablecoinTypedUpgradeCapId);
+    // Ensure that the owner of the dynamic field is the UpgradeService<T> itself.
+    assert.equal(dynamicFieldOwner, stablecoinUpgradeServiceId);
   });
 });

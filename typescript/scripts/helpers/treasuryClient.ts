@@ -76,20 +76,18 @@ export default class SuiTreasuryClient {
     suiClient: SuiClient,
     deploymentTxOutput: SuiTransactionBlockResponse
   ) {
-    const treasuryObjects = getCreatedObjects(
-      deploymentTxOutput,
-      /(?<=treasury::Treasury<)\w{66}::\w*::\w*(?=>)/
-    );
+    const treasuryObjects = getCreatedObjects(deploymentTxOutput, {
+      objectType: /(?<=treasury::Treasury<)\w{66}::\w*::\w*(?=>)/
+    });
     if (treasuryObjects.length !== 1) {
       throw new Error("Expected to have one treasury object in the tx output");
     }
     const treasuryObjectId = treasuryObjects[0].objectId;
     const treasuryType = treasuryObjects[0].objectType;
 
-    const metadataIds = getCreatedObjects(
-      deploymentTxOutput,
-      /(?<=coin::CoinMetadata<)\w{66}::\w*::\w*(?=>)/
-    );
+    const metadataIds = getCreatedObjects(deploymentTxOutput, {
+      objectType: /(?<=coin::CoinMetadata<)\w{66}::\w*::\w*(?=>)/
+    });
     if (metadataIds.length !== 1) {
       throw new Error("Expected to have one metadata object in the tx output");
     }
@@ -172,7 +170,9 @@ export default class SuiTreasuryClient {
   ) {
     const mintCapId = await this.getMintCapId(oldControllerAddress);
     if (!mintCapId) {
-      throw new Error(`Could not find Mint Cap for controller address ${oldControllerAddress}`);
+      throw new Error(
+        `Could not find Mint Cap for controller address ${oldControllerAddress}`
+      );
     }
 
     const txb = new Transaction();
@@ -232,8 +232,8 @@ export default class SuiTreasuryClient {
   }
 
   async getObjectOwner(objectId: string): Promise<{
-    type: string,
-    address: string | undefined
+    type: string;
+    address: string | undefined;
   }> {
     const mintCap = await this.suiClient.getObject({
       id: objectId,
@@ -241,22 +241,22 @@ export default class SuiTreasuryClient {
         showOwner: true
       }
     });
-    const owner = (mintCap.data?.owner) as any;
+    const owner = mintCap.data?.owner as any;
 
     let type = "unknown";
     let address = undefined;
-    if(!owner) {
+    if (!owner) {
       // continue
     } else if (owner === "Immutable") {
-      type = 'immutable';
+      type = "immutable";
     } else if (owner.AddressOwner) {
-      type = 'address';
-      address = owner.AddressOwner
+      type = "address";
+      address = owner.AddressOwner;
     } else if (owner.ObjectOwner) {
-      type = 'object';
-      address = owner.ObjectOwner
+      type = "object";
+      address = owner.ObjectOwner;
     } else if (owner.Shared) {
-      type = 'shared';
+      type = "shared";
     }
 
     return {

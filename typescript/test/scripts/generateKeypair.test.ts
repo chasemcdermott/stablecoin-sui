@@ -19,7 +19,6 @@
 import { SuiClient } from "@mysten/sui/client";
 import { strict as assert } from "assert";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
-import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
 
 describe("Test generate keypair script", async () => {
   let suiClient: SuiClient;
@@ -31,7 +30,7 @@ describe("Test generate keypair script", async () => {
   });
 
   it("Returns new keypair", async () => {
-    const keys: Ed25519Keypair = await generateKeypairCommand(false);
+    const keys = await generateKeypairCommand({ prefund: false });
 
     assert.equal(keys.getSecretKey().length, 70);
     assert.equal(keys.getPublicKey().toSuiAddress().length, 66);
@@ -43,7 +42,7 @@ describe("Test generate keypair script", async () => {
   });
 
   it("Returns prefunded keypair", async () => {
-    const keys: Ed25519Keypair = await generateKeypairCommand(true);
+    const keys = await generateKeypairCommand({ prefund: true });
 
     assert.equal(keys.getSecretKey().length, 70);
     assert.equal(keys.getPublicKey().toSuiAddress().length, 66);

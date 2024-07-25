@@ -20,8 +20,8 @@ import { SuiClient } from "@mysten/sui/client";
 import { strict as assert } from "assert";
 import { deployCommand } from "../scripts/deploy";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
-import { SuiObjectChangePublished } from "@mysten/sui/dist/cjs/client";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
+import { getPublishedPackages } from "../scripts/helpers";
 
 describe("Test total supply query", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
@@ -34,21 +34,19 @@ describe("Test total supply query", () => {
   let USDC_TYPE_ID: string;
 
   before("Deploy USDC", async () => {
-    deployerKeys = await generateKeypairCommand(true);
-    upgraderKeys = await generateKeypairCommand(false);
+    deployerKeys = await generateKeypairCommand({ prefund: true });
+    upgraderKeys = await generateKeypairCommand({ prefund: false });
 
-    const { objectChanges } = await deployCommand(
-      "usdc",
-      RPC_URL,
-      deployerKeys.getSecretKey(),
-      upgraderKeys.toSuiAddress(),
-      true // with unpublished dependencies
-    );
+    const deployTx = await deployCommand("usdc", {
+      rpcUrl: RPC_URL,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: upgraderKeys.toSuiAddress(),
+      withUnpublishedDependencies: true
+    });
 
-    const published =
-      objectChanges?.filter((c) => c.type === "published") || [];
+    const published = getPublishedPackages(deployTx);
     assert.equal(published.length, 1);
-    PACKAGE_ID = (published[0] as SuiObjectChangePublished).packageId;
+    PACKAGE_ID = published[0].packageId;
     USDC_TYPE_ID = `${PACKAGE_ID}::usdc::USDC`;
   });
 

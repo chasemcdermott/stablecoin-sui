@@ -17,11 +17,7 @@
  */
 
 import { bcs } from "@mysten/sui/bcs";
-import {
-  SuiClient,
-  SuiObjectChangeCreated,
-  SuiObjectChangePublished
-} from "@mysten/sui/client";
+import { SuiClient } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { strict as assert } from "assert";
@@ -31,7 +27,9 @@ import { generateKeypairCommand } from "../scripts/generateKeypair";
 import {
   buildPackageHelper,
   callViewFunction,
-  executeTransactionHelper
+  executeTransactionHelper,
+  getCreatedObjects,
+  getPublishedPackages
 } from "../scripts/helpers";
 
 describe("Test v1 -> v2 upgrade flow", () => {
@@ -42,71 +40,58 @@ describe("Test v1 -> v2 upgrade flow", () => {
   let deployerKeys: Ed25519Keypair;
   let monoUsdcPackageId: string;
   let upgradeCapId: string;
-  let typedUpgradeCapId: string;
+  let upgradeServiceId: string;
   let treasuryId: string;
 
   beforeEach(async () => {
     client = new SuiClient({ url: RPC_URL });
-    deployerKeys = await generateKeypairCommand(true);
+    deployerKeys = await generateKeypairCommand({ prefund: true });
 
     console.log(">>> Deploying a consolidated usdc package");
-    const usdcDeployTxOutput = await deployCommand(
-      "usdc",
-      RPC_URL,
-      deployerKeys.getSecretKey(),
-      deployerKeys.toSuiAddress(),
-      true /* with unpublished dependencies */
-    );
+    const usdcDeployTxOutput = await deployCommand("usdc", {
+      rpcUrl: RPC_URL,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: deployerKeys.toSuiAddress(),
+      withUnpublishedDependencies: true
+    });
 
     console.log(">>> Parsing the transaction output to get ids");
-    const published =
-      usdcDeployTxOutput.objectChanges?.filter(
-        (c): c is SuiObjectChangePublished => c.type === "published"
-      ) || [];
+    const published = getPublishedPackages(usdcDeployTxOutput);
     assert.equal(published.length, 1);
     monoUsdcPackageId = published[0].packageId;
 
-    const created =
-      usdcDeployTxOutput.objectChanges?.filter(
-        (c): c is SuiObjectChangeCreated => c.type === "created"
-      ) || [];
-
-    const upgradeCaps = created.filter(
-      (c) => c.objectType === "0x2::package::UpgradeCap"
-    );
+    const upgradeCaps = getCreatedObjects(usdcDeployTxOutput, {
+      objectType: "0x2::package::UpgradeCap"
+    });
     assert.equal(upgradeCaps.length, 1);
     upgradeCapId = upgradeCaps[0].objectId;
 
-    const typedUpgradeCaps = created.filter(
-      (c) =>
-        c.objectType ===
-        `${monoUsdcPackageId}::typed_upgrade_cap::UpgradeCap<${monoUsdcPackageId}::stablecoin::STABLECOIN>`
-    );
-    assert.equal(typedUpgradeCaps.length, 1);
-    typedUpgradeCapId = typedUpgradeCaps[0].objectId;
+    const upgradeServices = getCreatedObjects(usdcDeployTxOutput, {
+      objectType: `${monoUsdcPackageId}::upgrade_service::UpgradeService<${monoUsdcPackageId}::stablecoin::STABLECOIN>`
+    });
+    assert.equal(upgradeServices.length, 1);
+    upgradeServiceId = upgradeServices[0].objectId;
 
-    const treasury = created.filter(
-      (c) =>
-        c.objectType ===
-        `${monoUsdcPackageId}::treasury::Treasury<${monoUsdcPackageId}::usdc::USDC>`
-    );
+    const treasury = getCreatedObjects(usdcDeployTxOutput, {
+      objectType: `${monoUsdcPackageId}::treasury::Treasury<${monoUsdcPackageId}::usdc::USDC>`
+    });
     assert.equal(treasury.length, 1);
     treasuryId = treasury[0].objectId;
 
     console.log(">>> IDs found:", {
       monoUsdcPackageId,
       upgradeCapId,
-      typedUpgradeCapId,
+      upgradeServiceId,
       treasuryId
     });
 
-    console.log(">>> Deposit upgradeCap into typedUpgradeCap");
+    console.log(">>> Deposit upgradeCap into upgradeService");
     const depositTx = new Transaction();
     depositTx.moveCall({
-      target: `${monoUsdcPackageId}::typed_upgrade_cap::deposit`,
+      target: `${monoUsdcPackageId}::upgrade_service::deposit`,
       typeArguments: [`${monoUsdcPackageId}::stablecoin::STABLECOIN`],
       arguments: [
-        depositTx.object(typedUpgradeCapId),
+        depositTx.object(upgradeServiceId),
         depositTx.object(upgradeCapId)
       ]
     });
@@ -143,10 +128,10 @@ describe("Test v1 -> v2 upgrade flow", () => {
     });
 
     const [upgradeTicket] = upgradeTx.moveCall({
-      target: `${monoUsdcPackageId}::typed_upgrade_cap::authorize_upgrade`,
+      target: `${monoUsdcPackageId}::upgrade_service::authorize_upgrade`,
       typeArguments: [`${monoUsdcPackageId}::stablecoin::STABLECOIN`],
       arguments: [
-        upgradeTx.object(typedUpgradeCapId),
+        upgradeTx.object(upgradeServiceId),
         compatiblePolicyRef,
         upgradeTx.makeMoveVec({
           type: "u8",
@@ -163,9 +148,9 @@ describe("Test v1 -> v2 upgrade flow", () => {
     });
 
     upgradeTx.moveCall({
-      target: `${monoUsdcPackageId}::typed_upgrade_cap::commit_upgrade`,
+      target: `${monoUsdcPackageId}::upgrade_service::commit_upgrade`,
       typeArguments: [`${monoUsdcPackageId}::stablecoin::STABLECOIN`],
-      arguments: [upgradeTx.object(typedUpgradeCapId), upgradeReceipt]
+      arguments: [upgradeTx.object(upgradeServiceId), upgradeReceipt]
     });
 
     upgradeTx.setGasBudget(GAS_BUDGET);
@@ -175,10 +160,7 @@ describe("Test v1 -> v2 upgrade flow", () => {
       transaction: upgradeTx
     });
 
-    const published =
-      upgradeTxOutput.objectChanges?.filter(
-        (c): c is SuiObjectChangePublished => c.type === "published"
-      ) || [];
+    const published = getPublishedPackages(upgradeTxOutput);
     assert.equal(published.length, 1);
     monoUsdcPackageId = published[0].packageId;
 

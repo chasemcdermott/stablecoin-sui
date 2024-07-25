@@ -38,16 +38,15 @@ describe("Test configure minter script", () => {
   let currentMinter: Ed25519Keypair;
 
   before("Deploy USDC and configure a minter", async () => {
-    deployerKeys = await generateKeypairCommand(true);
-    upgraderKeys = await generateKeypairCommand(false);
+    deployerKeys = await generateKeypairCommand({ prefund: true });
+    upgraderKeys = await generateKeypairCommand({ prefund: false });
 
-    const deployTxOutput = await deployCommand(
-      "usdc",
-      RPC_URL,
-      deployerKeys.getSecretKey(),
-      upgraderKeys.toSuiAddress(),
-      true // with unpublished dependencies
-    );
+    const deployTxOutput = await deployCommand("usdc", {
+      rpcUrl: RPC_URL,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: upgraderKeys.toSuiAddress(),
+      withUnpublishedDependencies: true
+    });
 
     // build a client from the usdc deploy transaction output
     treasuryClient = SuiTreasuryClient.buildFromDeployment(
@@ -55,8 +54,8 @@ describe("Test configure minter script", () => {
       deployTxOutput
     );
 
-    const finalControllerKeys = await generateKeypairCommand(true);
-    const minterKeys = await generateKeypairCommand(false);
+    const finalControllerKeys = await generateKeypairCommand({ prefund: true });
+    const minterKeys = await generateKeypairCommand({ prefund: false });
     const initialAllowance = 12345;
     await testConfigureMinter({
       treasuryClient,
@@ -71,7 +70,7 @@ describe("Test configure minter script", () => {
   });
 
   it("Fails when the final controller already exists", async () => {
-    const randomKeys = await generateKeypairCommand(false);
+    const randomKeys = await generateKeypairCommand({ prefund: false });
     await assert.rejects(
       () =>
         testConfigureMinter({
@@ -90,7 +89,7 @@ describe("Test configure minter script", () => {
   });
 
   it("Fails when the master minter key is incorrect", async () => {
-    const randomKeys = await generateKeypairCommand(false);
+    const randomKeys = await generateKeypairCommand({ prefund: false });
     await assert.rejects(
       () =>
         testConfigureMinter({
@@ -109,7 +108,7 @@ describe("Test configure minter script", () => {
   });
 
   it("Fails when the temp controller exists and the minter is different", async () => {
-    const randomKeys = await generateKeypairCommand(false);
+    const randomKeys = await generateKeypairCommand({ prefund: false });
     await assert.rejects(
       () =>
         testConfigureMinter({
@@ -132,7 +131,7 @@ describe("Test configure minter script", () => {
   });
 
   it("Successfully updates the allowance and rotates the keys when the temp controller already exists", async () => {
-    const newFinalController = await generateKeypairCommand(false);
+    const newFinalController = await generateKeypairCommand({ prefund: false });
     await testConfigureMinter({
       treasuryClient,
       masterMinter: deployerKeys,
@@ -152,14 +151,13 @@ async function testConfigureMinter(args: {
   mintAllowanceInDollars: number;
   finalController: Ed25519Keypair;
 }) {
-  let mintCapId = await configureMinterHelper(
-    args.treasuryClient,
-    args.masterMinter.getSecretKey(),
-    args.tempController.getSecretKey(),
-    args.minter.toSuiAddress(),
-    args.mintAllowanceInDollars,
-    args.finalController.toSuiAddress()
-  );
+  let mintCapId = await configureMinterHelper(args.treasuryClient, {
+    hotMasterMinterKey: args.masterMinter.getSecretKey(),
+    tempControllerKey: args.tempController.getSecretKey(),
+    minterAddress: args.minter.toSuiAddress(),
+    mintAllowanceInDollars: args.mintAllowanceInDollars,
+    finalControllerAddress: args.finalController.toSuiAddress()
+  });
   assert.notEqual(mintCapId, undefined);
   mintCapId = mintCapId as string;
 

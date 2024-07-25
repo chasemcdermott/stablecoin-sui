@@ -19,7 +19,9 @@
 import { BcsType } from "@mysten/sui/bcs";
 import {
   SuiClient,
+  SuiObjectChange,
   SuiObjectChangeCreated,
+  SuiObjectChangeMutated,
   SuiObjectChangePublished,
   SuiTransactionBlockResponse
 } from "@mysten/sui/client";
@@ -299,23 +301,40 @@ export async function callViewFunction<T, Input = T>(args: {
 
 export function getCreatedObjects(
   txOutput: SuiTransactionBlockResponse,
-  objectType?: RegExp | string
+  filters?: { objectId?: string; objectType?: RegExp | string }
+): SuiObjectChangeCreated[] {
+  return getObjectsByType("created", txOutput, filters ?? {});
+}
+
+export function getMutatedObjects(
+  txOutput: SuiTransactionBlockResponse,
+  filters?: { objectId?: string; objectType?: RegExp | string }
+): SuiObjectChangeMutated[] {
+  return getObjectsByType("mutated", txOutput, filters ?? {});
+}
+
+export function getPublishedPackages(
+  txOutput: SuiTransactionBlockResponse
+): SuiObjectChangePublished[] {
+  return getObjectsByType("published", txOutput, {});
+}
+
+function getObjectsByType<T extends SuiObjectChange>(
+  type: SuiObjectChange["type"],
+  txOutput: SuiTransactionBlockResponse,
+  filters: { objectId?: string; objectType?: RegExp | string }
 ) {
-  let createdObjects = txOutput.objectChanges?.filter(
-    (c): c is SuiObjectChangeCreated => c.type === "created"
-  );
-  if (objectType) {
-    createdObjects = createdObjects?.filter((c) =>
+  let objects = txOutput.objectChanges?.filter((c): c is T => c.type === type);
+  const { objectId, objectType } = filters;
+  if (objectId && type != "published") {
+    objects = (objects as Exclude<T, { type: "published" }>[]).filter((c) =>
+      c.objectId.match(objectId)
+    );
+  }
+  if (objectType && type != "published") {
+    objects = (objects as Exclude<T, { type: "published" }>[]).filter((c) =>
       c.objectType.match(objectType)
     );
   }
-  return createdObjects || [];
-}
-
-export function getPublishedPackages(txOutput: SuiTransactionBlockResponse) {
-  return (
-    txOutput.objectChanges?.filter(
-      (c): c is SuiObjectChangePublished => c.type === "published"
-    ) || []
-  );
+  return objects || [];
 }

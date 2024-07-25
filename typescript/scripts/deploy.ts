@@ -35,22 +35,25 @@ import {
  */
 export async function deployCommand(
   packageName: string,
-  rpcUrl: string,
-  deployerKey: string,
-  upgradeCapRecipient: string,
-  withUnpublishedDependencies = false,
-  writePackageId = false
+  options: {
+    rpcUrl: string;
+    deployerKey: string;
+    upgradeCapRecipient?: string;
+    withUnpublishedDependencies?: boolean;
+    makeImmutable?: boolean;
+    writePackageId?: boolean;
+  }
 ) {
-  const client = new SuiClient({ url: rpcUrl });
-  log(`RPC URL: ${rpcUrl}`);
+  const client = new SuiClient({ url: options.rpcUrl });
+  log(`RPC URL: ${options.rpcUrl}`);
 
-  const deployer = getEd25519KeypairFromPrivateKey(deployerKey);
+  const deployer = getEd25519KeypairFromPrivateKey(options.deployerKey);
   log(`Deployer: ${deployer.toSuiAddress()}`);
 
   log(`Building package '${packageName}'...`);
   const { modules, dependencies } = buildPackageHelper({
     packageName,
-    withUnpublishedDependencies
+    withUnpublishedDependencies: !!options.withUnpublishedDependencies
   });
 
   log(`Deploying package '${packageName}'...`);
@@ -59,13 +62,13 @@ export async function deployCommand(
     deployer,
     modules,
     dependencies,
-    upgradeCapRecipient,
-    makeImmutable: false
+    upgradeCapRecipient: options.upgradeCapRecipient ?? null,
+    makeImmutable: !!options.makeImmutable
   });
 
   writeJsonOutput(`deploy-${packageName}`, transactionOutput);
 
-  if (writePackageId) {
+  if (options.writePackageId) {
     const publishedPackageIds = getPublishedPackages(transactionOutput);
     if (publishedPackageIds.length != 1) {
       throw new Error("Unexpected number of package IDs published");
@@ -84,10 +87,11 @@ export default program
   .createCommand("deploy")
   .description("Deploy a new Sui package")
   .argument("<package_name>", "Name of package to deploy")
-  .requiredOption(
+  .option(
     "--upgrade-cap-recipient <string>",
-    "The address that will receive the UpgradeCap"
+    "The address that will receive the UpgradeCap, optional if --make-immutable is set"
   )
+  .option("--make-immutable", "Destroys the UpgradeCap after deployment")
   .option("-r, --rpc-url <string>", "Network RPC URL", process.env.RPC_URL)
   .option(
     "--deployer-key <string>",
@@ -99,12 +103,5 @@ export default program
     "Write the deployed package ID to the package manifest"
   )
   .action((packageName, options) => {
-    deployCommand(
-      packageName, // package name
-      options.rpcUrl,
-      options.deployerKey,
-      options.upgradeCapRecipient,
-      false, // with unpublished dependencies
-      options.writePackageId
-    );
+    deployCommand(packageName, options);
   });

@@ -29,16 +29,16 @@ import { log, writeJsonOutput } from "./helpers";
  *
  * @returns Ed25519Keypair keypair
  */
-export async function generateKeypairCommand(
-  fundSigner: boolean = false,
-  faucetUrl: string | undefined = undefined
-): Promise<Ed25519Keypair> {
+export async function generateKeypairCommand(options: {
+  prefund?: boolean;
+  faucetUrl?: string;
+}): Promise<Ed25519Keypair> {
   const keypair = Ed25519Keypair.generate();
 
-  if (fundSigner) {
+  if (options.prefund) {
     log("Requesting test tokens...");
     await requestSuiFromFaucetV0({
-      host: faucetUrl || getFaucetHost("localnet"),
+      host: options.faucetUrl || getFaucetHost("localnet"),
       recipient: keypair.toSuiAddress()
     });
     log(`Funded address ${keypair.toSuiAddress()}`);
@@ -47,7 +47,7 @@ export async function generateKeypairCommand(
   writeJsonOutput("generate-keypair", {
     publicKey: keypair.getPublicKey().toSuiAddress(),
     secretKey: keypair.getSecretKey(),
-    funded: fundSigner
+    funded: options.prefund
   });
 
   return keypair;
@@ -59,10 +59,7 @@ export default program
   .option("--prefund", "Fund generated signer with some test SUI tokens")
   .option("--faucet-url", "Faucet URL", process.env.FAUCET_URL)
   .action(async (options) => {
-    const keypair = await generateKeypairCommand(
-      options.prefund,
-      options.faucetUrl
-    );
+    const keypair = await generateKeypairCommand(options);
     log("Public key: ", keypair.getPublicKey().toSuiAddress());
     log("Secret key: ", keypair.getSecretKey());
   });

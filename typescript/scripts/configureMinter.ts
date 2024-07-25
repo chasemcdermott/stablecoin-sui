@@ -36,12 +36,22 @@ import { SuiClient } from "@mysten/sui/client";
  */
 export async function configureMinterHelper(
   treasuryClient: SuiTreasuryClient,
-  hotMasterMinterKey: string,
-  tempControllerKey: string,
-  minterAddress: string,
-  mintAllowanceInDollars: number,
-  finalControllerAddress: string
+  options: {
+    hotMasterMinterKey: string;
+    tempControllerKey: string;
+    minterAddress: string;
+    mintAllowanceInDollars: number;
+    finalControllerAddress: string;
+  }
 ): Promise<string | undefined> {
+  const {
+    hotMasterMinterKey,
+    tempControllerKey,
+    minterAddress,
+    mintAllowanceInDollars,
+    finalControllerAddress
+  } = options;
+
   const hotMasterMinter = getEd25519KeypairFromPrivateKey(hotMasterMinterKey);
   const tempController = getEd25519KeypairFromPrivateKey(tempControllerKey);
 
@@ -104,7 +114,9 @@ export async function configureMinterHelper(
     );
     writeJsonOutput("configure-new-controller", txOutput);
 
-    mintCapId = await treasuryClient.getMintCapId(tempController.toSuiAddress());
+    mintCapId = await treasuryClient.getMintCapId(
+      tempController.toSuiAddress()
+    );
     log(`Created new MintCap with ID ${mintCapId}`);
   }
 
@@ -226,12 +238,5 @@ export default program
       );
     }
 
-    configureMinterHelper(
-      treasuryClient,
-      options.hotMasterMinterKey,
-      options.tempControllerKey,
-      options.minterAddress,
-      options.mintAllowance,
-      options.finalControllerAddress
-    );
+    configureMinterHelper(treasuryClient, options);
   });

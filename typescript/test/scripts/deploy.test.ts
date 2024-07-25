@@ -16,44 +16,32 @@
  * limitations under the License.
  */
 
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { strict as assert } from "assert";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
-import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import {
-  SuiObjectChangeCreated,
-  SuiObjectChangePublished
-} from "@mysten/sui/client";
-import {
-  resetPublishedAddressInPackageManifest,
-  writePublishedAddressToPackageManifest
+  getCreatedObjects,
+  getPublishedPackages,
+  resetPublishedAddressInPackageManifest
 } from "../../scripts/helpers";
 
 describe("Test deploy script", () => {
   let deployerKeys: Ed25519Keypair;
-  let suiExtensionsPackageId: string;
 
   before("Deploy 'sui_extensions' package", async () => {
-    deployerKeys = await generateKeypairCommand(true);
+    deployerKeys = await generateKeypairCommand({ prefund: true });
 
-    const { objectChanges } = await deployCommand(
-      "sui_extensions",
-      process.env.RPC_URL as string,
-      deployerKeys.getSecretKey(),
-      deployerKeys.toSuiAddress()
-    );
+    const deployTx = await deployCommand("sui_extensions", {
+      rpcUrl: process.env.RPC_URL as string,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: deployerKeys.toSuiAddress(),
+      writePackageId: true
+    });
 
     // Parse the transaction output to get the published package id
-    const published =
-      objectChanges?.filter(
-        (c): c is SuiObjectChangePublished => c.type === "published"
-      ) || [];
-    assert.equal(published.length, 1);
-    suiExtensionsPackageId = published[0].packageId;
-    writePublishedAddressToPackageManifest(
-      "sui_extensions",
-      suiExtensionsPackageId
-    );
+    const publishedPackageIds = getPublishedPackages(deployTx);
+    assert.equal(publishedPackageIds.length, 1);
   });
 
   after(() => {
@@ -61,35 +49,48 @@ describe("Test deploy script", () => {
   });
 
   it("Deploys stablecoin package successfully", async () => {
-    const upgraderKeys = await generateKeypairCommand(false);
+    const upgraderKeys = await generateKeypairCommand({ prefund: false });
 
-    const txOutput = await deployCommand(
-      "stablecoin",
-      process.env.RPC_URL as string,
-      deployerKeys.getSecretKey(),
-      upgraderKeys.toSuiAddress() // upgrader address
-    );
+    const txOutput = await deployCommand("stablecoin", {
+      rpcUrl: process.env.RPC_URL as string,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: upgraderKeys.toSuiAddress()
+    });
 
-    const { objectChanges } = txOutput;
-    const createdObjects =
-      objectChanges?.filter(
-        (c): c is SuiObjectChangeCreated => c.type === "created"
-      ) || [];
-    const publishedObjects =
-      objectChanges?.filter(
-        (c): c is SuiObjectChangePublished => c.type === "published"
-      ) || [];
+    const createdObjects = getCreatedObjects(txOutput);
+    const publishedObjects = getPublishedPackages(txOutput);
     assert.equal(createdObjects.length, 2);
     assert.equal(publishedObjects.length, 1);
 
-    const createdUpgradeCapObj = createdObjects.filter(
+    const createdUpgradeCapObj = createdObjects.find(
       (c) => c.objectType === "0x2::package::UpgradeCap"
-    )[0];
+    );
     assert(createdUpgradeCapObj != null);
     assert.equal(createdUpgradeCapObj.sender, deployerKeys.toSuiAddress());
     assert.equal(
       (createdUpgradeCapObj.owner as any).AddressOwner,
       upgraderKeys.toSuiAddress()
+    );
+  });
+
+  it("Should destroy UpgradeCap if makeImmutable is set", async () => {
+    const upgraderKeys = await generateKeypairCommand({ prefund: false });
+
+    const txOutput = await deployCommand("stablecoin", {
+      rpcUrl: process.env.RPC_URL as string,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: upgraderKeys.toSuiAddress(),
+      makeImmutable: true
+    });
+
+    const createdObjects = getCreatedObjects(txOutput);
+    const publishedObjects = getPublishedPackages(txOutput);
+    assert.equal(createdObjects.length, 1);
+    assert.equal(publishedObjects.length, 1);
+
+    assert(
+      createdObjects.find((c) => c.objectType === "0x2::package::UpgradeCap") ==
+        null
     );
   });
 });

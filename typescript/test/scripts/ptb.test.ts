@@ -33,16 +33,15 @@ describe("Test PTBs", () => {
   let upgraderKeys: Ed25519Keypair;
 
   before("Deploy USDC", async () => {
-    deployerKeys = await generateKeypairCommand(true);
-    upgraderKeys = await generateKeypairCommand(false);
+    deployerKeys = await generateKeypairCommand({ prefund: true });
+    upgraderKeys = await generateKeypairCommand({ prefund: false });
 
-    const deployTxOutput = await deployCommand(
-      "usdc",
-      RPC_URL,
-      deployerKeys.getSecretKey(),
-      upgraderKeys.toSuiAddress(),
-      true // with unpublished dependencies
-    );
+    const deployTxOutput = await deployCommand("usdc", {
+      rpcUrl: RPC_URL,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: upgraderKeys.toSuiAddress(),
+      withUnpublishedDependencies: true
+    });
 
     treasuryClient = SuiTreasuryClient.buildFromDeployment(
       client,
@@ -80,7 +79,7 @@ describe("Test PTBs", () => {
 
   it("Builds and submits a PTB to update roles via entry functions", async () => {
     const deployerAddress = deployerKeys.getPublicKey().toSuiAddress();
-    const newAddress = (await generateKeypairCommand(false))
+    const newAddress = (await generateKeypairCommand({ prefund: false }))
       .getPublicKey()
       .toSuiAddress();
 
