@@ -571,7 +571,7 @@ module stablecoin::treasury {
     /// Updates the CoinMetadata<T> object of the same type as the Treasury<T>.
     /// - Only callable by the metadata updater.
     /// - Only callable if the Treasury object is compatible with this package.
-    public entry fun update_metadata<T>(
+    public fun update_metadata<T>(
         treasury: &Treasury<T>,
         metadata: &mut CoinMetadata<T>,
         name: string::String,

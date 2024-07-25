@@ -14,6 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[test_only]
 module sui_extensions::upgrade_service_tests {
     use sui::{
         event,
