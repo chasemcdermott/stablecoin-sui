@@ -22,8 +22,10 @@ import {
   buildPackageHelper,
   deployPackageHelper,
   getEd25519KeypairFromPrivateKey,
+  getPublishedPackages,
   log,
-  writeJsonOutput
+  writeJsonOutput,
+  writePublishedAddressToPackageManifest
 } from "./helpers";
 
 /**
@@ -36,7 +38,8 @@ export async function deployCommand(
   rpcUrl: string,
   deployerKey: string,
   upgradeCapRecipient: string,
-  withUnpublishedDependencies = false
+  withUnpublishedDependencies = false,
+  writePackageId = false
 ) {
   const client = new SuiClient({ url: rpcUrl });
   log(`RPC URL: ${rpcUrl}`);
@@ -61,6 +64,18 @@ export async function deployCommand(
   });
 
   writeJsonOutput(`deploy-${packageName}`, transactionOutput);
+
+  if (writePackageId) {
+    const publishedPackageIds = getPublishedPackages(transactionOutput);
+    if (publishedPackageIds.length != 1) {
+      throw new Error("Unexpected number of package IDs published");
+    }
+    writePublishedAddressToPackageManifest(
+      packageName,
+      publishedPackageIds[0].packageId
+    );
+  }
+
   log("Deploy process complete!");
   return transactionOutput;
 }
@@ -79,11 +94,17 @@ export default program
     "Deployer private key",
     process.env.DEPLOYER_PRIVATE_KEY
   )
+  .option(
+    "--write-package-id",
+    "Write the deployed package ID to the package manifest"
+  )
   .action((packageName, options) => {
     deployCommand(
       packageName, // package name
       options.rpcUrl,
       options.deployerKey,
-      options.upgradeCapRecipient
+      options.upgradeCapRecipient,
+      false, // with unpublished dependencies
+      options.writePackageId
     );
   });

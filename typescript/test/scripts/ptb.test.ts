@@ -16,34 +16,27 @@
  * limitations under the License.
  */
 
-import { CoinMetadata, SuiClient, SuiObjectChange } from "@mysten/sui/client";
+import { CoinMetadata, SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { strict as assert } from "assert";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
-import {
-  SuiObjectChangeCreated,
-  SuiObjectChangePublished
-} from "@mysten/sui/dist/cjs/client";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
+import { SuiTreasuryClient } from "../../scripts/helpers";
 
 describe("Test PTBs", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
   const client = new SuiClient({ url: RPC_URL });
+  let treasuryClient: SuiTreasuryClient;
 
   let deployerKeys: Ed25519Keypair;
   let upgraderKeys: Ed25519Keypair;
-
-  let PACKAGE_ID: string;
-  let TREASURY_OBJECT_ID: string;
-  let METADATA_OBJECT_ID: string;
-  let USDC_TYPE_ID: string;
 
   before("Deploy USDC", async () => {
     deployerKeys = await generateKeypairCommand(true);
     upgraderKeys = await generateKeypairCommand(false);
 
-    const { objectChanges } = await deployCommand(
+    const deployTxOutput = await deployCommand(
       "usdc",
       RPC_URL,
       deployerKeys.getSecretKey(),
@@ -51,25 +44,10 @@ describe("Test PTBs", () => {
       true // with unpublished dependencies
     );
 
-    const isPackage = (c: SuiObjectChange) => c.type === "published";
-    const published = objectChanges?.filter(isPackage) || [];
-    assert.equal(published.length, 1);
-    PACKAGE_ID = (published[0] as SuiObjectChangePublished).packageId;
-    USDC_TYPE_ID = `${PACKAGE_ID}::usdc::USDC`;
-
-    const isTreasury = (c: SuiObjectChange) =>
-      c.type === "created" &&
-      c.objectType.includes(`treasury::Treasury<${USDC_TYPE_ID}>`);
-    const treasury = objectChanges?.filter(isTreasury) || [];
-    assert.equal(treasury.length, 1);
-    TREASURY_OBJECT_ID = (treasury[0] as SuiObjectChangeCreated).objectId;
-
-    const isMetadata = (c: SuiObjectChange) =>
-      c.type === "created" &&
-      c.objectType.includes(`coin::CoinMetadata<${USDC_TYPE_ID}>`);
-    const metadata = objectChanges?.filter(isMetadata) || [];
-    assert.equal(metadata.length, 1);
-    METADATA_OBJECT_ID = (metadata[0] as SuiObjectChangeCreated).objectId;
+    treasuryClient = SuiTreasuryClient.buildFromDeployment(
+      client,
+      deployTxOutput
+    );
   });
 
   it("Builds and submits a PTB successfully", async () => {
@@ -78,18 +56,50 @@ describe("Test PTBs", () => {
     const new_desc = "new description";
     const new_icon = "new icon url";
 
-    // Build a PTB to update metadata
+    await treasuryClient.updateMetadata(
+      deployerKeys,
+      new_name,
+      new_symbol,
+      new_desc,
+      new_icon
+    );
+
+    // Assert that metadata object was updated
+    const maybeMetadata = await client.getCoinMetadata({
+      coinType: treasuryClient.coinOtwType
+    });
+    assert.notEqual(maybeMetadata, null);
+
+    const metadata = maybeMetadata as CoinMetadata;
+    assert.equal(metadata.decimals, 6);
+    assert.equal(metadata.name, new_name);
+    assert.equal(metadata.symbol, new_symbol);
+    assert.equal(metadata.description, new_desc);
+    assert.equal(metadata.iconUrl, new_icon);
+  });
+
+  it("Builds and submits a PTB to update roles via entry functions", async () => {
+    const deployerAddress = deployerKeys.getPublicKey().toSuiAddress();
+    const newAddress = (await generateKeypairCommand(false))
+      .getPublicKey()
+      .toSuiAddress();
+
+    // Build a PTB to update some roles
     const txb = new Transaction();
     txb.moveCall({
-      target: `${PACKAGE_ID}::treasury::update_metadata`,
-      typeArguments: [USDC_TYPE_ID],
+      target: `${treasuryClient.stablecoinPackageId}::entry::update_blocklister`,
+      typeArguments: [treasuryClient.coinOtwType],
       arguments: [
-        txb.object(TREASURY_OBJECT_ID),
-        txb.object(METADATA_OBJECT_ID),
-        txb.pure.string(new_name),
-        txb.pure.string(new_symbol),
-        txb.pure.string(new_desc),
-        txb.pure.string(new_icon)
+        txb.object(treasuryClient.treasuryObjectId),
+        txb.pure.address(newAddress)
+      ]
+    });
+    txb.moveCall({
+      target: `${treasuryClient.stablecoinPackageId}::entry::update_pauser`,
+      typeArguments: [treasuryClient.coinOtwType],
+      arguments: [
+        txb.object(treasuryClient.treasuryObjectId),
+        txb.pure.address(newAddress)
       ]
     });
 
@@ -113,104 +123,12 @@ describe("Test PTBs", () => {
       digest: result.digest
     });
 
-    // Assert that metadata object was updated
-    const maybeMetadata = await client.getCoinMetadata({
-      coinType: USDC_TYPE_ID
-    });
-    assert.notEqual(maybeMetadata, null);
-
-    const metadata = maybeMetadata as CoinMetadata;
-    assert.equal(metadata.decimals, 6);
-    assert.equal(metadata.name, new_name);
-    assert.equal(metadata.symbol, new_symbol);
-    assert.equal(metadata.description, new_desc);
-    assert.equal(metadata.iconUrl, new_icon);
-  });
-
-  it("Builds and submits a PTB to update roles via entry functions", async () => {
-    const deployerAddress = deployerKeys.getPublicKey().toSuiAddress();
-    const newAddress = (await generateKeypairCommand(false))
-      .getPublicKey()
-      .toSuiAddress();
-
-    // Build a PTB to update some roles
-    const txb = new Transaction();
-    txb.moveCall({
-      target: `${PACKAGE_ID}::entry::update_blocklister`,
-      typeArguments: [USDC_TYPE_ID],
-      arguments: [txb.object(TREASURY_OBJECT_ID), txb.pure.address(newAddress)]
-    });
-    txb.moveCall({
-      target: `${PACKAGE_ID}::entry::update_pauser`,
-      typeArguments: [USDC_TYPE_ID],
-      arguments: [txb.object(TREASURY_OBJECT_ID), txb.pure.address(newAddress)]
-    });
-
-    // Sign and submit transaction, assert success
-    const result = await client.signAndExecuteTransaction({
-      signer: deployerKeys,
-      transaction: txb,
-      options: {
-        showBalanceChanges: true,
-        showEffects: true,
-        showEvents: true,
-        showInput: true,
-        showObjectChanges: true,
-        showRawInput: true
-      }
-    });
-    assert.equal(result.effects?.status.status, "success");
-
-    // Wait for the transaction to be available over API
-    await client.waitForTransaction({
-      digest: result.digest
-    });
-
     // Assert that roles were updated
-    const roles = await getRoles();
+    const roles = await treasuryClient.getRoles();
     assert.equal(roles.owner, deployerAddress);
     assert.equal(roles.masterMinter, deployerAddress);
     assert.equal(roles.blocklister, newAddress);
     assert.equal(roles.pauser, newAddress);
     assert.equal(roles.metadataUpdater, deployerAddress);
   });
-
-  const getRoles = async () => {
-    const treasury = await client.getObject({
-      id: TREASURY_OBJECT_ID,
-      options: {
-        showContent: true
-      }
-    });
-    assert.equal(treasury.data?.content?.dataType, "moveObject");
-
-    const treasuryFields = treasury.data.content.fields as any;
-    const roleFields = treasuryFields.roles.fields;
-    const bagId = roleFields.data.fields.id.id;
-
-    const getBagObjectFields = async (keyType: string) => {
-      let dfo = await client.getDynamicFieldObject({
-        parentId: bagId,
-        name: {
-          type: keyType,
-          value: { dummy_field: false }
-      }});
-      assert.equal(dfo.data?.content?.dataType, 'moveObject');
-      return (dfo.data.content.fields as any);
-    };
-
-    const ownerFields = await getBagObjectFields(`${PACKAGE_ID}::roles::OwnerKey`);
-    const masterMinterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::MasterMinterKey`);
-    const blocklisterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::BlocklisterKey`);
-    const pauserFields = await getBagObjectFields(`${PACKAGE_ID}::roles::PauserKey`);
-    const metadataUpdaterFields = await getBagObjectFields(`${PACKAGE_ID}::roles::MetadataUpdaterKey`);
-    return {
-      owner: ownerFields.value.fields.active_address,
-      pendingOwner: ownerFields.value.fields.pending_address,
-      masterMinter: masterMinterFields.value,
-      blocklister: blocklisterFields.value,
-      pauser: pauserFields.value,
-      metadataUpdater: metadataUpdaterFields.value,
-    }
-  }
 });

@@ -17,7 +17,12 @@
  */
 
 import { BcsType } from "@mysten/sui/bcs";
-import { SuiClient, SuiTransactionBlockResponse } from "@mysten/sui/client";
+import {
+  SuiClient,
+  SuiObjectChangeCreated,
+  SuiObjectChangePublished,
+  SuiTransactionBlockResponse
+} from "@mysten/sui/client";
 import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
@@ -27,6 +32,10 @@ import fs from "fs";
 import path from "path";
 import readline from "readline/promises";
 import util from "util";
+
+export { default as SuiTreasuryClient } from "./treasuryClient";
+
+export const DENY_LIST_OBJECT_ID = "0x403";
 
 export class TransactionError extends Error {
   transactionOutput: SuiTransactionBlockResponse;
@@ -83,7 +92,7 @@ export async function waitForUserConfirmation() {
 export function writeJsonOutput(filePrefix: string, output: Record<any, any>) {
   if (process.env.NODE_ENV !== "TESTING") {
     const randomString = new Date().getTime().toString();
-    const outputDirectory = path.join(__dirname, "../logs/");
+    const outputDirectory = path.join(__dirname, "../../logs/");
     const outputFilepath = path.join(
       outputDirectory,
       `${filePrefix}-${randomString}.json`
@@ -93,6 +102,12 @@ export function writeJsonOutput(filePrefix: string, output: Record<any, any>) {
 
     log(`Logs written to ${outputFilepath}`);
   }
+}
+
+export function readTransactionOutput(
+  jsonFilePath: string
+): SuiTransactionBlockResponse {
+  return JSON.parse(fs.readFileSync(jsonFilePath, "utf-8"));
 }
 
 // Turn private key into keypair format
@@ -113,7 +128,7 @@ export function buildPackageHelper(args: {
 } {
   const packagePath = path.join(
     __dirname,
-    `../../packages/${args.packageName}`
+    `../../../packages/${args.packageName}`
   );
   const withUnpublishedDependenciesArg = !!args.withUnpublishedDependencies
     ? "--with-unpublished-dependencies"
@@ -123,6 +138,62 @@ export function buildPackageHelper(args: {
     { encoding: "utf-8" }
   );
   return JSON.parse(rawCompiledPackages);
+}
+
+export function writePublishedAddressToPackageManifest(
+  packageName: string,
+  address: string
+) {
+  const moveTomlFilepath = getMoveTomlFilepath(packageName);
+  let existingContent = fs.readFileSync(moveTomlFilepath, "utf-8");
+
+  // Add published-at field.
+  existingContent = existingContent.replace(
+    "[package]",
+    `[package]\npublished-at = "${address}"`
+  );
+
+  // Set package alias to address.
+  existingContent = existingContent.replace(
+    `${packageName} = "0x0"`,
+    `${packageName} = "${address}"`
+  );
+
+  fs.writeFileSync(moveTomlFilepath, existingContent);
+
+  // Run a build to update the Move.lock file.
+  buildPackageHelper({ packageName, withUnpublishedDependencies: false });
+}
+
+export function resetPublishedAddressInPackageManifest(packageName: string) {
+  const moveTomlFilepath = getMoveTomlFilepath(packageName);
+  let existingContent = fs.readFileSync(moveTomlFilepath, "utf-8");
+
+  // Remove published-at field.
+  existingContent = existingContent.replace(/\npublished-at.*\w{66}.*/, "");
+
+  // Reset package alias to 0x0.
+  existingContent = existingContent.replace(
+    new RegExp(`\\n${packageName}.*\\w{66}.*`),
+    `\n${packageName} = "0x0"`
+  );
+
+  fs.writeFileSync(moveTomlFilepath, existingContent);
+
+  // Run a build to update the Move.lock file.
+  buildPackageHelper({ packageName, withUnpublishedDependencies: false });
+}
+
+function getMoveTomlFilepath(packageName: string) {
+  return path.join(
+    __dirname,
+    "..",
+    "..",
+    "..",
+    "packages",
+    packageName,
+    "Move.toml"
+  );
 }
 
 export async function deployPackageHelper(args: {
@@ -224,4 +295,27 @@ export async function callViewFunction<T, Input = T>(args: {
   );
 
   return decodedResults;
+}
+
+export function getCreatedObjects(
+  txOutput: SuiTransactionBlockResponse,
+  objectType?: RegExp | string
+) {
+  let createdObjects = txOutput.objectChanges?.filter(
+    (c): c is SuiObjectChangeCreated => c.type === "created"
+  );
+  if (objectType) {
+    createdObjects = createdObjects?.filter((c) =>
+      c.objectType.match(objectType)
+    );
+  }
+  return createdObjects || [];
+}
+
+export function getPublishedPackages(txOutput: SuiTransactionBlockResponse) {
+  return (
+    txOutput.objectChanges?.filter(
+      (c): c is SuiObjectChangePublished => c.type === "published"
+    ) || []
+  );
 }

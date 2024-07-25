@@ -29,7 +29,7 @@ import { depositUpgradeCapCommand } from "../../scripts/depositUpgradeCap";
 import {
   resetPublishedAddressInPackageManifest,
   writePublishedAddressToPackageManifest
-} from "../utils";
+} from "../../scripts/helpers";
 
 describe("Test deposit-upgrade-cap script", () => {
   const RPC_URL = process.env.RPC_URL as string;

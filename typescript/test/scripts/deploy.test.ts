@@ -27,7 +27,7 @@ import {
 import {
   resetPublishedAddressInPackageManifest,
   writePublishedAddressToPackageManifest
-} from "../utils";
+} from "../../scripts/helpers";
 
 describe("Test deploy script", () => {
   let deployerKeys: Ed25519Keypair;
