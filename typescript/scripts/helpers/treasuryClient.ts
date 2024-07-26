@@ -145,7 +145,7 @@ export default class SuiTreasuryClient {
     });
   }
 
-  async setMintAllowance(controller: Ed25519Keypair, mintAllowance: number) {
+  async setMintAllowance(controller: Ed25519Keypair, mintAllowance: bigint) {
     const txb = new Transaction();
     txb.moveCall({
       target: `${this.stablecoinPackageId}::treasury::configure_minter`,
@@ -280,7 +280,7 @@ export default class SuiTreasuryClient {
       transaction: getAllowanceTx,
       returnTypes: [bcs.U64]
     });
-    return Number(allowance);
+    return BigInt(allowance);
   }
 
   async getMintCapId(

@@ -56,13 +56,12 @@ describe("Test configure minter script", () => {
 
     const finalControllerKeys = await generateKeypairCommand({ prefund: true });
     const minterKeys = await generateKeypairCommand({ prefund: false });
-    const initialAllowance = 12345;
     await testConfigureMinter({
       treasuryClient,
       masterMinter: deployerKeys,
       tempController: deployerKeys,
       minter: minterKeys,
-      mintAllowanceInDollars: initialAllowance,
+      mintAllowanceInDollars: BigInt(18446744073709),
       finalController: finalControllerKeys
     });
     currentControllerKeys = finalControllerKeys;
@@ -78,7 +77,7 @@ describe("Test configure minter script", () => {
           masterMinter: deployerKeys,
           tempController: randomKeys,
           minter: currentMinter,
-          mintAllowanceInDollars: 12345,
+          mintAllowanceInDollars: BigInt(18446744073709),
           finalController: currentControllerKeys
         }),
       (err: any) => {
@@ -97,7 +96,7 @@ describe("Test configure minter script", () => {
           masterMinter: randomKeys,
           tempController: randomKeys,
           minter: currentMinter,
-          mintAllowanceInDollars: 12345,
+          mintAllowanceInDollars: BigInt(18446744073709),
           finalController: randomKeys
         }),
       (err: any) => {
@@ -116,7 +115,7 @@ describe("Test configure minter script", () => {
           masterMinter: deployerKeys,
           tempController: currentControllerKeys,
           minter: randomKeys,
-          mintAllowanceInDollars: 12345,
+          mintAllowanceInDollars: BigInt(18446744073709),
           finalController: randomKeys
         }),
       (err: any) => {
@@ -137,7 +136,7 @@ describe("Test configure minter script", () => {
       masterMinter: deployerKeys,
       tempController: currentControllerKeys,
       minter: currentMinter,
-      mintAllowanceInDollars: random(100_000_000, 200_000_000),
+      mintAllowanceInDollars: BigInt(random(100_000_000, 200_000_000)),
       finalController: newFinalController
     });
   });
@@ -148,7 +147,7 @@ async function testConfigureMinter(args: {
   masterMinter: Ed25519Keypair;
   tempController: Ed25519Keypair;
   minter: Ed25519Keypair;
-  mintAllowanceInDollars: number;
+  mintAllowanceInDollars: bigint;
   finalController: Ed25519Keypair;
 }) {
   let mintCapId = await configureMinterHelper(args.treasuryClient, {
@@ -172,7 +171,7 @@ async function testConfigureMinter(args: {
   assert.equal(mintCapOwner.address, args.minter.toSuiAddress());
 
   // assert that the mint allowance was correctly configured
-  const expectedAllowance = args.mintAllowanceInDollars * 10 ** USDC_DECIMALS;
+  const expectedAllowance = BigInt(args.mintAllowanceInDollars) * BigInt(10 ** USDC_DECIMALS);
   const allowance = await args.treasuryClient.getMintAllowance(mintCapId);
   assert.equal(allowance, expectedAllowance);
 

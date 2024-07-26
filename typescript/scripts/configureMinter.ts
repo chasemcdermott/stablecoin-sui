@@ -40,7 +40,7 @@ export async function configureMinterHelper(
     hotMasterMinterKey: string;
     tempControllerKey: string;
     minterAddress: string;
-    mintAllowanceInDollars: number;
+    mintAllowanceInDollars: bigint;
     finalControllerAddress: string;
   }
 ): Promise<string | undefined> {
@@ -132,7 +132,7 @@ export async function configureMinterHelper(
   // Check if the mint allowance has already been set. If so, continue to STEP 3.
   let skipSetMintAllowance = false;
   const decimals = (await treasuryClient.getMetadata()).decimals;
-  const mintAllowance = mintAllowanceInDollars * 10 ** decimals;
+  const mintAllowance = BigInt(mintAllowanceInDollars) * BigInt(10 ** decimals);
   const currentMintAllowance = await treasuryClient.getMintAllowance(mintCapId);
   if (currentMintAllowance == mintAllowance) {
     log(
@@ -200,7 +200,7 @@ export default program
     "The address of the minter to be configured"
   )
   .requiredOption(
-    "--mint-allowance <number>",
+    "--mint-allowance-in-dollars <bigint>",
     "The mint allowance to set, in whole units (Dollars, Euros, etc). E.g 1000 = $1,000.00"
   )
   .requiredOption(
