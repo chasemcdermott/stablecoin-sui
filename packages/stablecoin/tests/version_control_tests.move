@@ -45,4 +45,15 @@ module stablecoin::version_control_tests {
             compatible_versions
         )
     }
+
+    #[test, expected_failure(abort_code = version_control::EIncompatibleVersion)]
+    fun assert_object_version_is_compatible_with_package__should_fail_if_none_of_multiple_compatible_versions() {
+        let mut compatible_versions: VecSet<u64> = vec_set::empty();
+        compatible_versions.insert(version_control::current_version() + 1);
+        compatible_versions.insert(version_control::current_version() + 2);
+
+        version_control::assert_object_version_is_compatible_with_package(
+            compatible_versions
+        )
+    }
 }

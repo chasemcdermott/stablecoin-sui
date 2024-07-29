@@ -35,6 +35,9 @@ module stablecoin::mint_allowance_tests {
         allowance.set(5);
         assert_eq(allowance.value(), 5);
 
+        allowance.increase(3);
+        assert_eq(allowance.value(), 8);
+
         allowance.destroy();
     }
 
@@ -54,6 +57,23 @@ module stablecoin::mint_allowance_tests {
         assert_eq(allowance.value(), 0);
 
         allowance.decrease(1);
+        allowance.destroy();
+    }
+
+    #[test]
+    fun increase_decrease__should_succeed_if_value_is_zero() {
+        let mut allowance = mint_allowance::new<MINT_ALLOWANCE_TESTS>();
+        assert_eq(allowance.value(), 0);
+
+        allowance.set(100);
+        assert_eq(allowance.value(), 100);
+
+        allowance.decrease(0);
+        assert_eq(allowance.value(), 100);
+
+        allowance.increase(0);
+        assert_eq(allowance.value(), 100);
+
         allowance.destroy();
     }
 }

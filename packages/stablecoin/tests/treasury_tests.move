@@ -47,6 +47,8 @@ module stablecoin::treasury_tests {
 
     const RANDOM_ADDRESS: address = @0x1000;
     const RANDOM_ADDRESS_2: address = @0x1001;
+    const RANDOM_ADDRESS_3: address = @0x1002;
+    const RANDOM_ADDRESS_4: address = @0x1003;
 
     public struct TREASURY_TESTS has drop {}
 
@@ -165,6 +167,30 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMasterMinter)]
+    fun configure_new_controller__should_fail_if_caller_is_not_master_minter() {
+        let mut scenario = setup();
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        test_configure_new_controller(CONTROLLER, RANDOM_ADDRESS_2, &mut scenario); 
+
+        scenario.end();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EControllerAlreadyConfigured)]
+    fun configure_new_controller__should_fail_with_existing_controller() {
+        let mut scenario = setup();
+
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, RANDOM_ADDRESS_2, &mut scenario);
+
+        // Configure the same controller - expect failure
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, RANDOM_ADDRESS_2, &mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotController)]
     fun remove_controller__should_fail_with_non_controller() {
         let mut scenario = setup();
@@ -215,7 +241,7 @@ module stablecoin::treasury_tests {
     fun configure_minter__should_fail_when_paused() {
         let mut scenario = setup();
 
-        scenario.next_tx(OWNER); 
+        scenario.next_tx(PAUSER); 
         test_pause(&mut scenario);
 
         scenario.next_tx(CONTROLLER); 
@@ -244,7 +270,7 @@ module stablecoin::treasury_tests {
     fun increment_mint_allowance__should_fail_when_paused() {
         let mut scenario = setup();
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(PAUSER);
         test_pause(&mut scenario);
 
         scenario.next_tx(CONTROLLER);
@@ -363,6 +389,22 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test, expected_failure(abort_code = ::stablecoin::treasury::EInsufficientAllowance)]
+    fun mint__should_fail_if_exceed_allowance_non_zero() {
+        let mut scenario = setup();
+
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_configure_minter(900000, &mut scenario);
+
+        scenario.next_tx(MINTER);
+        test_mint(1000000, MINT_RECIPIENT, &mut scenario);
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::EDeniedAddress)]
     fun mint__should_fail_from_denylisted_sender() {
         let mut scenario = setup();
@@ -373,7 +415,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(CONTROLLER);
         test_configure_minter(0, &mut scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(MINTER, &mut scenario);
 
         scenario.next_tx(MINTER);
@@ -392,7 +434,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(CONTROLLER);
         test_configure_minter(0, &mut scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(MINT_RECIPIENT, &mut scenario);
 
         scenario.next_tx(MINTER);
@@ -452,7 +494,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(CONTROLLER);
         test_configure_minter(0, &mut scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(PAUSER);
         test_pause(&mut scenario);
 
         scenario.next_tx(MINTER);
@@ -474,7 +516,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(MINTER);
         test_mint(1000000, MINTER, &mut scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(MINTER, &mut scenario);
 
         scenario.next_tx(MINTER);
@@ -516,7 +558,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(MINTER);
         test_mint(1000000, MINTER, &mut scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(PAUSER);
         test_pause(&mut scenario);
 
         scenario.next_tx(MINTER);
@@ -566,7 +608,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(RANDOM_ADDRESS);
         remove_deny_cap(&scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.end();
@@ -577,7 +619,7 @@ module stablecoin::treasury_tests {
         let mut scenario = setup();
 
         // Blocklister blocklists an address.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.next_epoch(RANDOM_ADDRESS);
@@ -591,11 +633,11 @@ module stablecoin::treasury_tests {
         let mut scenario = setup();
 
         // Blocklister blocklists an address.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         // Blocklisting the same address keeps the address in the blocklisted state.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.next_epoch(RANDOM_ADDRESS);
@@ -609,7 +651,7 @@ module stablecoin::treasury_tests {
         let mut scenario = setup();
 
         // Blocklister blocklists an address.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         // Some random address tries to unblocklist the address, should fail.
@@ -623,13 +665,13 @@ module stablecoin::treasury_tests {
     fun unblocklist__should_fail_when_deny_cap_is_missing() {
         let mut scenario = setup();
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.next_tx(RANDOM_ADDRESS);
         remove_deny_cap(&scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.end();
@@ -640,11 +682,11 @@ module stablecoin::treasury_tests {
         let mut scenario = setup();
 
         // Blocklister blocklists an address.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         // Blocklister unblocklists the address.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         // Fast forward to next epoch, check blocklist state
@@ -659,15 +701,15 @@ module stablecoin::treasury_tests {
         let mut scenario = setup();
 
         // Blocklister blocklists an address.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_blocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         // Blocklister unblocklists the address.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         // Unblocklisting the same address keeps the address in the unblocklisted state.
-        scenario.next_tx(OWNER);
+        scenario.next_tx(BLOCKLISTER);
         test_unblocklist(RANDOM_ADDRESS_2, &mut scenario);
 
         // Fast forward to next epoch, check blocklist state
@@ -690,16 +732,16 @@ module stablecoin::treasury_tests {
 
         // use the DEPLOYER address to modify the master minter, blocklister, pauser, and metadata updater
         scenario.next_tx(DEPLOYER);
-        test_update_master_minter(MASTER_MINTER, &mut scenario);
+        test_update_master_minter(RANDOM_ADDRESS, &mut scenario);
 
         scenario.next_tx(DEPLOYER);
-        test_update_blocklister(BLOCKLISTER, &mut scenario);
+        test_update_blocklister(RANDOM_ADDRESS_2, &mut scenario);
 
         scenario.next_tx(DEPLOYER);
-        test_update_pauser(PAUSER, &mut scenario);
+        test_update_pauser(RANDOM_ADDRESS_3, &mut scenario);
 
         scenario.next_tx(DEPLOYER);
-        test_update_metadata_updater(METADATA_UPDATER, &mut scenario);
+        test_update_metadata_updater(RANDOM_ADDRESS_4, &mut scenario);
 
         scenario.end();
     }
@@ -708,7 +750,7 @@ module stablecoin::treasury_tests {
     fun update_metadata__should_succeed_and_pass_all_assertions() {
         let mut scenario = setup();
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(METADATA_UPDATER);
         test_update_metadata(
             string::utf8(b"new name"),
             ascii::string(b"new symbol"),
@@ -718,7 +760,7 @@ module stablecoin::treasury_tests {
         );
 
         // try to unset the URL
-        scenario.next_tx(OWNER);
+        scenario.next_tx(METADATA_UPDATER);
         test_update_metadata(
             string::utf8(b"new name"),
             ascii::string(b"new symbol"),
@@ -753,7 +795,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(RANDOM_ADDRESS);
         remove_treasury_cap(&scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(METADATA_UPDATER);
         test_update_metadata(
             string::utf8(b"new name"),
             ascii::string(b"new symbol"),
@@ -782,7 +824,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(RANDOM_ADDRESS);
         remove_deny_cap(&scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(PAUSER);
         test_pause(&mut scenario);
 
         scenario.end();
@@ -840,7 +882,7 @@ module stablecoin::treasury_tests {
         scenario.next_tx(RANDOM_ADDRESS);
         remove_deny_cap(&scenario);
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(PAUSER);
         test_unpause(&mut scenario);
 
         scenario.end();
@@ -850,10 +892,10 @@ module stablecoin::treasury_tests {
     fun unpause__should_succeed() {
         let mut scenario = setup();
 
-        scenario.next_tx(OWNER);
+        scenario.next_tx(PAUSER);
         test_pause(&mut scenario);
         
-        scenario.next_tx(OWNER);
+        scenario.next_tx(PAUSER);
         test_unpause(&mut scenario);
 
         scenario.next_epoch(RANDOM_ADDRESS);
@@ -964,6 +1006,13 @@ module stablecoin::treasury_tests {
     fun configure_controller__should_fail_if_treasury_object_is_incompatible() {
         let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
         treasury.configure_controller(RANDOM_ADDRESS, object::id_from_address(RANDOM_ADDRESS_2), scenario.ctx());
+        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
+    fun configure_new_controller__should_fail_if_treasury_object_is_incompatible() {
+        let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
+        treasury.configure_new_controller(RANDOM_ADDRESS, RANDOM_ADDRESS_2, scenario.ctx());
         after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
     }
 
@@ -1138,9 +1187,9 @@ module stablecoin::treasury_tests {
                 deny_cap,
                 OWNER,
                 MASTER_MINTER,
-                OWNER,
-                OWNER,
-                OWNER,
+                BLOCKLISTER,
+                PAUSER,
+                METADATA_UPDATER,
                 scenario.ctx()
             );
             assert_eq(treasury.total_supply(), 0);
@@ -1148,9 +1197,9 @@ module stablecoin::treasury_tests {
             assert_eq(treasury.get_mint_allowances_for_testing().length(), 0);
             assert_eq(treasury.roles().owner(), OWNER);
             assert_eq(treasury.roles().master_minter(), MASTER_MINTER);
-            assert_eq(treasury.roles().blocklister(), OWNER);
-            assert_eq(treasury.roles().pauser(), OWNER);
-            assert_eq(treasury.roles().metadata_updater(), OWNER);
+            assert_eq(treasury.roles().blocklister(), BLOCKLISTER);
+            assert_eq(treasury.roles().pauser(), PAUSER);
+            assert_eq(treasury.roles().metadata_updater(), METADATA_UPDATER);
             assert_eq(treasury.compatible_versions(), vector[version_control::current_version()]);
             treasury.assert_treasury_cap_exists();
             treasury.assert_deny_cap_exists();
