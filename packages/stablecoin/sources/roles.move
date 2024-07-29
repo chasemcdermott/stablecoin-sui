@@ -15,232 +15,198 @@
 // limitations under the License.
 
 module stablecoin::roles {
+    use sui::bag::{Self, Bag};
     use sui::event;
-
-    // === Errors ===
-
-    const ENotOwner: u64 = 0;
-    const EPendingOwnerNotSet: u64 = 1;
-    const ENotPendingOwner: u64 = 2;
-    const ESamePendingOwner: u64 = 3;
-    const ESameBlocklister: u64 = 4;
-    const ESamePauser: u64 = 5;
-    const ENotAdmin: u64 = 6;
-    const EPendingAdminNotSet: u64 = 7;
-    const ENotPendingAdmin: u64 = 8;
-    const ESamePendingAdmin: u64 = 9;
-    const ESameMetadataUpdater: u64 = 10;
+    use sui_extensions::two_step_role::{Self, TwoStepRole};
 
     // === Structs ===
 
-    public struct Roles has store {
-        /// Mutable address of the treasury admin EOA
-        admin: address,
-        /// Mutable address of the pending treasury admin EOA
-        pending_admin: Option<address>,
-        /// Mutable address of the owner EOA
-        owner: address,
-        /// Mutable address of the pending owner EOA
-        pending_owner: Option<address>,
-        /// Mutable address of the blocklister EOA, controlled by owner
-        blocklister: address,
-        /// Mutable address of the pauser EOA, controlled by owner
-        pauser: address,
-        /// Mutable address of the metadata updater EOA, controlled by the owner
-        metadata_updater: address,
+    public struct Roles<phantom T> has store {
+        /// A bag that maintains the mapping of privileged roles and their addresses.
+        /// Keys are structs that are suffixed with _Key.
+        /// Values are either addresses or objects containing more complex logic.
+        data: Bag
     }
+
+    /// Type used to specify which TwoStepRole the owner role corresponds to.
+    public struct OwnerRole<phantom T> {}
+
+    /// Key used to map to the mutable TwoStepRole of the owner EOA
+    public struct OwnerKey {} has copy, store, drop;
+    /// Key used to map to the mutable address of the master minter EOA, controlled by owner
+    public struct MasterMinterKey {} has copy, store, drop;
+    /// Key used to map to the address of the blocklister EOA, controlled by owner
+    public struct BlocklisterKey {} has copy, store, drop;
+    /// Key used to map to the address of the pauser EOA, controlled by owner
+    public struct PauserKey {} has copy, store, drop;
+    /// Key used to map to the address of the metadata updater EOA, controlled by owner
+    public struct MetadataUpdaterKey {} has copy, store, drop;
 
     // === Events ===
 
-    public struct TreasuryAdminTransferStarted has copy, drop {
-        old_admin: address,
-        new_admin: address,
+    public struct MasterMinterChanged<phantom T> has copy, drop {
+        old_master_minter: address,
+        new_master_minter: address,
     }
 
-    public struct TreasuryAdminChanged has copy, drop {
-        old_admin: address,
-        new_admin: address,
-    }
-
-    public struct OwnershipTransferStarted has copy, drop {
-        old_owner: address,
-        new_owner: address,
-    }
-
-    public struct OwnershipTransferred has copy, drop {
-        old_owner: address,
-        new_owner: address,
-    }
-
-    public struct BlocklisterChanged has copy, drop {
+    public struct BlocklisterChanged<phantom T> has copy, drop {
         old_blocklister: address,
         new_blocklister: address,
     }
 
-    public struct PauserChanged has copy, drop {
+    public struct PauserChanged<phantom T> has copy, drop {
         old_pauser: address,
         new_pauser: address,
     }
 
-    public struct MetadataUpdaterChanged has copy, drop {
+    public struct MetadataUpdaterChanged<phantom T> has copy, drop {
         old_metadata_updater: address,
         new_metadata_updater: address,
     }
 
     // === View-only functions ===
 
-    /// Check the treasury admin address
-    public fun admin(roles: &Roles): address {
-        roles.admin
+    /// [Package private] Gets a mutable reference to the owner's TwoStepRole object.
+    public(package) fun owner_role_mut<T>(roles: &mut Roles<T>): &mut TwoStepRole<OwnerRole<T>> {
+        roles.data.borrow_mut(OwnerKey {})
     }
 
-    /// Check the treasury pending admin address
-    public fun pending_admin(roles: &Roles): Option<address> {
-        roles.pending_admin
+    /// [Package private] Gets an immutable reference to the owner's TwoStepRole object.
+    public(package) fun owner_role<T>(roles: &Roles<T>): &TwoStepRole<OwnerRole<T>> {
+        roles.data.borrow(OwnerKey {})
+    }
+    
+    /// Gets the current owner address.
+    public fun owner<T>(roles: &Roles<T>): address {
+        roles.owner_role().active_address()
     }
 
-    /// Check the owner address
-    public fun owner(roles: &Roles): address {
-        roles.owner
+    /// Gets the pending owner address.
+    public fun pending_owner<T>(roles: &Roles<T>): Option<address> {
+        roles.owner_role().pending_address()
     }
 
-    /// Check the pending owner address
-    public fun pending_owner(roles: &Roles): Option<address> {
-        roles.pending_owner
+    /// Gets the master minter address.
+    public fun master_minter<T>(roles: &Roles<T>): address {
+        *roles.data.borrow(MasterMinterKey {})
     }
 
-    /// Check the blocklister address
-    public fun blocklister(roles: &Roles): address {
-        roles.blocklister
+    /// Gets the blocklister address.
+    public fun blocklister<T>(roles: &Roles<T>): address {
+        *roles.data.borrow(BlocklisterKey {})
     }
 
-    /// Check the pauser address
-    public fun pauser(roles: &Roles): address {
-        roles.pauser
+    /// Gets the pauser address.
+    public fun pauser<T>(roles: &Roles<T>): address {
+        *roles.data.borrow(PauserKey {})
     }
 
-    /// Check the metadata updater address
-    public fun metadata_updater(roles: &Roles): address {
-        roles.metadata_updater
+    /// Gets the metadata updater address.
+    public fun metadata_updater<T>(roles: &Roles<T>): address {
+        *roles.data.borrow(MetadataUpdaterKey {})
     }
 
     // === Write functions ===
 
-    public(package) fun create_roles(
-        admin: address,
+    /// [Package private] Creates and initializes a Roles object.
+    public(package) fun new<T>(
         owner: address, 
+        master_minter: address,
         blocklister: address, 
         pauser: address,
         metadata_updater: address,
-    ): Roles {
-
+        ctx: &mut TxContext,
+    ): Roles<T> {
+        let mut data = bag::new(ctx);
+        data.add(OwnerKey {}, two_step_role::new<OwnerRole<T>>(owner));
+        data.add(MasterMinterKey {}, master_minter);
+        data.add(BlocklisterKey {}, blocklister);
+        data.add(PauserKey {}, pauser);
+        data.add(MetadataUpdaterKey {}, metadata_updater);
         Roles {
-            admin,
-            pending_admin: option::none(),
-            owner,
-            pending_owner: option::none(),
-            blocklister,
-            pauser,
-            metadata_updater,
+            data
         }
     }
 
-    /// Start treasury admin role transfer process.
-    public fun change_admin(
-        roles: &mut Roles,
-        new_admin: address,
-        ctx: &TxContext
-    ) {
-        assert!(roles.admin == ctx.sender(), ENotAdmin);
-        assert!(!roles.pending_admin.contains(&new_admin), ESamePendingAdmin);
+    /// [Package private] Change the master minter address.
+    /// - Only callable by the owner.
+    public(package) fun update_master_minter<T>(roles: &mut Roles<T>, new_master_minter: address, ctx: &TxContext) {
+        roles.owner_role().assert_sender_is_active_role(ctx);
 
-        roles.pending_admin = option::some(new_admin);
+        let old_master_minter = roles.update_address(MasterMinterKey {}, new_master_minter);
 
-        event::emit(TreasuryAdminTransferStarted {
-            old_admin: roles.admin,
-            new_admin,
+        event::emit(MasterMinterChanged<T> { 
+            old_master_minter, 
+            new_master_minter 
         });
     }
 
-    /// Finalize treasury admin role transfer process.
-    public fun accept_admin(
-        roles: &mut Roles,
-        ctx: &TxContext
-    ) {
-        let old_admin = roles.admin;
+    /// [Package private] Change the blocklister address.
+    /// - Only callable by the owner.
+    public(package) fun update_blocklister<T>(roles: &mut Roles<T>, new_blocklister: address, ctx: &TxContext) {
+        roles.owner_role().assert_sender_is_active_role(ctx);
 
-        assert!(roles.pending_admin.is_some(), EPendingAdminNotSet);
-        let new_admin = roles.pending_admin.extract();
+        let old_blocklister = roles.update_address(BlocklisterKey {}, new_blocklister);
 
-        assert!(new_admin == ctx.sender(), ENotPendingAdmin);
-        roles.admin = new_admin;
-
-        event::emit(TreasuryAdminChanged { old_admin, new_admin });
-    }
-
-    /// Start owner role transfer process.
-    public fun transfer_ownership(
-        roles: &mut Roles,
-        new_owner: address,
-        ctx: &TxContext
-    ) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
-        assert!(!roles.pending_owner.contains(&new_owner), ESamePendingOwner);
-
-        roles.pending_owner = option::some(new_owner);
-
-        event::emit(OwnershipTransferStarted {
-            old_owner: roles.owner,
-            new_owner,
+        event::emit(BlocklisterChanged<T> {
+            old_blocklister,
+            new_blocklister
         });
     }
 
-    /// Finalize owner role transfer process.
-    public fun accept_ownership(
-        roles: &mut Roles,
-        ctx: &TxContext
-    ) {
-        let old_owner = roles.owner;
+    /// [Package private] Change the pauser address.
+    /// - Only callable by the owner.
+    public(package) fun update_pauser<T>(roles: &mut Roles<T>, new_pauser: address, ctx: &TxContext) {
+        roles.owner_role().assert_sender_is_active_role(ctx);
 
-        assert!(roles.pending_owner.is_some(), EPendingOwnerNotSet);
-        let new_owner = roles.pending_owner.extract();
+        let old_pauser = roles.update_address(PauserKey {}, new_pauser);
 
-        assert!(new_owner == ctx.sender(), ENotPendingOwner);
-        roles.owner = new_owner;
-
-        event::emit(OwnershipTransferred { old_owner, new_owner });
+        event::emit(PauserChanged<T> {
+            old_pauser,
+            new_pauser
+        });
     }
 
-    /// Change the blocklister address.
-    public fun update_blocklister(roles: &mut Roles, new_blocklister: address, ctx: &TxContext) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
-        assert!(roles.blocklister != new_blocklister, ESameBlocklister);
+    /// [Package private] Change the metadata updater address.
+    /// - Only callable by the owner.
+    public(package) fun update_metadata_updater<T>(roles: &mut Roles<T>, new_metadata_updater: address, ctx: &TxContext) {
+        roles.owner_role().assert_sender_is_active_role(ctx);
 
-        let old_blocklister = roles.blocklister;
-        roles.blocklister = new_blocklister;
+        let old_metadata_updater = roles.update_address(MetadataUpdaterKey {}, new_metadata_updater);
 
-        event::emit(BlocklisterChanged { old_blocklister, new_blocklister });
+        event::emit(MetadataUpdaterChanged<T> {
+            old_metadata_updater,
+            new_metadata_updater
+        });
     }
 
-    /// Change the pauser address.
-    public fun update_pauser(roles: &mut Roles, new_pauser: address, ctx: &TxContext) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
-        assert!(roles.pauser != new_pauser, ESamePauser);
-
-        let old_pauser = roles.pauser;
-        roles.pauser = new_pauser;
-
-        event::emit(PauserChanged { old_pauser, new_pauser });
+    /// Updates an existing simple address role and returns the previously set address.
+    /// Fails if the key does not exist, or if the previously set value is not an address.
+    fun update_address<T, K: copy + drop + store>(roles: &mut Roles<T>, key: K, new_address: address): address {
+        let old_address = roles.data.remove(key);
+        roles.data.add(key, new_address);
+        old_address
     }
 
-    /// Change the metadata updater address.
-    public fun update_metadata_updater(roles: &mut Roles, new_metadata_updater: address, ctx: &TxContext) {
-        assert!(roles.owner == ctx.sender(), ENotOwner);
-        assert!(roles.metadata_updater != new_metadata_updater, ESameMetadataUpdater);
+    // === Test Only ===
 
-        let old_metadata_updater = roles.metadata_updater;
-        roles.metadata_updater = new_metadata_updater;
+    #[test_only]
+    public(package) fun create_master_minter_changed_event<T>(old_master_minter: address, new_master_minter: address): MasterMinterChanged<T> {
+        MasterMinterChanged { old_master_minter, new_master_minter }
+    }
 
-        event::emit(MetadataUpdaterChanged { old_metadata_updater, new_metadata_updater });
+    #[test_only]
+    public(package) fun create_blocklister_changed_event<T>(old_blocklister: address, new_blocklister: address): BlocklisterChanged<T> {
+        BlocklisterChanged { old_blocklister, new_blocklister }
+    }
+
+    #[test_only]
+    public(package) fun create_pauser_changed_event<T>(old_pauser: address, new_pauser: address): PauserChanged<T> {
+        PauserChanged { old_pauser, new_pauser }
+    }
+
+    #[test_only]
+    public(package) fun create_metadata_updater_changed_event<T>(old_metadata_updater: address, new_metadata_updater: address): MetadataUpdaterChanged<T> {
+        MetadataUpdaterChanged { old_metadata_updater, new_metadata_updater }
     }
 }

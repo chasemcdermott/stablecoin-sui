@@ -2,12 +2,10 @@
 
 [move]
 version = 2
-manifest_digest = "AE5CE533B5EF7A039B4A7AAD90E998CA2CF411A7BE25485903315C172D7803B1"
-deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
+manifest_digest = "517AABAEDA4C45F305B57681DB482E83067079E6AB688B73A2C70AFDC4025F9A"
+deps_digest = "F8BBB0CCB2491CA29A3DF03D6F92277A4F3574266507ACD77214D37ECA3F3082"
 dependencies = [
   { name = "Sui" },
-  { name = "stablecoin" },
-  { name = "sui_extensions" },
 ]
 
 [[move.package]]
@@ -20,23 +18,6 @@ source = { git = "https://github.com/MystenLabs/sui.git", rev = "afe6d2679a8fa39
 
 dependencies = [
   { name = "MoveStdlib" },
-]
-
-[[move.package]]
-name = "stablecoin"
-source = { local = "../stablecoin" }
-
-dependencies = [
-  { name = "Sui" },
-  { name = "sui_extensions" },
-]
-
-[[move.package]]
-name = "sui_extensions"
-source = { local = "../sui_extensions" }
-
-dependencies = [
-  { name = "Sui" },
 ]
 
 [move.toolchain-version]

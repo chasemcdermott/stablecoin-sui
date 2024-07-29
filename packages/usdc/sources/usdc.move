@@ -15,41 +15,60 @@
 // limitations under the License.
 
 module usdc::usdc {
-  use sui::coin;
-  use stablecoin::treasury;
+    use std::ascii::string;
+    use sui::coin;
+    use sui::url;
+    use stablecoin::treasury;
+    use sui_extensions::upgrade_service;
 
-  /// The One-Time Witness struct for the USDC coin.
-  public struct USDC has drop {}
+    /// The One-Time Witness struct for the USDC coin.
+    public struct USDC has drop {}
 
-  #[allow(lint(share_owned))]
-  fun init(witness: USDC, ctx: &mut TxContext) {
-    let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency(
-      witness,
-      6,               // decimals
-      b"USDC",         // symbol
-      b"USDC",         // name
-      b"",             // description
-      option::none(),  // icon url
-      ctx
-    );
+    // === Constants ===
 
-    let treasury = treasury::create_treasury(
-      treasury_cap, 
-      deny_cap,
-      ctx.sender(), // treasury admin
-      ctx.sender(), // owner
-      ctx.sender(), // blocklister
-      ctx.sender(), // pauser
-      ctx.sender(), // metadata updater
-      ctx
-    );
-    
-    transfer::public_share_object(metadata);
-    transfer::public_share_object(treasury);
-  }
+    const DESCRIPTION: vector<u8> = b"USDC is a US dollar-backed stablecoin issued by Circle. USDC is designed to provide a faster, safer, and more efficient way to send, spend, and exchange money around the world.";
+    const ICON_URL: vector<u8> = b"https://www.circle.com/hubfs/Brand/USDC/USDC_icon_32x32.png";
 
-  #[test_only]
-  public fun init_for_testing(ctx: &mut TxContext) {
-    init(USDC {}, ctx)
-  }
+    #[allow(lint(share_owned))]
+    /// Initializes
+    /// - A shared Treasury<USDC> object
+    /// - A shared UpgradeService<USDC> object
+    fun init(witness: USDC, ctx: &mut TxContext) {
+        let (upgrade_service, witness) = upgrade_service::new(
+            witness,
+            ctx.sender() /* admin */,
+            ctx
+        );
+
+        let (treasury_cap, deny_cap, metadata) = coin::create_regulated_currency_v2(
+            witness,
+            6,               // decimals
+            b"USDC",         // symbol
+            b"USDC",         // name
+            DESCRIPTION,
+            option::some(url::new_unsafe(string(ICON_URL))),
+            true,            // allow global pause
+            ctx
+        );
+
+        let treasury = treasury::new(
+            treasury_cap, 
+            deny_cap,
+            ctx.sender(), // owner
+            ctx.sender(), // master minter
+            ctx.sender(), // blocklister
+            ctx.sender(), // pauser
+            ctx.sender(), // metadata updater
+            ctx
+        );
+            
+        transfer::public_share_object(metadata);
+        transfer::public_share_object(treasury);
+        transfer::public_share_object(upgrade_service);
+    }
+
+    #[test_only]
+    public(package) fun init_for_testing(ctx: &mut TxContext) {
+        init(USDC {}, ctx)
+    }
 }

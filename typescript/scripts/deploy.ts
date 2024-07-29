@@ -17,100 +17,95 @@
  */
 
 import { SuiClient } from "@mysten/sui/client";
-import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
-import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { Transaction } from "@mysten/sui/transactions";
-import { execSync } from "child_process";
 import { program } from "commander";
-import "dotenv/config";
-import path from "path";
+import {
+  buildPackageHelper,
+  deployPackageHelper,
+  getEd25519KeypairFromPrivateKey,
+  getPublishedPackages,
+  log,
+  writeJsonOutput,
+  writePublishedAddressToPackageManifest
+} from "./helpers";
 
 /**
  * Deploys a package and transfers the package UpgradeCap to upgradeCapRecipient
  *
  * @returns Transaction output
  */
-export async function deploy(
+export async function deployCommand(
   packageName: string,
-  rpcUrl: string,
-  deployerKey: string,
-  upgradeCapRecipient: string,
-  withUnpublishedDependencies = false
+  options: {
+    rpcUrl: string;
+    deployerKey: string;
+    upgradeCapRecipient?: string;
+    withUnpublishedDependencies?: boolean;
+    makeImmutable?: boolean;
+    writePackageId?: boolean;
+  }
 ) {
-  const client = new SuiClient({ url: rpcUrl });
-  console.log(`RPC URL: ${rpcUrl}`);
+  const client = new SuiClient({ url: options.rpcUrl });
+  log(`RPC URL: ${options.rpcUrl}`);
 
-  // Turn private key into keypair format
-  // cuts off 1st byte as it signifies which signature type is used.
-  const deployer = Ed25519Keypair.fromSecretKey(
-    decodeSuiPrivateKey(deployerKey).secretKey
-  );
-  console.log(`Deployer: ${deployer.toSuiAddress()}`);
+  const deployer = getEd25519KeypairFromPrivateKey(options.deployerKey);
+  log(`Deployer: ${deployer.toSuiAddress()}`);
 
-  console.log("Building packages...");
-  const packagePath = path.join(__dirname, `../../packages/${packageName}`);
-  const withUnpublishedDependenciesArg = withUnpublishedDependencies
-    ? "--with-unpublished-dependencies"
-    : "";
-  const rawCompiledPackages = execSync(
-    `sui move build --dump-bytecode-as-base64 --path ${packagePath} ${withUnpublishedDependenciesArg}`,
-    { encoding: "utf-8" }
-  );
-  const { modules, dependencies } = JSON.parse(rawCompiledPackages);
+  log(`Building package '${packageName}'...`);
+  const { modules, dependencies } = buildPackageHelper({
+    packageName,
+    withUnpublishedDependencies: !!options.withUnpublishedDependencies
+  });
 
-  console.log("Deploying packages...");
-  const transaction = new Transaction();
-
-  // Command #1: Publish packages
-  const upgradeCap = transaction.publish({
+  log(`Deploying package '${packageName}'...`);
+  const transactionOutput = await deployPackageHelper({
+    client,
+    deployer,
     modules,
-    dependencies
+    dependencies,
+    upgradeCapRecipient: options.upgradeCapRecipient ?? null,
+    makeImmutable: !!options.makeImmutable
   });
 
-  // Command #2: Publish Transfer UpgradeCap
-  transaction.transferObjects([upgradeCap], upgradeCapRecipient);
+  writeJsonOutput(`deploy-${packageName}`, transactionOutput);
 
-  const transactionOutput = await client.signAndExecuteTransaction({
-    signer: deployer,
-    transaction,
-    options: {
-      showBalanceChanges: true,
-      showEffects: true,
-      showEvents: true,
-      showInput: true,
-      showObjectChanges: true,
-      showRawInput: false // too verbose
+  if (options.writePackageId) {
+    const publishedPackageIds = getPublishedPackages(transactionOutput);
+    if (publishedPackageIds.length != 1) {
+      throw new Error("Unexpected number of package IDs published");
     }
-  });
+    writePublishedAddressToPackageManifest(
+      packageName,
+      publishedPackageIds[0].packageId
+    );
+  }
 
-  console.log(transactionOutput);
-  console.log("Deploy process complete!");
+  log("Deploy process complete!");
   return transactionOutput;
 }
 
-program
-  .name("deploy")
+export default program
+  .createCommand("deploy")
   .description("Deploy a new Sui package")
   .argument("<package_name>", "Name of package to deploy")
-  .option("-r, --rpc-url <string>", "Network RPC URL", process.env.RPC_URL)
+  .requiredOption(
+    "-r, --rpc-url <string>",
+    "Network RPC URL",
+    process.env.RPC_URL
+  )
+  .option(
+    "--upgrade-cap-recipient <string>",
+    "The address that will receive the UpgradeCap, optional if --make-immutable is set"
+  )
+  .option("--make-immutable", "Destroys the UpgradeCap after deployment")
   .option(
     "--deployer-key <string>",
     "Deployer private key",
     process.env.DEPLOYER_PRIVATE_KEY
   )
   .option(
-    "--upgrade-cap-recipient <string>",
-    "The address that will receive the UpgradeCap"
+    "--write-package-id",
+    "Write the deployed package ID to the package manifest"
   )
   .action((packageName, options) => {
-    deploy(
-      packageName, // package name
-      options.rpcUrl,
-      options.deployerKey,
-      options.upgradeCapRecipient
-    );
+    deployCommand(packageName, options);
   });
-
-if (process.env.NODE_ENV !== "TESTING") {
-  program.parse();
-}

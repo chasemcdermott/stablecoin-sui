@@ -49,14 +49,19 @@ function test() {
 
 function start_network() {
   docker run -d \
-    -p 9001:6000 \
-    -p 9123:6123 \
+    -p 9001:7000 \
+    -p 9123:7123 \
     --name sui-network \
-    514563129364.dkr.ecr.us-east-1.amazonaws.com/blockchain/sui/sui:localnet-v1.26.0
+    124945441934.dkr.ecr.us-east-1.amazonaws.com/blockchain/sui/sui:devnet-afe6d26-v1.29.0
 }
 
 function stop_network() {
   docker kill sui-network && docker rm sui-network
+}
+
+function create_patch() {
+  GIT_DIFF=$(git diff)
+  echo "$GIT_DIFF" > $1
 }
 
 function _get_packages() {

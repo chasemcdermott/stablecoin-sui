@@ -16,33 +16,81 @@
  * limitations under the License.
  */
 
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { strict as assert } from "assert";
-import { deploy } from "../../scripts/deploy";
-import { generateKeypair } from "../../scripts/generateKeypair";
+import { deployCommand } from "../../scripts/deploy";
+import { generateKeypairCommand } from "../../scripts/generateKeypair";
+import {
+  getCreatedObjects,
+  getPublishedPackages,
+  resetPublishedAddressInPackageManifest
+} from "../../scripts/helpers";
 
 describe("Test deploy script", () => {
+  let deployerKeys: Ed25519Keypair;
+
+  before("Deploy 'sui_extensions' package", async () => {
+    deployerKeys = await generateKeypairCommand({ prefund: true });
+
+    const deployTx = await deployCommand("sui_extensions", {
+      rpcUrl: process.env.RPC_URL as string,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: deployerKeys.toSuiAddress(),
+      writePackageId: true
+    });
+
+    // Parse the transaction output to get the published package id
+    const publishedPackageIds = getPublishedPackages(deployTx);
+    assert.equal(publishedPackageIds.length, 1);
+  });
+
+  after(() => {
+    resetPublishedAddressInPackageManifest("sui_extensions");
+  });
+
   it("Deploys stablecoin package successfully", async () => {
-    const deployerKeys = await generateKeypair(true);
-    const upgraderKeys = await generateKeypair(false);
+    const upgraderKeys = await generateKeypairCommand({ prefund: false });
 
-    const txOutput = await deploy(
-      "stablecoin",
-      process.env.RPC_URL as string,
-      deployerKeys.getSecretKey(),
-      upgraderKeys.toSuiAddress() // upgrader address
+    const txOutput = await deployCommand("stablecoin", {
+      rpcUrl: process.env.RPC_URL as string,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: upgraderKeys.toSuiAddress()
+    });
+
+    const createdObjects = getCreatedObjects(txOutput);
+    const publishedObjects = getPublishedPackages(txOutput);
+    assert.equal(createdObjects.length, 2);
+    assert.equal(publishedObjects.length, 1);
+
+    const createdUpgradeCapObj = createdObjects.find(
+      (c) => c.objectType === "0x2::package::UpgradeCap"
     );
+    assert(createdUpgradeCapObj != null);
+    assert.equal(createdUpgradeCapObj.sender, deployerKeys.toSuiAddress());
+    assert.equal(
+      (createdUpgradeCapObj.owner as any).AddressOwner,
+      upgraderKeys.toSuiAddress()
+    );
+  });
 
-    const { objectChanges } = txOutput;
-    const createdObjects =
-      objectChanges?.filter((c) => c.type === "created") || [];
-    const publishedObjects =
-      objectChanges?.filter((c) => c.type === "published") || [];
+  it("Should destroy UpgradeCap if makeImmutable is set", async () => {
+    const upgraderKeys = await generateKeypairCommand({ prefund: false });
+
+    const txOutput = await deployCommand("stablecoin", {
+      rpcUrl: process.env.RPC_URL as string,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: upgraderKeys.toSuiAddress(),
+      makeImmutable: true
+    });
+
+    const createdObjects = getCreatedObjects(txOutput);
+    const publishedObjects = getPublishedPackages(txOutput);
     assert.equal(createdObjects.length, 1);
     assert.equal(publishedObjects.length, 1);
 
-    const createdObj = createdObjects[0] as any;
-    assert.equal(createdObj.objectType, "0x2::package::UpgradeCap");
-    assert.equal(createdObj.sender, deployerKeys.toSuiAddress());
-    assert.equal(createdObj.owner.AddressOwner, upgraderKeys.toSuiAddress());
+    assert(
+      createdObjects.find((c) => c.objectType === "0x2::package::UpgradeCap") ==
+        null
+    );
   });
 });

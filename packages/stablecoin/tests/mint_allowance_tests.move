@@ -23,7 +23,7 @@ module stablecoin::mint_allowance_tests {
 
     #[test]
     fun create_and_mutate_mint_allowance__should_succeed() {
-        let mut allowance = mint_allowance::create<MINT_ALLOWANCE_TESTS>();
+        let mut allowance = mint_allowance::new<MINT_ALLOWANCE_TESTS>();
         assert_eq(allowance.value(), 0);
 
         allowance.set(1);
@@ -35,15 +35,45 @@ module stablecoin::mint_allowance_tests {
         allowance.set(5);
         assert_eq(allowance.value(), 5);
 
+        allowance.increase(3);
+        assert_eq(allowance.value(), 8);
+
         allowance.destroy();
     }
 
     #[test, expected_failure(abort_code = ::stablecoin::mint_allowance::EOverflow)]
-    fun decrease__should_fail_with_overflow() {
-        let mut allowance = mint_allowance::create<MINT_ALLOWANCE_TESTS>();
+    fun increase__should_fail_on_integer_overflow() {
+        let mut allowance = mint_allowance::new<MINT_ALLOWANCE_TESTS>();
+        allowance.set(1);
+        assert_eq(allowance.value(), 1);
+
+        allowance.increase(18446744073709551615u64);
+        allowance.destroy();
+    }
+
+    #[test, expected_failure(abort_code = ::stablecoin::mint_allowance::EInsufficientAllowance)]
+    fun decrease__should_fail_if_allowance_is_insufficient() {
+        let mut allowance = mint_allowance::new<MINT_ALLOWANCE_TESTS>();
         assert_eq(allowance.value(), 0);
 
         allowance.decrease(1);
+        allowance.destroy();
+    }
+
+    #[test]
+    fun increase_decrease__should_succeed_if_value_is_zero() {
+        let mut allowance = mint_allowance::new<MINT_ALLOWANCE_TESTS>();
+        assert_eq(allowance.value(), 0);
+
+        allowance.set(100);
+        assert_eq(allowance.value(), 100);
+
+        allowance.decrease(0);
+        assert_eq(allowance.value(), 100);
+
+        allowance.increase(0);
+        assert_eq(allowance.value(), 100);
+
         allowance.destroy();
     }
 }
