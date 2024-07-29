@@ -207,7 +207,11 @@ export default program
     "--final-controller-address <string>",
     "The address that the final controller should be set to"
   )
-  .option("-r, --rpc-url <string>", "Network RPC URL", process.env.RPC_URL)
+  .requiredOption(
+    "-r, --rpc-url <string>",
+    "Network RPC URL",
+    process.env.RPC_URL
+  )
   .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 

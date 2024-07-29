@@ -27,6 +27,8 @@ import {
   callViewFunction
 } from ".";
 
+const GAS_BUDGET = 1_000_000_000;
+
 export default class SuiTreasuryClient {
   suiClient: SuiClient;
   treasuryObjectId: string;
@@ -161,6 +163,99 @@ export default class SuiTreasuryClient {
       signer: controller,
       transaction: txb
     });
+  }
+
+  async mint(
+    minter: Ed25519Keypair,
+    mintCapId: string,
+    recipient: string,
+    amount: bigint
+  ) {
+    const txb = new Transaction();
+    txb.moveCall({
+      target: `${this.stablecoinPackageId}::treasury::mint`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        txb.object(this.treasuryObjectId),
+        txb.object(mintCapId),
+        txb.object(DENY_LIST_OBJECT_ID),
+        txb.pure.u64(amount),
+        txb.object(recipient)
+      ]
+    });
+    txb.setGasBudget(GAS_BUDGET);
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: minter,
+      transaction: txb
+    });
+  }
+
+  async setBlocklistState(
+    blocklisterKeys: Ed25519Keypair,
+    addr: string,
+    blocked: boolean
+  ) {
+    const txb = new Transaction();
+    const target = blocked
+      ? `${this.stablecoinPackageId}::treasury::blocklist`
+      : `${this.stablecoinPackageId}::treasury::unblocklist`;
+    txb.moveCall({
+      target,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        txb.object(this.treasuryObjectId),
+        txb.object(DENY_LIST_OBJECT_ID),
+        txb.object(addr)
+      ]
+    });
+    txb.setGasBudget(GAS_BUDGET);
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: blocklisterKeys,
+      transaction: txb
+    });
+  }
+
+  async setPausedState(pauserKeys: Ed25519Keypair, paused: boolean) {
+    const txb = new Transaction();
+    const target = paused
+      ? `${this.stablecoinPackageId}::treasury::pause`
+      : `${this.stablecoinPackageId}::treasury::unpause`;
+    txb.moveCall({
+      target,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        txb.object(this.treasuryObjectId),
+        txb.object(DENY_LIST_OBJECT_ID)
+      ]
+    });
+    txb.setGasBudget(GAS_BUDGET);
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: pauserKeys,
+      transaction: txb
+    });
+  }
+
+  async isBlocklisted(
+    addr: string,
+    epochType: "current" | "next"
+  ): Promise<boolean> {
+    const txb = new Transaction();
+    txb.moveCall({
+      target: `0x2::coin::deny_list_v2_contains_${epochType}_epoch`,
+      typeArguments: [this.coinOtwType],
+      arguments: [txb.object(DENY_LIST_OBJECT_ID), txb.object(addr)]
+    });
+
+    const [isBlocklisted] = await callViewFunction({
+      client: this.suiClient,
+      transaction: txb,
+      returnTypes: [bcs.Bool]
+    });
+
+    return isBlocklisted;
   }
 
   async rotateController(

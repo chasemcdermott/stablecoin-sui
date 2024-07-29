@@ -141,7 +141,11 @@ export default program
     "--upgrade-service-object-id <string>",
     "The id of the UpgradeService<T> to deposit into"
   )
-  .option("-r, --rpc-url <string>", "Network RPC URL", process.env.RPC_URL)
+  .requiredOption(
+    "-r, --rpc-url <string>",
+    "Network RPC URL",
+    process.env.RPC_URL
+  )
   .action((options) => {
     depositUpgradeCapCommand(options);
   });

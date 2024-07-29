@@ -17,11 +17,11 @@
  */
 
 import { SuiClient } from "@mysten/sui/client";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { strict as assert } from "assert";
 import { deployCommand } from "../scripts/deploy";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
-import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
-import { getPublishedPackages } from "../scripts/helpers";
+import { expectError, getPublishedPackages } from "../scripts/helpers";
 
 describe("Test total supply query", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
@@ -51,13 +51,10 @@ describe("Test total supply query", () => {
   });
 
   it("Throws when querying total supply on non-existent coin type", async () => {
-    await assert.rejects(
+    await expectError(
       () =>
         client.getTotalSupply({ coinType: "0x0::nonexistent::NONEXISTENT" }),
-      (err: any) => {
-        assert(err.message.includes("ObjectNotFound"));
-        return true;
-      }
+      "ObjectNotFound"
     );
   });
 

@@ -22,7 +22,7 @@ import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
 import { configureMinterHelper } from "../../scripts/configureMinter";
-import { SuiTreasuryClient } from "../../scripts/helpers";
+import { expectError, SuiTreasuryClient } from "../../scripts/helpers";
 import { random } from "lodash";
 
 const USDC_DECIMALS = 6;
@@ -70,7 +70,7 @@ describe("Test configure minter script", () => {
 
   it("Fails when the final controller already exists", async () => {
     const randomKeys = await generateKeypairCommand({ prefund: false });
-    await assert.rejects(
+    await expectError(
       () =>
         testConfigureMinter({
           treasuryClient,
@@ -80,16 +80,13 @@ describe("Test configure minter script", () => {
           mintAllowanceInDollars: BigInt(18446744073709),
           finalController: currentControllerKeys
         }),
-      (err: any) => {
-        assert(err.message.includes("Final controller is already configured"));
-        return true;
-      }
+      "Final controller is already configured"
     );
   });
 
   it("Fails when the master minter key is incorrect", async () => {
     const randomKeys = await generateKeypairCommand({ prefund: false });
-    await assert.rejects(
+    await expectError(
       () =>
         testConfigureMinter({
           treasuryClient,
@@ -99,16 +96,13 @@ describe("Test configure minter script", () => {
           mintAllowanceInDollars: BigInt(18446744073709),
           finalController: randomKeys
         }),
-      (err: any) => {
-        assert(err.message.includes("Incorrect master minter key"));
-        return true;
-      }
+      "Incorrect master minter key"
     );
   });
 
   it("Fails when the temp controller exists and the minter is different", async () => {
     const randomKeys = await generateKeypairCommand({ prefund: false });
-    await assert.rejects(
+    await expectError(
       () =>
         testConfigureMinter({
           treasuryClient,
@@ -118,14 +112,7 @@ describe("Test configure minter script", () => {
           mintAllowanceInDollars: BigInt(18446744073709),
           finalController: randomKeys
         }),
-      (err: any) => {
-        assert(
-          err.message.match(
-            /Temp controller was already configured, but the MintCap \w* is held by \w*/
-          )
-        );
-        return true;
-      }
+      /Temp controller was already configured, but the MintCap \w* is held by \w*/
     );
   });
 
@@ -171,7 +158,8 @@ async function testConfigureMinter(args: {
   assert.equal(mintCapOwner.address, args.minter.toSuiAddress());
 
   // assert that the mint allowance was correctly configured
-  const expectedAllowance = BigInt(args.mintAllowanceInDollars) * BigInt(10 ** USDC_DECIMALS);
+  const expectedAllowance =
+    BigInt(args.mintAllowanceInDollars) * BigInt(10 ** USDC_DECIMALS);
   const allowance = await args.treasuryClient.getMintAllowance(mintCapId);
   assert.equal(allowance, expectedAllowance);
 

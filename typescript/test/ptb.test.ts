@@ -17,12 +17,12 @@
  */
 
 import { CoinMetadata, SuiClient } from "@mysten/sui/client";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { strict as assert } from "assert";
-import { deployCommand } from "../../scripts/deploy";
-import { generateKeypairCommand } from "../../scripts/generateKeypair";
-import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
-import { SuiTreasuryClient } from "../../scripts/helpers";
+import { deployCommand } from "../scripts/deploy";
+import { generateKeypairCommand } from "../scripts/generateKeypair";
+import { SuiTreasuryClient } from "../scripts/helpers";
 
 describe("Test PTBs", () => {
   const RPC_URL: string = process.env.RPC_URL as string;

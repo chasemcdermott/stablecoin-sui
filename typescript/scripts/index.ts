@@ -22,6 +22,7 @@ import { program } from "commander";
 import deploy from "./deploy";
 import generateKeypair from "./generateKeypair";
 import depositUpgradeCap from "./depositUpgradeCap";
+import setBlocklistState from "./setBlocklistState";
 import configureMinter from "./configureMinter";
 
 program
@@ -30,7 +31,8 @@ program
   .addCommand(configureMinter)
   .addCommand(deploy)
   .addCommand(generateKeypair)
-  .addCommand(depositUpgradeCap);
+  .addCommand(depositUpgradeCap)
+  .addCommand(setBlocklistState);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();

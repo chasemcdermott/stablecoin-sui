@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+import { strict as assert } from "assert";
 import { BcsType } from "@mysten/sui/bcs";
 import {
   SuiClient,
@@ -79,7 +80,7 @@ export async function waitForUserConfirmation() {
   let userResponse: boolean;
 
   while (true) {
-    const response = await rl.question("Are you sure? (Y/N): ");
+    const response = (await rl.question("Are you sure? (Y/N): ")).toUpperCase();
     if (response != "Y" && response != "N") {
       continue;
     }
@@ -337,4 +338,83 @@ function getObjectsByType<T extends SuiObjectChange>(
     );
   }
   return objects || [];
+}
+
+export async function transferCoinHelper(
+  client: SuiClient,
+  coinId: string,
+  sender: Ed25519Keypair,
+  recipient: string
+) {
+  const txb = new Transaction();
+  txb.transferObjects([coinId], recipient);
+  return executeTransactionHelper({
+    client,
+    signer: sender,
+    transaction: txb
+  });
+}
+
+export async function executeSponsoredTxHelper({
+  client,
+  txb,
+  sender,
+  sponsor
+}: {
+  client: SuiClient;
+  txb: Transaction;
+  sender: Ed25519Keypair;
+  sponsor: Ed25519Keypair;
+}): Promise<SuiTransactionBlockResponse> {
+  const payment = await getGasCoinsFromAddress(client, sponsor.toSuiAddress());
+  txb.setSender(sender.toSuiAddress());
+  txb.setGasOwner(sponsor.toSuiAddress());
+  txb.setGasPayment(payment);
+  const txBytes = await txb.build({ client });
+
+  // Transaction needs to be signed by both the sender and the sponsor
+  const sponsoredBytes = await sponsor.signTransaction(txBytes);
+  const senderBytes = await sender.signTransaction(txBytes);
+
+  return await client.executeTransactionBlock({
+    transactionBlock: txBytes,
+    signature: [senderBytes.signature, sponsoredBytes.signature],
+    options: {
+      showEffects: true,
+      showEvents: true,
+      showObjectChanges: true
+    }
+  });
+}
+
+export async function getCoinBalance(
+  client: SuiClient,
+  owner: string,
+  coinType: string
+): Promise<number> {
+  return parseInt((await client.getBalance({ owner, coinType })).totalBalance);
+}
+
+export async function expectError(
+  errBlock: () => Promise<any>,
+  errDescription: string | RegExp
+) {
+  await assert.rejects(errBlock, (err: any) => {
+    if (_.isRegExp(errDescription)) {
+      assert(err.message.match(errDescription));
+    } else {
+      assert(err.message.includes(errDescription));
+    }
+    return true;
+  });
+}
+
+export async function getGasCoinsFromAddress(client: SuiClient, owner: string) {
+  const coins = await client.getCoins({ owner, limit: 1 });
+  if (!coins.data.length) throw new Error("Gas coin not found");
+  return coins.data.map((coin) => ({
+    objectId: coin.coinObjectId,
+    version: coin.version,
+    digest: coin.digest
+  }));
 }

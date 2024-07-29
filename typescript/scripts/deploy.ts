@@ -87,12 +87,16 @@ export default program
   .createCommand("deploy")
   .description("Deploy a new Sui package")
   .argument("<package_name>", "Name of package to deploy")
+  .requiredOption(
+    "-r, --rpc-url <string>",
+    "Network RPC URL",
+    process.env.RPC_URL
+  )
   .option(
     "--upgrade-cap-recipient <string>",
     "The address that will receive the UpgradeCap, optional if --make-immutable is set"
   )
   .option("--make-immutable", "Destroys the UpgradeCap after deployment")
-  .option("-r, --rpc-url <string>", "Network RPC URL", process.env.RPC_URL)
   .option(
     "--deployer-key <string>",
     "Deployer private key",
