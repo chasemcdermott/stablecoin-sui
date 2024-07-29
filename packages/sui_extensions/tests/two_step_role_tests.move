@@ -41,6 +41,33 @@ module sui_extensions::two_step_role_tests {
         (scenario, role)
     }
 
+    fun test_begin_role_transfer(new_address: address, role: &mut TwoStepRole<TWO_STEP_ROLE_TESTS>, scenario: &mut Scenario) {
+        let active_address = role.active_address();
+        role.begin_role_transfer(new_address, scenario.ctx());
+
+        assert_eq(role.active_address(), active_address);
+        assert_eq(role.pending_address(), option::some(new_address));
+
+        let expected_event = two_step_role::create_role_transfer_started_event<TWO_STEP_ROLE_TESTS>(active_address, new_address);
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type(), expected_event);
+    }
+
+    fun test_accept_role(role: &mut TwoStepRole<TWO_STEP_ROLE_TESTS>, scenario: &mut Scenario) {
+        let old_active_address = role.active_address();
+        let new_active_address = role.pending_address();
+        role.accept_role(scenario.ctx());
+
+        assert_eq(role.active_address(), *new_active_address.borrow());
+        assert_eq(role.pending_address().is_none(), true);
+
+        let expected_event = two_step_role::create_role_transferred_event<TWO_STEP_ROLE_TESTS>(
+            old_active_address, *new_active_address.borrow()
+        );
+        assert_eq(event::num_events(), 1);
+        assert_eq(last_event_by_type(), expected_event);
+    }
+
     // === Tests ===
 
     // new tests
@@ -62,16 +89,35 @@ module sui_extensions::two_step_role_tests {
         let (mut scenario, mut role) = setup();
         
         scenario.next_tx(ADMIN);
-        {
-            let ctx = scenario.ctx();
-            role.begin_role_transfer(NEW_ADMIN, ctx);
-        };
-        assert_eq(role.active_address(), ADMIN);
-        assert_eq(role.pending_address(), option::some(NEW_ADMIN));
+        test_begin_role_transfer(NEW_ADMIN, &mut role, &mut scenario);
 
-        let expected_event = two_step_role::create_role_transfer_started_event<TWO_STEP_ROLE_TESTS>(ADMIN, NEW_ADMIN);
-        assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type(), expected_event);
+        role.destroy();
+        scenario.end();
+    }
+
+    #[test]
+    fun begin_role_transfer__should_succeed_if_pending_address_is_set() {
+        let (mut scenario, mut role) = setup();
+        
+        // Transfer to INVALID_ADMIN
+        scenario.next_tx(ADMIN);
+        test_begin_role_transfer(INVALID_ADMIN, &mut role,  &mut scenario);
+
+         // Transfer to NEW_ADMIN before original transfer is accepted
+        scenario.next_tx(ADMIN);
+        test_begin_role_transfer(NEW_ADMIN, &mut role, &mut scenario);
+
+        role.destroy();
+        scenario.end();
+    }
+
+    #[test]
+    fun begin_role_transfer__should_succeed_when_set_to_current_active_address() {
+        let (mut scenario, mut role) = setup();
+        
+        // Transfer to current active address
+        scenario.next_tx(ADMIN);
+        test_begin_role_transfer(ADMIN, &mut role, &mut scenario);
 
         role.destroy();
         scenario.end();
@@ -92,21 +138,28 @@ module sui_extensions::two_step_role_tests {
     // accept_role tests
 
     #[test]
-    fun accept_role_should_succeed() {
+    fun accept_role__should_succeed() {
         let (mut scenario, mut role) = setup();
 
         scenario.next_tx(ADMIN);
-        role.begin_role_transfer(NEW_ADMIN, scenario.ctx());
+        test_begin_role_transfer(NEW_ADMIN, &mut role, &mut scenario);
 
         scenario.next_tx(NEW_ADMIN);
-        role.accept_role(scenario.ctx());
+        test_accept_role(&mut role, &mut scenario);
         
-        assert_eq(role.active_address(), NEW_ADMIN);
-        assert_eq(role.pending_address(), option::none());
+        role.destroy();
+        scenario.end();
+    }
 
-        let expected_event = two_step_role::create_role_transferred_event<TWO_STEP_ROLE_TESTS>(ADMIN, NEW_ADMIN);
-        assert_eq(event::num_events(), 1);
-        assert_eq(last_event_by_type(), expected_event);
+    #[test]
+    fun accept_role__should_succeed_if_pending_address_is_active_address() {
+        let (mut scenario, mut role) = setup();
+
+        scenario.next_tx(ADMIN);
+        test_begin_role_transfer(ADMIN, &mut role, &mut scenario);
+        
+        scenario.next_tx(ADMIN);
+        test_accept_role(&mut role, &mut scenario);
 
         role.destroy();
         scenario.end();
@@ -118,7 +171,7 @@ module sui_extensions::two_step_role_tests {
         let (mut scenario, mut role) = setup();
 
         scenario.next_tx(NEW_ADMIN);
-        role.accept_role(scenario.ctx());
+        test_accept_role(&mut role, &mut scenario);
 
         role.destroy();
         scenario.end();
@@ -130,10 +183,10 @@ module sui_extensions::two_step_role_tests {
         let (mut scenario, mut role) = setup();
 
         scenario.next_tx(ADMIN);
-        role.begin_role_transfer(NEW_ADMIN, scenario.ctx());
+        test_begin_role_transfer(NEW_ADMIN, &mut role, &mut scenario);
 
         scenario.next_tx(INVALID_ADMIN);
-        role.accept_role(scenario.ctx());
+        test_accept_role(&mut role, &mut scenario);
 
         role.destroy();
         scenario.end();
@@ -163,4 +216,5 @@ module sui_extensions::two_step_role_tests {
         role.destroy();
         scenario.end();
     }
+
 }
