@@ -196,6 +196,11 @@ module stablecoin::treasury {
         treasury.borrow_treasury_cap().total_supply()
     }
 
+    /// Checks if a MintCap object is authorized to mint.
+    public fun is_authorized_mint_cap<T>(treasury: &Treasury<T>, id: ID): bool {
+        treasury.mint_allowances.contains(id)
+    }
+
     /// [Package private] Ensures that TreasuryCap exists.
     public(package) fun assert_treasury_cap_exists<T>(treasury: &Treasury<T>) {
         assert!(dof::exists_with_type<_, TreasuryCap<T>>(&treasury.id, TreasuryCapKey {}), ETreasuryCapNotFound);
@@ -214,11 +219,6 @@ module stablecoin::treasury {
     /// Checks if an address is a mint controller.
     fun is_controller<T>(treasury: &Treasury<T>, controller_addr: address): bool {
         treasury.controllers.contains(controller_addr)
-    }
-
-    /// Checks if a MintCap object is authorized to mint.
-    fun is_authorized_mint_cap<T>(treasury: &Treasury<T>, id: ID): bool {
-        treasury.mint_allowances.contains(id)
     }
 
     // === Write functions ===

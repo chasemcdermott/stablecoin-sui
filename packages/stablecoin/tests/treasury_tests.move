@@ -887,6 +887,33 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
+    #[test]
+    fun is_authorized_mint_cap__should_return_expected_state() {
+        let mut scenario = setup();
+
+        scenario.next_tx(MASTER_MINTER);
+        test_configure_new_controller(CONTROLLER, MINTER, &mut scenario);
+
+        scenario.next_tx(CONTROLLER);
+        test_configure_minter(10, &mut scenario);
+
+        scenario.next_tx(RANDOM_ADDRESS);
+        {
+            let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
+            let mint_cap = scenario.take_from_address<MintCap<TREASURY_TESTS>>(MINTER);
+            
+            let random_object_id = object::new(scenario.ctx());
+            assert_eq(treasury.is_authorized_mint_cap(object::id(&mint_cap)), true);
+            assert_eq(treasury.is_authorized_mint_cap(random_object_id.uid_to_inner()), false);
+            
+            object::delete(random_object_id);
+            test_scenario::return_to_address(MINTER, mint_cap);
+            test_scenario::return_shared(treasury);
+        };
+
+        scenario.end();
+    }
+
     #[test, expected_failure(abort_code = ::stablecoin::treasury::ETreasuryCapNotFound)]
     fun total_supply__should_fail_when_treasury_cap_is_missing() {
         let mut scenario = setup();
