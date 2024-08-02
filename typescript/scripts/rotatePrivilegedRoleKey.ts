@@ -47,6 +47,7 @@ export async function rotatePrivilegedRoleKeyHelper(
     newPauser: string;
     newMetadataUpdater: string;
     newTreasuryOwner: string;
+    gasBudget?: string;
   }
 ) {
   const {
@@ -57,14 +58,13 @@ export async function rotatePrivilegedRoleKeyHelper(
     newMetadataUpdater,
     newTreasuryOwner
   } = options;
+  const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
 
   // Ensure owner key is correct
   const treasuryOwner = getEd25519KeypairFromPrivateKey(treasuryOwnerKey);
   const { owner } = await treasuryClient.getRoles();
   if (owner !== treasuryOwner.toSuiAddress()) {
-    throw new Error(
-      "Incorrect treasury owner key"
-    );
+    throw new Error("Incorrect treasury owner key");
   }
 
   // Get user confirmation
@@ -87,7 +87,8 @@ export async function rotatePrivilegedRoleKeyHelper(
     newBlocklister,
     newPauser,
     newMetadataUpdater,
-    newTreasuryOwner
+    newTreasuryOwner,
+    { gasBudget }
   );
   writeJsonOutput("rotate-privileged-role-ke", txOutput);
 
@@ -131,6 +132,7 @@ export default program
     "Network RPC URL",
     process.env.RPC_URL
   )
+  .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 

@@ -21,7 +21,11 @@ import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
 import { rotatePrivilegedRoleKeyHelper } from "../../scripts/rotatePrivilegedRoleKey";
-import { expectError, SuiTreasuryClient } from "../../scripts/helpers";
+import {
+  expectError,
+  SuiTreasuryClient,
+  DEFAULT_GAS_BUDGET
+} from "../../scripts/helpers";
 import { strict as assert } from "assert";
 
 describe("Test privileged key role rotation script", () => {
@@ -110,7 +114,8 @@ async function testPriviledgedKeyRoleRotation(args: {
     newBlocklister: args.newBlocklister.toSuiAddress(),
     newPauser: args.newPauser.toSuiAddress(),
     newMetadataUpdater: args.newMetadataUpdater.toSuiAddress(),
-    newTreasuryOwner: args.newTreasuryOwner.toSuiAddress()
+    newTreasuryOwner: args.newTreasuryOwner.toSuiAddress(),
+    gasBudget: DEFAULT_GAS_BUDGET.toString()
   });
 
   const { masterMinter, blocklister, pauser, metadataUpdater, pendingOwner } =

@@ -506,7 +506,8 @@ export default class SuiTreasuryClient {
     newBlockLister: string,
     newPauser: string,
     newMetadataUpdater: string,
-    newTreasuryOwner: string
+    newTreasuryOwner: string,
+    options: { gasBudget: bigint | null }
   ) {
     const rotatePrivilegedKeyRoleTx = new Transaction();
 
@@ -563,7 +564,8 @@ export default class SuiTreasuryClient {
     return executeTransactionHelper({
       client: this.suiClient,
       signer: owner,
-      transaction: rotatePrivilegedKeyRoleTx
+      transaction: rotatePrivilegedKeyRoleTx,
+      gasBudget: options?.gasBudget ?? null
     });
   }
 }
