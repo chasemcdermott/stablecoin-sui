@@ -476,62 +476,62 @@ export default class SuiTreasuryClient {
     newMetadataUpdater: string,
     newTreasuryOwner: string
   ) {
-    const privilegedKeyRoleRotationTx = new Transaction();
+    const rotatePrivilegedKeyRoleTx = new Transaction();
 
     // update master minter
-    privilegedKeyRoleRotationTx.moveCall({
+    rotatePrivilegedKeyRoleTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_master_minter`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newMasterMinter)
+        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
+        rotatePrivilegedKeyRoleTx.pure.address(newMasterMinter)
       ]
     });
 
     // update blocklister
-    privilegedKeyRoleRotationTx.moveCall({
+    rotatePrivilegedKeyRoleTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_blocklister`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newBlockLister)
+        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
+        rotatePrivilegedKeyRoleTx.pure.address(newBlockLister)
       ]
     });
 
     // update pauser
-    privilegedKeyRoleRotationTx.moveCall({
+    rotatePrivilegedKeyRoleTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_pauser`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newPauser)
+        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
+        rotatePrivilegedKeyRoleTx.pure.address(newPauser)
       ]
     });
 
     // update metadata updater
-    privilegedKeyRoleRotationTx.moveCall({
+    rotatePrivilegedKeyRoleTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_metadata_updater`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newMetadataUpdater)
+        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
+        rotatePrivilegedKeyRoleTx.pure.address(newMetadataUpdater)
       ]
     });
 
     // initiate ownership transfer
-    privilegedKeyRoleRotationTx.moveCall({
+    rotatePrivilegedKeyRoleTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::transfer_ownership`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newTreasuryOwner)
+        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
+        rotatePrivilegedKeyRoleTx.pure.address(newTreasuryOwner)
       ]
     });
 
     return executeTransactionHelper({
       client: this.suiClient,
       signer: owner,
-      transaction: privilegedKeyRoleRotationTx
+      transaction: rotatePrivilegedKeyRoleTx
     });
   }
 }
