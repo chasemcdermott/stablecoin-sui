@@ -38,7 +38,7 @@ import { SuiClient } from "@mysten/sui/client";
  *
  * @returns Transaction output
  */
-export async function privilegedRoleKeyRotationHelper(
+export async function rotatePrivilegedRoleKeyHelper(
   treasuryClient: SuiTreasuryClient,
   options: {
     treasuryOwnerKey: string;
@@ -81,7 +81,7 @@ export async function privilegedRoleKeyRotationHelper(
   }
 
   // Update roles
-  const txOutput = await treasuryClient.privilegedKeyRoleRotation(
+  const txOutput = await treasuryClient.rotatePrivilegedKeyRole(
     treasuryOwner,
     newMasterMinter,
     newBlocklister,
@@ -89,7 +89,7 @@ export async function privilegedRoleKeyRotationHelper(
     newMetadataUpdater,
     newTreasuryOwner
   );
-  writeJsonOutput("priviledged-key-role-rotation", txOutput);
+  writeJsonOutput("rotate-privileged-role-ke", txOutput);
 
   log("privileged role key rotation complete");
 }
@@ -161,5 +161,5 @@ export default program
       );
     }
 
-    privilegedRoleKeyRotationHelper(treasuryClient, options);
+    rotatePrivilegedRoleKeyHelper(treasuryClient, options);
   });

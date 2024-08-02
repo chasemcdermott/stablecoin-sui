@@ -20,7 +20,7 @@ import { SuiClient } from "@mysten/sui/client";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
-import { privilegedRoleKeyRotationHelper } from "../../scripts/privilegedRoleKeyRotation";
+import { rotatePrivilegedRoleKeyHelper } from "../../scripts/rotatePrivilegedRoleKey";
 import { expectError, SuiTreasuryClient } from "../../scripts/helpers";
 import { strict as assert } from "assert";
 
@@ -104,7 +104,7 @@ async function testPriviledgedKeyRoleRotation(args: {
   newMetadataUpdater: Ed25519Keypair;
   newTreasuryOwner: Ed25519Keypair;
 }) {
-  await privilegedRoleKeyRotationHelper(args.treasuryClient, {
+  await rotatePrivilegedRoleKeyHelper(args.treasuryClient, {
     treasuryOwnerKey: args.treasuryOwner.getSecretKey(),
     newMasterMinter: args.newMasterMinter.toSuiAddress(),
     newBlocklister: args.newBlocklister.toSuiAddress(),

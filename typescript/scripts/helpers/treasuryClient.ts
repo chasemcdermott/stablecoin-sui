@@ -468,7 +468,7 @@ export default class SuiTreasuryClient {
     };
   }
 
-  async privilegedKeyRoleRotation(
+  async rotatePrivilegedKeyRole(
     owner: Ed25519Keypair,
     newMasterMinter: string,
     newBlockLister: string,
