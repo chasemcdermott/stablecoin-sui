@@ -90,7 +90,7 @@ describe("Test privileged key role rotation script", () => {
           newMetadataUpdater: newMetadataUpdaterKey,
           newTreasuryOwner: newTreasuryOwnerKey
         }),
-      "Received owner's private key doesn't match expected!"
+      "Incorrect treasury owner key"
     );
   });
 });
@@ -115,7 +115,6 @@ async function testPriviledgedKeyRoleRotation(args: {
 
   const { masterMinter, blocklister, pauser, metadataUpdater, pendingOwner } =
     await args.treasuryClient.getRoles();
-
   assert.equal(masterMinter, args.newMasterMinter.toSuiAddress());
   assert.equal(blocklister, args.newBlocklister.toSuiAddress());
   assert.equal(pauser, args.newPauser.toSuiAddress());
