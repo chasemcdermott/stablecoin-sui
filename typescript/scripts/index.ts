@@ -24,7 +24,7 @@ import generateKeypair from "./generateKeypair";
 import depositUpgradeCap from "./depositUpgradeCap";
 import setBlocklistState from "./setBlocklistState";
 import configureMinter from "./configureMinter";
-import rotatePrivilegedRoleKey from "./rotatePrivilegedRoleKey";
+import rotatePrivilegedRoles from "./rotatePrivilegedRoles";
 
 program
   .name("scripts")
@@ -34,7 +34,7 @@ program
   .addCommand(generateKeypair)
   .addCommand(depositUpgradeCap)
   .addCommand(setBlocklistState)
-  .addCommand(rotatePrivilegedRoleKey);
+  .addCommand(rotatePrivilegedRoles);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();

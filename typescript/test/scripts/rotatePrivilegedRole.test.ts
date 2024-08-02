@@ -20,7 +20,7 @@ import { SuiClient } from "@mysten/sui/client";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
-import { rotatePrivilegedRoleKeyHelper } from "../../scripts/rotatePrivilegedRoleKey";
+import { rotatePrivilegedRolesHelper } from "../../scripts/rotatePrivilegedRoles";
 import {
   expectError,
   SuiTreasuryClient,
@@ -35,15 +35,21 @@ describe("Test privileged key role rotation script", () => {
 
   let deployerKeys: Ed25519Keypair;
   let upgraderKeys: Ed25519Keypair;
+  let newMasterMinterKey: Ed25519Keypair;
+  let newBlocklisterKey: Ed25519Keypair;
+  let newPauserKey: Ed25519Keypair;
+  let newMetadataUpdaterKey: Ed25519Keypair;
+  let newTreasuryOwnerKey: Ed25519Keypair;
 
-  before("Deploy USDC and update privileged role keys", async () => {
+  before("Deploy USDC", async () => {
     deployerKeys = await generateKeypairCommand({ prefund: true });
     upgraderKeys = await generateKeypairCommand({ prefund: false });
     const deployTxOutput = await deployCommand("usdc", {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
-      withUnpublishedDependencies: true
+      withUnpublishedDependencies: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     // build a client from the usdc deploy transaction output
@@ -52,37 +58,20 @@ describe("Test privileged key role rotation script", () => {
       deployTxOutput
     );
 
-    const newMasterMinterKey = await generateKeypairCommand({ prefund: false });
-    const newBlocklisterKey = await generateKeypairCommand({ prefund: false });
-    const newPauserKey = await generateKeypairCommand({ prefund: false });
-    const newMetadataUpdaterKey = await generateKeypairCommand({
+    // generate shared keys for testing
+    newMasterMinterKey = await generateKeypairCommand({ prefund: false });
+    newBlocklisterKey = await generateKeypairCommand({ prefund: false });
+    newPauserKey = await generateKeypairCommand({ prefund: false });
+    newMetadataUpdaterKey = await generateKeypairCommand({
       prefund: false
     });
-    const newTreasuryOwnerKey = await generateKeypairCommand({
+    newTreasuryOwnerKey = await generateKeypairCommand({
       prefund: false
-    });
-    await testPriviledgedKeyRoleRotation({
-      treasuryClient,
-      treasuryOwner: deployerKeys,
-      newMasterMinter: newMasterMinterKey,
-      newBlocklister: newBlocklisterKey,
-      newPauser: newPauserKey,
-      newMetadataUpdater: newMetadataUpdaterKey,
-      newTreasuryOwner: newTreasuryOwnerKey
     });
   });
 
   it("Fails when the owner is inconsistent with actual owner", async () => {
     const randomKeys = await generateKeypairCommand({ prefund: false });
-    const newMasterMinterKey = await generateKeypairCommand({ prefund: false });
-    const newBlocklisterKey = await generateKeypairCommand({ prefund: false });
-    const newPauserKey = await generateKeypairCommand({ prefund: false });
-    const newMetadataUpdaterKey = await generateKeypairCommand({
-      prefund: false
-    });
-    const newTreasuryOwnerKey = await generateKeypairCommand({
-      prefund: false
-    });
     await expectError(
       () =>
         testPriviledgedKeyRoleRotation({
@@ -94,8 +83,20 @@ describe("Test privileged key role rotation script", () => {
           newMetadataUpdater: newMetadataUpdaterKey,
           newTreasuryOwner: newTreasuryOwnerKey
         }),
-      "Incorrect treasury owner key"
+      /Incorrect treasury owner key */
     );
+  });
+
+  it("Successfully updates all priviledged roles to given addresses", async () => {
+    await testPriviledgedKeyRoleRotation({
+      treasuryClient,
+      treasuryOwner: deployerKeys,
+      newMasterMinter: newMasterMinterKey,
+      newBlocklister: newBlocklisterKey,
+      newPauser: newPauserKey,
+      newMetadataUpdater: newMetadataUpdaterKey,
+      newTreasuryOwner: newTreasuryOwnerKey
+    });
   });
 });
 
@@ -108,7 +109,7 @@ async function testPriviledgedKeyRoleRotation(args: {
   newMetadataUpdater: Ed25519Keypair;
   newTreasuryOwner: Ed25519Keypair;
 }) {
-  await rotatePrivilegedRoleKeyHelper(args.treasuryClient, {
+  await rotatePrivilegedRolesHelper(args.treasuryClient, {
     treasuryOwnerKey: args.treasuryOwner.getSecretKey(),
     newMasterMinter: args.newMasterMinter.toSuiAddress(),
     newBlocklister: args.newBlocklister.toSuiAddress(),

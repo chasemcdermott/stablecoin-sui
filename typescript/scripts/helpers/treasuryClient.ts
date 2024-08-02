@@ -500,7 +500,7 @@ export default class SuiTreasuryClient {
     };
   }
 
-  async rotatePrivilegedKeyRole(
+  async rotatePrivilegedRoles(
     owner: Ed25519Keypair,
     newMasterMinter: string,
     newBlockLister: string,
@@ -509,62 +509,62 @@ export default class SuiTreasuryClient {
     newTreasuryOwner: string,
     options: { gasBudget: bigint | null }
   ) {
-    const rotatePrivilegedKeyRoleTx = new Transaction();
+    const rotatePrivilegedRolesTx = new Transaction();
 
     // update master minter
-    rotatePrivilegedKeyRoleTx.moveCall({
+    rotatePrivilegedRolesTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_master_minter`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
-        rotatePrivilegedKeyRoleTx.pure.address(newMasterMinter)
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newMasterMinter)
       ]
     });
 
     // update blocklister
-    rotatePrivilegedKeyRoleTx.moveCall({
+    rotatePrivilegedRolesTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_blocklister`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
-        rotatePrivilegedKeyRoleTx.pure.address(newBlockLister)
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newBlockLister)
       ]
     });
 
     // update pauser
-    rotatePrivilegedKeyRoleTx.moveCall({
+    rotatePrivilegedRolesTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_pauser`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
-        rotatePrivilegedKeyRoleTx.pure.address(newPauser)
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newPauser)
       ]
     });
 
     // update metadata updater
-    rotatePrivilegedKeyRoleTx.moveCall({
+    rotatePrivilegedRolesTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_metadata_updater`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
-        rotatePrivilegedKeyRoleTx.pure.address(newMetadataUpdater)
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newMetadataUpdater)
       ]
     });
 
     // initiate ownership transfer
-    rotatePrivilegedKeyRoleTx.moveCall({
+    rotatePrivilegedRolesTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::transfer_ownership`,
       typeArguments: [this.coinOtwType],
       arguments: [
-        rotatePrivilegedKeyRoleTx.object(this.treasuryObjectId),
-        rotatePrivilegedKeyRoleTx.pure.address(newTreasuryOwner)
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newTreasuryOwner)
       ]
     });
 
     return executeTransactionHelper({
       client: this.suiClient,
       signer: owner,
-      transaction: rotatePrivilegedKeyRoleTx,
+      transaction: rotatePrivilegedRolesTx,
       gasBudget: options?.gasBudget ?? null
     });
   }

@@ -38,7 +38,7 @@ import { SuiClient } from "@mysten/sui/client";
  *
  * @returns Transaction output
  */
-export async function rotatePrivilegedRoleKeyHelper(
+export async function rotatePrivilegedRolesHelper(
   treasuryClient: SuiTreasuryClient,
   options: {
     treasuryOwnerKey: string;
@@ -62,14 +62,21 @@ export async function rotatePrivilegedRoleKeyHelper(
 
   // Ensure owner key is correct
   const treasuryOwner = getEd25519KeypairFromPrivateKey(treasuryOwnerKey);
-  const { owner } = await treasuryClient.getRoles();
+  const {
+    owner,
+    masterMinter,
+    blocklister,
+    pauser,
+    metadataUpdater,
+    pendingOwner
+  } = await treasuryClient.getRoles();
   if (owner !== treasuryOwner.toSuiAddress()) {
-    throw new Error("Incorrect treasury owner key");
+    throw new Error(
+      `Incorrect treasury owner key, given ${treasuryOwner.toSuiAddress()}, expected ${owner}`
+    );
   }
 
   // Get user confirmation
-  const { masterMinter, blocklister, pauser, metadataUpdater, pendingOwner } =
-    await treasuryClient.getRoles();
   log(`Going to update \n 
     master minter from ${masterMinter} to ${newMasterMinter} \n 
     blocklister from ${blocklister} to ${newBlocklister} \n 
@@ -81,7 +88,7 @@ export async function rotatePrivilegedRoleKeyHelper(
   }
 
   // Update roles
-  const txOutput = await treasuryClient.rotatePrivilegedKeyRole(
+  const txOutput = await treasuryClient.rotatePrivilegedRoles(
     treasuryOwner,
     newMasterMinter,
     newBlocklister,
@@ -90,13 +97,13 @@ export async function rotatePrivilegedRoleKeyHelper(
     newTreasuryOwner,
     { gasBudget }
   );
-  writeJsonOutput("rotate-privileged-role-ke", txOutput);
+  writeJsonOutput("rotate-privileged-role-key", txOutput);
 
   log("privileged role key rotation complete");
 }
 
 export default program
-  .createCommand("rotate-privileged-role-key")
+  .createCommand("rotate-privileged-roles")
   .description("Rotate privileged role keys to input addresses")
   .option(
     "--treasury-deploy-file <string>",
@@ -117,7 +124,7 @@ export default program
   )
   .requiredOption(
     "--new-pauser <string>",
-    "The address where the pauser role will be transferredr"
+    "The address where the pauser role will be transferred"
   )
   .requiredOption(
     "--new-metadata-updater <string>",
@@ -163,5 +170,5 @@ export default program
       );
     }
 
-    rotatePrivilegedRoleKeyHelper(treasuryClient, options);
+    rotatePrivilegedRolesHelper(treasuryClient, options);
   });
