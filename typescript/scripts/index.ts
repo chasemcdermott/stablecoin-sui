@@ -24,6 +24,8 @@ import generateKeypair from "./generateKeypair";
 import depositUpgradeCap from "./depositUpgradeCap";
 import setBlocklistState from "./setBlocklistState";
 import configureMinter from "./configureMinter";
+import privilegedRoleKeyRotation from "./privilegedRoleKeyRotation";
+
 
 program
   .name("scripts")
@@ -32,7 +34,8 @@ program
   .addCommand(deploy)
   .addCommand(generateKeypair)
   .addCommand(depositUpgradeCap)
-  .addCommand(setBlocklistState);
+  .addCommand(setBlocklistState)
+  .addCommand(privilegedRoleKeyRotation);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();

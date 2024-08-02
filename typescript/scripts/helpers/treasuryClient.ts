@@ -467,4 +467,71 @@ export default class SuiTreasuryClient {
       metadataUpdater: metadataUpdaterFields.value
     };
   }
+
+  async privilegedKeyRoleRotation(
+    owner: Ed25519Keypair,
+    newMasterMinter: Ed25519Keypair,
+    newBlockLister: Ed25519Keypair,
+    newPauser: Ed25519Keypair,
+    newMetadataUpdater: Ed25519Keypair,
+    newTreasuryOwner: Ed25519Keypair
+  ) {
+    const privilegedKeyRoleRotationTx = new Transaction();
+
+    // update master minter
+    privilegedKeyRoleRotationTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::update_master_minter`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
+        privilegedKeyRoleRotationTx.pure.address(newMasterMinter.toSuiAddress())
+      ]
+    });
+
+    // update block lister
+    privilegedKeyRoleRotationTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::update_blocklister`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
+        privilegedKeyRoleRotationTx.pure.address(newBlockLister.toSuiAddress())
+      ]
+    });
+
+    // update pauser
+    privilegedKeyRoleRotationTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::update_pauser`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
+        privilegedKeyRoleRotationTx.pure.address(newPauser.toSuiAddress())
+      ]
+    });
+
+    // updateMetadataUpdater
+    privilegedKeyRoleRotationTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::update_metadata_updater`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
+        privilegedKeyRoleRotationTx.pure.address(newMetadataUpdater.toSuiAddress())
+      ]
+    });
+
+    // initiate ownership transfer
+    privilegedKeyRoleRotationTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::transfer_ownership`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
+        privilegedKeyRoleRotationTx.pure.address(newTreasuryOwner.toSuiAddress())
+      ]
+    });
+
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: owner,
+      transaction: privilegedKeyRoleRotationTx
+    });
+  }
 }
