@@ -22,7 +22,11 @@ import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
 import { configureMinterHelper } from "../../scripts/configureMinter";
-import { expectError, SuiTreasuryClient } from "../../scripts/helpers";
+import {
+  DEFAULT_GAS_BUDGET,
+  expectError,
+  SuiTreasuryClient
+} from "../../scripts/helpers";
 import { random } from "lodash";
 
 const USDC_DECIMALS = 6;
@@ -45,7 +49,8 @@ describe("Test configure minter script", () => {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
-      withUnpublishedDependencies: true
+      withUnpublishedDependencies: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     // build a client from the usdc deploy transaction output
@@ -142,7 +147,8 @@ async function testConfigureMinter(args: {
     tempControllerKey: args.tempController.getSecretKey(),
     minterAddress: args.minter.toSuiAddress(),
     mintAllowanceInDollars: args.mintAllowanceInDollars,
-    finalControllerAddress: args.finalController.toSuiAddress()
+    finalControllerAddress: args.finalController.toSuiAddress(),
+    gasBudget: DEFAULT_GAS_BUDGET.toString()
   });
   assert.notEqual(mintCapId, undefined);
   mintCapId = mintCapId as string;

@@ -22,6 +22,7 @@ import { deployCommand } from "../../scripts/deploy";
 import { depositUpgradeCapCommand } from "../../scripts/depositUpgradeCap";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import {
+  DEFAULT_GAS_BUDGET,
   getCreatedObjects,
   getMutatedObjects,
   getPublishedPackages,
@@ -46,7 +47,8 @@ describe("Test deposit-upgrade-cap script", () => {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: deployerKeys.toSuiAddress(),
-      writePackageId: true
+      writePackageId: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     // Parse the transaction output to get the published package id
@@ -65,7 +67,8 @@ describe("Test deposit-upgrade-cap script", () => {
     const deployTx = await deployCommand("stablecoin", {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
-      upgradeCapRecipient: stablecoinUpgradeCapOwner.toSuiAddress()
+      upgradeCapRecipient: stablecoinUpgradeCapOwner.toSuiAddress(),
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     // Parse the transaction output to get the published package id
@@ -94,7 +97,8 @@ describe("Test deposit-upgrade-cap script", () => {
       suiExtensionsPackageId,
       upgradeCapObjectId: stablecoinUpgradeCapId,
       upgradeCapOwnerKey: stablecoinUpgradeCapOwner.getSecretKey(),
-      upgradeServiceObjectId: stablecoinUpgradeServiceId
+      upgradeServiceObjectId: stablecoinUpgradeServiceId,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
     assert(depositUpgradeCapTx, "Missing depositUpgradeCapTx!");
 

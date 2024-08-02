@@ -22,7 +22,7 @@ license = "Apache 2.0"
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
-rev = "afe6d2679a8fa397757a3e0188fc211e7387ee0a"
+rev = "framework/mainnet"
 
 [dependencies.stablecoin]
 local = "../stablecoin"

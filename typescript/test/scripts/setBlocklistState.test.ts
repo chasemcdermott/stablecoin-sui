@@ -21,7 +21,7 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { strict as assert } from "assert";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
-import { SuiTreasuryClient } from "../../scripts/helpers";
+import { DEFAULT_GAS_BUDGET, SuiTreasuryClient } from "../../scripts/helpers";
 import { setBlocklistStateHelper } from "../../scripts/setBlocklistState";
 
 describe("Test set blocklist state script", () => {
@@ -39,7 +39,8 @@ describe("Test set blocklist state script", () => {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
-      withUnpublishedDependencies: true
+      withUnpublishedDependencies: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     // build a client from the usdc deploy transaction output
@@ -55,7 +56,8 @@ describe("Test set blocklist state script", () => {
     ).toSuiAddress();
     await setBlocklistStateHelper(treasuryClient, randomAddress, {
       blocklisterKey: deployerKeys.getSecretKey(),
-      unblock: false
+      unblock: false,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
     assert.equal(
       await treasuryClient.isBlocklisted(randomAddress, "next"),
@@ -64,7 +66,8 @@ describe("Test set blocklist state script", () => {
 
     await setBlocklistStateHelper(treasuryClient, randomAddress, {
       blocklisterKey: deployerKeys.getSecretKey(),
-      unblock: true
+      unblock: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
     assert.equal(
       await treasuryClient.isBlocklisted(randomAddress, "next"),

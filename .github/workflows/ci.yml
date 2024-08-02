@@ -19,6 +19,11 @@ on:
   push:
     branches: [master]
   pull_request:
+  schedule:
+    # At 5PM UTC every day
+    - cron: "0 17 * * *"
+
+permissions: read-all
 
 jobs:
   run_ci_tests:
@@ -27,28 +32,49 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
 
+      - name: Install Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20.14.0"
+
       - name: Setup CI Environment
         run: bash setup.sh
 
-      - name: Run tests
+      - name: Get Yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+
+      - name: Retrieve yarn cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('typescript/yarn.lock') }}
+          restore-keys: ${{ runner.os }}-yarn-
+
+      - name: Install packages & Setup repository
+        run: cd typescript && yarn install --frozen-lockfile
+
+      - name: Run static checks
+        run: bash run.sh static_checks
+
+      - name: Run Move tests
         run: bash run.sh test
 
-      - name: Run tests on v2
+      - name: Run Move tests on v2
         run: |
           git apply packages/stablecoin/examples/v2_base.patch
           bash run.sh test
           git apply -R packages/stablecoin/examples/v2_base.patch
 
-  run_typescript_tests:
-    name: "Run typescript tests"
-    uses: circlefin/github-shared-pipelines/.github/workflows/yarn-ci.yaml@v1
-    if: ${{ github.repository_owner == 'circlefin' && github.ref != 'refs/heads/master' }}
-    with:
-      repository: ${{ github.repository }}
-      branch: ${{ github.ref }}
-      node_version: "20.14.0"
-      install_dependencies_command: bash setup.sh && cd typescript && cp .env.example .env && yarn install --frozen-lockfile
-      start_containers: true
-      start_containers_command: bash run.sh start_network
-      run_command: cd typescript && yarn test
-      runner: large-dind-spot
+      - name: Start network
+        run: bash run.sh start_network
+
+      - name: Run Typescript tests
+        run: |
+          cd typescript && \
+          cp .env.example .env && \
+          yarn test
+
+      - name: Stop network
+        if: ${{ always() }}
+        run: bash run.sh stop_network

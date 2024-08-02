@@ -21,7 +21,11 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { strict as assert } from "assert";
 import { deployCommand } from "../scripts/deploy";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
-import { expectError, getPublishedPackages } from "../scripts/helpers";
+import {
+  DEFAULT_GAS_BUDGET,
+  expectError,
+  getPublishedPackages
+} from "../scripts/helpers";
 
 describe("Test total supply query", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
@@ -41,7 +45,8 @@ describe("Test total supply query", () => {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
-      withUnpublishedDependencies: true
+      withUnpublishedDependencies: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     const published = getPublishedPackages(deployTx);

@@ -22,7 +22,11 @@ import { Transaction } from "@mysten/sui/transactions";
 import { strict as assert } from "assert";
 import { deployCommand } from "../scripts/deploy";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
-import { SuiTreasuryClient } from "../scripts/helpers";
+import {
+  DEFAULT_GAS_BUDGET,
+  executeTransactionHelper,
+  SuiTreasuryClient
+} from "../scripts/helpers";
 
 describe("Test PTBs", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
@@ -40,7 +44,8 @@ describe("Test PTBs", () => {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
-      withUnpublishedDependencies: true
+      withUnpublishedDependencies: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     treasuryClient = SuiTreasuryClient.buildFromDeployment(
@@ -60,7 +65,8 @@ describe("Test PTBs", () => {
       new_name,
       new_symbol,
       new_desc,
-      new_icon
+      new_icon,
+      { gasBudget: DEFAULT_GAS_BUDGET }
     );
 
     // Assert that metadata object was updated
@@ -102,24 +108,11 @@ describe("Test PTBs", () => {
       ]
     });
 
-    // Sign and submit transaction, assert success
-    const result = await client.signAndExecuteTransaction({
+    await executeTransactionHelper({
+      client,
       signer: deployerKeys,
       transaction: txb,
-      options: {
-        showBalanceChanges: true,
-        showEffects: true,
-        showEvents: true,
-        showInput: true,
-        showObjectChanges: true,
-        showRawInput: true
-      }
-    });
-    assert.equal(result.effects?.status.status, "success");
-
-    // Wait for the transaction to be available over API
-    await client.waitForTransaction({
-      digest: result.digest
+      gasBudget: DEFAULT_GAS_BUDGET
     });
 
     // Assert that roles were updated

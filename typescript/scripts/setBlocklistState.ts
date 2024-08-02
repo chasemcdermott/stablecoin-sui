@@ -36,6 +36,7 @@ export async function setBlocklistStateHelper(
   options: {
     blocklisterKey: string;
     unblock?: boolean;
+    gasBudget?: string;
   }
 ) {
   const blocklister = getEd25519KeypairFromPrivateKey(options.blocklisterKey);
@@ -49,7 +50,8 @@ export async function setBlocklistStateHelper(
   const txOutput = await treasuryClient.setBlocklistState(
     blocklister,
     addrToBlock,
-    !options.unblock
+    !options.unblock,
+    { gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null }
   );
   writeJsonOutput(`set-blocklist-state`, txOutput);
   log(
@@ -78,6 +80,7 @@ export default program
   )
   .option("--treasury-object-id <string>", "The ID of the treasury object")
   .option("--unblock", "Set true to block, false to unblock")
+  .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .action(async (address, options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 
@@ -108,8 +111,5 @@ export default program
       );
     }
 
-    await setBlocklistStateHelper(treasuryClient, address, {
-      blocklisterKey: options.blocklisterKey,
-      unblock: options.unblock
-    });
+    await setBlocklistStateHelper(treasuryClient, address, options);
   });

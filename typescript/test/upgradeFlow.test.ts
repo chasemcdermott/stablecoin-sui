@@ -28,12 +28,12 @@ import {
   buildPackageHelper,
   callViewFunction,
   executeTransactionHelper,
+  DEFAULT_GAS_BUDGET,
   getCreatedObjects,
   getPublishedPackages
 } from "../scripts/helpers";
 
 describe("Test v1 -> v2 upgrade flow", () => {
-  const GAS_BUDGET = 1_000_000_000;
   const RPC_URL = process.env.RPC_URL as string;
 
   let client: SuiClient;
@@ -52,7 +52,8 @@ describe("Test v1 -> v2 upgrade flow", () => {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: deployerKeys.toSuiAddress(),
-      withUnpublishedDependencies: true
+      withUnpublishedDependencies: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     console.log(">>> Parsing the transaction output to get ids");
@@ -95,11 +96,11 @@ describe("Test v1 -> v2 upgrade flow", () => {
         depositTx.object(upgradeCapId)
       ]
     });
-    depositTx.setGasBudget(GAS_BUDGET);
     await executeTransactionHelper({
       client,
       signer: deployerKeys,
-      transaction: depositTx
+      transaction: depositTx,
+      gasBudget: DEFAULT_GAS_BUDGET
     });
 
     console.log(">>> Update source code to stablecoin v2");
@@ -153,11 +154,11 @@ describe("Test v1 -> v2 upgrade flow", () => {
       arguments: [upgradeTx.object(upgradeServiceId), upgradeReceipt]
     });
 
-    upgradeTx.setGasBudget(GAS_BUDGET);
     const upgradeTxOutput = await executeTransactionHelper({
       client,
       signer: deployerKeys,
-      transaction: upgradeTx
+      transaction: upgradeTx,
+      gasBudget: DEFAULT_GAS_BUDGET
     });
 
     const published = getPublishedPackages(upgradeTxOutput);
@@ -173,11 +174,11 @@ describe("Test v1 -> v2 upgrade flow", () => {
       typeArguments: [`${monoUsdcPackageId}::usdc::USDC`],
       arguments: [startMigrationTx.object(treasuryId)]
     });
-    startMigrationTx.setGasBudget(GAS_BUDGET);
     await executeTransactionHelper({
       client,
       signer: deployerKeys,
-      transaction: startMigrationTx
+      transaction: startMigrationTx,
+      gasBudget: DEFAULT_GAS_BUDGET
     });
 
     console.log(">>> Completing migration...");
@@ -187,11 +188,11 @@ describe("Test v1 -> v2 upgrade flow", () => {
       typeArguments: [`${monoUsdcPackageId}::usdc::USDC`],
       arguments: [completeMigrationTx.object(treasuryId)]
     });
-    completeMigrationTx.setGasBudget(GAS_BUDGET);
     await executeTransactionHelper({
       client,
       signer: deployerKeys,
-      transaction: completeMigrationTx
+      transaction: completeMigrationTx,
+      gasBudget: DEFAULT_GAS_BUDGET
     });
 
     console.log(">>> Checking compatible_versions ...");
@@ -201,7 +202,6 @@ describe("Test v1 -> v2 upgrade flow", () => {
       typeArguments: [`${monoUsdcPackageId}::usdc::USDC`],
       arguments: [checkCompatibleVersionsTx.object(treasuryId)]
     });
-    checkCompatibleVersionsTx.setGasBudget(GAS_BUDGET);
     const [compatibleVersions] = await callViewFunction({
       client,
       transaction: checkCompatibleVersionsTx,

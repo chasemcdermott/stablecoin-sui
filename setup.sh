@@ -18,41 +18,62 @@
 
 set -e
 
-# In the CI, download the prebuilt debug mode binary for Ubuntu.
-if [[ "$CI" == true ]]; then
-  echo "Downloading the Sui binary from Github..."
+if [[ "$CI" == true ]]
+then
+  OS="ubuntu-x86_64"
+else
+  OS="macos-arm64"
+fi
+
+SUI_VERSION="$(jq -r .compilerVersion sui.config.json)"
+SUI_INSTALLATION_DIRECTORY="$HOME/.sui/bin"
+
+if ! command -v sui &> /dev/null || ! sui -V | grep -q "sui $SUI_VERSION-"
+then
+  echo "Installing Sui binary from Github..."
+  echo ">> Version: '$SUI_VERSION'"
+  echo ">> OS: '$OS'"
 
   # Download and extract Sui binaries.
-  mkdir -p ./bin/sui
-  curl -L -o ./bin/sui/sui-v1.29.0.tgz https://github.com/MystenLabs/sui/releases/download/devnet-afe6d26-v1.29.0/sui-devnet-afe6d26-v1.29.0-ubuntu-x86_64.tgz
-  tar -xvzf ./bin/sui/sui-v1.29.0.tgz -C ./bin/sui
-  rm ./bin/sui/sui-v1.29.0.tgz
+  rm -rf "$SUI_INSTALLATION_DIRECTORY"
+  mkdir -p "$SUI_INSTALLATION_DIRECTORY"
+  curl -L -o "$SUI_INSTALLATION_DIRECTORY/sui-v$SUI_VERSION.tgz" "https://github.com/MystenLabs/sui/releases/download/mainnet-v$SUI_VERSION/sui-mainnet-v$SUI_VERSION-$OS.tgz"
+  tar -xvzf "$SUI_INSTALLATION_DIRECTORY/sui-v$SUI_VERSION.tgz" -C "$SUI_INSTALLATION_DIRECTORY"
+  rm "$SUI_INSTALLATION_DIRECTORY/sui-v$SUI_VERSION.tgz"
 
-  # Replace the release mode Sui with the debug mode Sui binary.
-  rm ./bin/sui/sui
-  mv ./bin/sui/sui-debug ./bin/sui/sui
+  # Sanity check that the Sui binary was installed correctly
+  echo "Checking sui installation..."
+  if ! "$SUI_INSTALLATION_DIRECTORY/sui" -V | grep -q "sui $SUI_VERSION-"
+  then
+    echo "Sui binary was not installed correctly"
+    exit 1
+  fi
 
-  # Add Sui binaries to PATH for the current shell.
-  export PATH="$PWD/bin/sui:$PATH"
-
-  # Add Sui binaries to the PATH for all other steps in the CI workflow.
-  echo "$PWD/bin/sui" >> $GITHUB_PATH
-
-  echo $(sui -V)
-
-# In all other environments, build the Sui binary from source in debug mode.
-else
-  echo "Building Sui binary from source in debug mode..."
-
-  cargo install \
-    --git https://github.com/MystenLabs/sui.git \
-    --rev afe6d2679a8fa397757a3e0188fc211e7387ee0a \
-    --locked --debug sui  
+  if [[ "$CI" == true ]]
+  then
+    echo "$SUI_INSTALLATION_DIRECTORY" >> $GITHUB_PATH
+  else
+    echo "    Sui binary installed successfully. Run the following command to add 'sui' to your shell"
+    echo "    echo 'export PATH=\"$SUI_INSTALLATION_DIRECTORY:\$PATH\"' >> ~/.zshrc"
+  fi
 fi
 
-# Sanity check that the Sui binary was installed correctly
-if ! command -v sui &> /dev/null || ! sui -V | grep -q 'sui 1.29.0-afe6d2679a8f'
+# ==== Yarn Installation ====
+YARN_VERSION="^1.x.x"
+YARN_VERSION_REGEX="^1\..*\..*"
+
+if ! command -v yarn &> /dev/null || ! yarn --version | grep -q "$YARN_VERSION_REGEX"
 then
-  echo "Sui binary was not installed"
-  exit 1
+  echo "Installing yarn..."
+  npm install -g "yarn@$YARN_VERSION"
+
+  # Sanity check that yarn was installed correctly
+  echo "Checking yarn installation..."
+  if ! yarn --version | grep -q "$YARN_VERSION_REGEX"
+  then
+    echo "Yarn was not installed correctly"
+    exit 1
+  fi
 fi
+
+echo "Setup completed!"
