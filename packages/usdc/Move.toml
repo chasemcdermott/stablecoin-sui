@@ -15,7 +15,6 @@
 # limitations under the License.
 
 [package]
-published-at = "0x298616f7c2228e5f9a97f97dcd19d6c885f285f6b6d67c1bccefac95c28dcd12"
 name = "usdc"
 edition = "2024.beta"
 license = "Apache 2.0"
@@ -23,7 +22,7 @@ license = "Apache 2.0"
 [dependencies.Sui]
 git = "https://github.com/MystenLabs/sui.git"
 subdir = "crates/sui-framework/packages/sui-framework"
-rev = "afe6d2679a8fa397757a3e0188fc211e7387ee0a"
+rev = "framework/mainnet"
 
 [dependencies.stablecoin]
 local = "../stablecoin"
@@ -32,7 +31,7 @@ local = "../stablecoin"
 local = "../sui_extensions"
 
 [addresses]
-usdc = "0x298616f7c2228e5f9a97f97dcd19d6c885f285f6b6d67c1bccefac95c28dcd12"
+usdc = "0x0"
 
 [dev-dependencies]
 

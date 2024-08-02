@@ -26,7 +26,6 @@ import setBlocklistState from "./setBlocklistState";
 import configureMinter from "./configureMinter";
 import privilegedRoleKeyRotation from "./privilegedRoleKeyRotation";
 
-
 program
   .name("scripts")
   .description("Scripts related to SUI development")

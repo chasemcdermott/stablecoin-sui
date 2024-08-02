@@ -25,95 +25,100 @@ import { expectError, SuiTreasuryClient } from "../../scripts/helpers";
 import { strict as assert } from "assert";
 
 describe("Test privileged key role rotation script", () => {
-    const RPC_URL: string = process.env.RPC_URL as string;
-    const client = new SuiClient({ url: RPC_URL });
-    let treasuryClient: SuiTreasuryClient;
+  const RPC_URL: string = process.env.RPC_URL as string;
+  const client = new SuiClient({ url: RPC_URL });
+  let treasuryClient: SuiTreasuryClient;
 
-    let deployerKeys: Ed25519Keypair;
-    let upgraderKeys: Ed25519Keypair;
+  let deployerKeys: Ed25519Keypair;
+  let upgraderKeys: Ed25519Keypair;
 
-    before("Deploy USDC and update privileged role keys", async () => {
-        deployerKeys = await generateKeypairCommand({ prefund: true });
-        upgraderKeys = await generateKeypairCommand({ prefund: false });
-        const deployTxOutput = await deployCommand("usdc", {
-            rpcUrl: RPC_URL,
-            deployerKey: deployerKeys.getSecretKey(),
-            upgradeCapRecipient: upgraderKeys.toSuiAddress(),
-            withUnpublishedDependencies: true
-        });
-        
-        // build a client from the usdc deploy transaction output
-        treasuryClient = SuiTreasuryClient.buildFromDeployment(
-            client,
-            deployTxOutput
-        );
-    
-        const newMasterMinterKey = await generateKeypairCommand({ prefund: true });
-        const newBlocklisterKey = await generateKeypairCommand({ prefund: true });
-        const newPauserKey = await generateKeypairCommand({ prefund: true });
-        const newMetadataUpdaterKey = await generateKeypairCommand({ prefund: true });
-        const newTreasuryOwnerKey = await generateKeypairCommand({ prefund: false });
-        await testPriviledgedKeyRoleRotation({
-            treasuryClient,
-            treasuryOwner: deployerKeys,
-            newMasterMinter: newMasterMinterKey,
-            newBlocklister: newBlocklisterKey,
-            newPauser: newPauserKey,
-            newMetadataUpdater: newMetadataUpdaterKey,
-            newTreasuryOwner: newTreasuryOwnerKey
-        });
+  before("Deploy USDC and update privileged role keys", async () => {
+    deployerKeys = await generateKeypairCommand({ prefund: true });
+    upgraderKeys = await generateKeypairCommand({ prefund: false });
+    const deployTxOutput = await deployCommand("usdc", {
+      rpcUrl: RPC_URL,
+      deployerKey: deployerKeys.getSecretKey(),
+      upgradeCapRecipient: upgraderKeys.toSuiAddress(),
+      withUnpublishedDependencies: true
     });
 
-    it("Fails when the owner is inconsistent with actual owner", async () => {
-        const randomKeys = await generateKeypairCommand({ prefund: false });
-        const newMasterMinterKey = await generateKeypairCommand({ prefund: true });
-        const newBlocklisterKey = await generateKeypairCommand({ prefund: true });
-        const newPauserKey = await generateKeypairCommand({ prefund: true });
-        const newMetadataUpdaterKey = await generateKeypairCommand({ prefund: true });
-        const newTreasuryOwnerKey = await generateKeypairCommand({ prefund: false });
-        await expectError(
-            () =>
-                testPriviledgedKeyRoleRotation({
-                    treasuryClient,
-                    treasuryOwner: randomKeys,
-                    newMasterMinter: newMasterMinterKey,
-                    newBlocklister: newBlocklisterKey,
-                    newPauser: newPauserKey,
-                    newMetadataUpdater: newMetadataUpdaterKey,
-                    newTreasuryOwner: newTreasuryOwnerKey
-                }),
-            "Received owner's private key doesn't match expected!"
-          );
+    // build a client from the usdc deploy transaction output
+    treasuryClient = SuiTreasuryClient.buildFromDeployment(
+      client,
+      deployTxOutput
+    );
+
+    const newMasterMinterKey = await generateKeypairCommand({ prefund: false });
+    const newBlocklisterKey = await generateKeypairCommand({ prefund: false });
+    const newPauserKey = await generateKeypairCommand({ prefund: false });
+    const newMetadataUpdaterKey = await generateKeypairCommand({
+      prefund: false
     });
+    const newTreasuryOwnerKey = await generateKeypairCommand({
+      prefund: false
+    });
+    await testPriviledgedKeyRoleRotation({
+      treasuryClient,
+      treasuryOwner: deployerKeys,
+      newMasterMinter: newMasterMinterKey,
+      newBlocklister: newBlocklisterKey,
+      newPauser: newPauserKey,
+      newMetadataUpdater: newMetadataUpdaterKey,
+      newTreasuryOwner: newTreasuryOwnerKey
+    });
+  });
+
+  it("Fails when the owner is inconsistent with actual owner", async () => {
+    const randomKeys = await generateKeypairCommand({ prefund: false });
+    const newMasterMinterKey = await generateKeypairCommand({ prefund: false });
+    const newBlocklisterKey = await generateKeypairCommand({ prefund: false });
+    const newPauserKey = await generateKeypairCommand({ prefund: false });
+    const newMetadataUpdaterKey = await generateKeypairCommand({
+      prefund: false
+    });
+    const newTreasuryOwnerKey = await generateKeypairCommand({
+      prefund: false
+    });
+    await expectError(
+      () =>
+        testPriviledgedKeyRoleRotation({
+          treasuryClient,
+          treasuryOwner: randomKeys,
+          newMasterMinter: newMasterMinterKey,
+          newBlocklister: newBlocklisterKey,
+          newPauser: newPauserKey,
+          newMetadataUpdater: newMetadataUpdaterKey,
+          newTreasuryOwner: newTreasuryOwnerKey
+        }),
+      "Received owner's private key doesn't match expected!"
+    );
+  });
 });
 
 async function testPriviledgedKeyRoleRotation(args: {
-    treasuryClient: SuiTreasuryClient;
-    treasuryOwner: Ed25519Keypair;
-    newMasterMinter: Ed25519Keypair;
-    newBlocklister: Ed25519Keypair;
-    newPauser: Ed25519Keypair;
-    newMetadataUpdater: Ed25519Keypair;
-    newTreasuryOwner: Ed25519Keypair;
+  treasuryClient: SuiTreasuryClient;
+  treasuryOwner: Ed25519Keypair;
+  newMasterMinter: Ed25519Keypair;
+  newBlocklister: Ed25519Keypair;
+  newPauser: Ed25519Keypair;
+  newMetadataUpdater: Ed25519Keypair;
+  newTreasuryOwner: Ed25519Keypair;
 }) {
-    await privilegedRoleKeyRotationHelper(args.treasuryClient, {
-        treasuryOwnerKey: args.treasuryOwner.getSecretKey(),
-        newMasterMinterKey: args.newMasterMinter.getSecretKey(),
-        newBlocklisterKey: args.newBlocklister.getSecretKey(),
-        newPauserKey: args.newPauser.getSecretKey(),
-        newMetadataUpdaterKey: args.newMetadataUpdater.getSecretKey(),
-        newTreasuryOwnerKey: args.newTreasuryOwner.getSecretKey()
-    });
+  await privilegedRoleKeyRotationHelper(args.treasuryClient, {
+    treasuryOwnerKey: args.treasuryOwner.getSecretKey(),
+    newMasterMinter: args.newMasterMinter.toSuiAddress(),
+    newBlocklister: args.newBlocklister.toSuiAddress(),
+    newPauser: args.newPauser.toSuiAddress(),
+    newMetadataUpdater: args.newMetadataUpdater.toSuiAddress(),
+    newTreasuryOwner: args.newTreasuryOwner.toSuiAddress()
+  });
 
-    const { masterMinter } = await args.treasuryClient.getRoles();
-    const { blocklister } = await args.treasuryClient.getRoles();
-    const { pauser } = await args.treasuryClient.getRoles();
-    const { metadataUpdater } = await args.treasuryClient.getRoles();
-    const { pendingOwner } = await args.treasuryClient.getRoles();
+  const { masterMinter, blocklister, pauser, metadataUpdater, pendingOwner } =
+    await args.treasuryClient.getRoles();
 
-    assert.equal(masterMinter, args.newMasterMinter.toSuiAddress());
-    assert.equal(blocklister, args.newBlocklister.toSuiAddress());
-    assert.equal(pauser, args.newPauser.toSuiAddress());
-    assert.equal(metadataUpdater, args.newMetadataUpdater.toSuiAddress());
-    assert.equal(pendingOwner, args.newTreasuryOwner.toSuiAddress());
+  assert.equal(masterMinter, args.newMasterMinter.toSuiAddress());
+  assert.equal(blocklister, args.newBlocklister.toSuiAddress());
+  assert.equal(pauser, args.newPauser.toSuiAddress());
+  assert.equal(metadataUpdater, args.newMetadataUpdater.toSuiAddress());
+  assert.equal(pendingOwner, args.newTreasuryOwner.toSuiAddress());
 }

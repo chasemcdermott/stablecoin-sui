@@ -470,11 +470,11 @@ export default class SuiTreasuryClient {
 
   async privilegedKeyRoleRotation(
     owner: Ed25519Keypair,
-    newMasterMinter: Ed25519Keypair,
-    newBlockLister: Ed25519Keypair,
-    newPauser: Ed25519Keypair,
-    newMetadataUpdater: Ed25519Keypair,
-    newTreasuryOwner: Ed25519Keypair
+    newMasterMinter: string,
+    newBlockLister: string,
+    newPauser: string,
+    newMetadataUpdater: string,
+    newTreasuryOwner: string
   ) {
     const privilegedKeyRoleRotationTx = new Transaction();
 
@@ -484,17 +484,17 @@ export default class SuiTreasuryClient {
       typeArguments: [this.coinOtwType],
       arguments: [
         privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newMasterMinter.toSuiAddress())
+        privilegedKeyRoleRotationTx.pure.address(newMasterMinter)
       ]
     });
 
-    // update block lister
+    // update blocklister
     privilegedKeyRoleRotationTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_blocklister`,
       typeArguments: [this.coinOtwType],
       arguments: [
         privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newBlockLister.toSuiAddress())
+        privilegedKeyRoleRotationTx.pure.address(newBlockLister)
       ]
     });
 
@@ -504,17 +504,17 @@ export default class SuiTreasuryClient {
       typeArguments: [this.coinOtwType],
       arguments: [
         privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newPauser.toSuiAddress())
+        privilegedKeyRoleRotationTx.pure.address(newPauser)
       ]
     });
 
-    // updateMetadataUpdater
+    // update metadata updater
     privilegedKeyRoleRotationTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::update_metadata_updater`,
       typeArguments: [this.coinOtwType],
       arguments: [
         privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newMetadataUpdater.toSuiAddress())
+        privilegedKeyRoleRotationTx.pure.address(newMetadataUpdater)
       ]
     });
 
@@ -524,7 +524,7 @@ export default class SuiTreasuryClient {
       typeArguments: [this.coinOtwType],
       arguments: [
         privilegedKeyRoleRotationTx.object(this.treasuryObjectId),
-        privilegedKeyRoleRotationTx.pure.address(newTreasuryOwner.toSuiAddress())
+        privilegedKeyRoleRotationTx.pure.address(newTreasuryOwner)
       ]
     });
 

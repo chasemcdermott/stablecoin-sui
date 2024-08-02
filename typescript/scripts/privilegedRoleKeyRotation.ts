@@ -21,6 +21,7 @@ import {
   getEd25519KeypairFromPrivateKey,
   writeJsonOutput,
   SuiTreasuryClient,
+  waitForUserConfirmation,
   readTransactionOutput,
   log
 } from "./helpers";
@@ -28,7 +29,7 @@ import { SuiClient } from "@mysten/sui/client";
 
 /**
  * After minter configuration is done
- * 
+ *
  * Update master minter (after minter configuration is done!)
  * Update pauser
  * Update blocklister (after initial blocklisting, if necessary)
@@ -38,59 +39,64 @@ import { SuiClient } from "@mysten/sui/client";
  * @returns Transaction output
  */
 export async function privilegedRoleKeyRotationHelper(
-    treasuryClient: SuiTreasuryClient,
-    options: {
-      treasuryOwnerKey: string;
-      newMasterMinterKey: string;
-      newBlocklisterKey: string;
-      newPauserKey: string;
-      newMetadataUpdaterKey: string;
-      newTreasuryOwnerKey: string;
-    }
-  ) {
-    const{
-      treasuryOwnerKey,
-      newMasterMinterKey,
-      newBlocklisterKey,
-      newPauserKey,
-      newMetadataUpdaterKey,
-      newTreasuryOwnerKey
-    } = options;
+  treasuryClient: SuiTreasuryClient,
+  options: {
+    treasuryOwnerKey: string;
+    newMasterMinter: string;
+    newBlocklister: string;
+    newPauser: string;
+    newMetadataUpdater: string;
+    newTreasuryOwner: string;
+  }
+) {
+  const {
+    treasuryOwnerKey,
+    newMasterMinter,
+    newBlocklister,
+    newPauser,
+    newMetadataUpdater,
+    newTreasuryOwner
+  } = options;
 
-    // Ensure owner key is correct
-    const treasuryOwner = getEd25519KeypairFromPrivateKey(treasuryOwnerKey);
-    const { owner } = await treasuryClient.getRoles();
-    if (owner !== treasuryOwner.toSuiAddress()) {
-        throw new Error(
-        `Incorrect owner key, given ${treasuryOwner.toSuiAddress()}, expected ${owner}`
-        );
-    }
+  // Ensure owner key is correct
+  const treasuryOwner = getEd25519KeypairFromPrivateKey(treasuryOwnerKey);
+  const { owner } = await treasuryClient.getRoles();
+  if (owner !== treasuryOwner.toSuiAddress()) {
+    throw new Error(
+      `Incorrect owner key, given ${treasuryOwner.toSuiAddress()}, expected ${owner}`
+    );
+  }
 
-    const newMasterMinter = getEd25519KeypairFromPrivateKey(newMasterMinterKey);
-    const newBlocklister = getEd25519KeypairFromPrivateKey(newBlocklisterKey);
-    const newPauser = getEd25519KeypairFromPrivateKey(newPauserKey);
-    const newMetadataUpdater = getEd25519KeypairFromPrivateKey(newMetadataUpdaterKey);
-    const newTreasuryOwner = getEd25519KeypairFromPrivateKey(newTreasuryOwnerKey);
+  // Get user confirmation
+  const { masterMinter, blocklister, pauser, metadataUpdater, pendingOwner } =
+    await treasuryClient.getRoles();
+  log(`Going to update \n 
+    master minter from ${masterMinter} to ${newMasterMinter} \n 
+    blocklister from ${blocklister} to ${newBlocklister} \n 
+    pauser from ${pauser} to ${newPauser} \n
+    metadata updater from ${metadataUpdater} to ${newMetadataUpdater} \n
+    And initiate ownership transfer from ${pendingOwner} to ${newTreasuryOwner} \n`);
+  if (!(await waitForUserConfirmation())) {
+    throw new Error("Terminating...");
+  }
 
-    // Update roles
-    const txOutput = await treasuryClient.privilegedKeyRoleRotation(
-        treasuryOwner,
-        newMasterMinter,
-        newBlocklister,
-        newPauser,
-        newMetadataUpdater,
-        newTreasuryOwner
-      );
-    writeJsonOutput("priviledged-key-role-rotation", txOutput);
+  // Update roles
+  const txOutput = await treasuryClient.privilegedKeyRoleRotation(
+    treasuryOwner,
+    newMasterMinter,
+    newBlocklister,
+    newPauser,
+    newMetadataUpdater,
+    newTreasuryOwner
+  );
+  writeJsonOutput("priviledged-key-role-rotation", txOutput);
 
-    log("Mint configuration complete");
+  log("privileged role key rotation complete");
 }
 
 export default program
-  .createCommand("privileged-key-role-rotation")
-  .description(
-    "add later"
-  )
+  .createCommand("rotate-privileged-role-key")
+  .description("Rotate privileged role keys to input addresses")
   .option(
     "--treasury-deploy-file <string>",
     "Path to a file containing the treasury deploy output in JSON format"
@@ -101,24 +107,24 @@ export default program
     "The private key of the treasury object's owner"
   )
   .requiredOption(
-    "--new-master-minter-key <string>",
-    "add later"
+    "--new-master-minter <string>",
+    "The address where the master minter role will be transferred"
   )
   .requiredOption(
-    "--new-blocklister-key <string>",
-    "add later"
+    "--new-blocklister <string>",
+    "The address where the blocklister role will be transferred"
   )
   .requiredOption(
-    "--new-pauser-key <string>",
-    "add later"
+    "--new-pauser <string>",
+    "The address where the pauser role will be transferredr"
   )
   .requiredOption(
-    "--new-metadata-updater-key <string>",
-    "add later"
+    "--new-metadata-updater <string>",
+    "The address where the metadata updater role will be transferred"
   )
   .requiredOption(
-    "--new-treasury-owner-key <string>",
-    "add later"
+    "--new-treasury-owner <string>",
+    "The address where the pending owner role will be transferred"
   )
   .requiredOption(
     "-r, --rpc-url <string>",
