@@ -16,7 +16,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
+FULLNODE_PORT="$(jq -r .port sui.config.json)"
+FULLNODE_EPOCH_DURATION_MS="$(jq -r .epochDurationMs sui.config.json)"
+FAUCET_PORT="$(jq -r .faucetPort sui.config.json)"
+FULLNODE_URL=http://localhost:$FULLNODE_PORT
+FAUCET_URL=http://localhost:$FAUCET_PORT
 
 function clean() {
   for path in $(_get_packages); do
@@ -30,33 +34,107 @@ function clean() {
 function build() {
   for path in $(_get_packages); do
     echo ">> Building $path..."
-    sui move build --path $path
+    if ! sui move build --path $path --lint; then
+      exit 1
+    fi
   done
+}
+
+function static_checks() {
+  # Fails if any files (eg Move.lock) was updated.
+  build
+  if ! git diff --quiet --exit-code "**/Move.lock"; then
+    echo ">> Did you forget to commit the Move.lock files?"
+    echo ""
+    git --no-pager diff "**/Move.lock"
+    exit 1
+  fi
+  
+  current_dir="$PWD"
+  cd typescript
+  yarn format:check && yarn type-check && yarn lint
+  cd $current_dir
 }
 
 function test() {
   for path in $(_get_packages); do
     echo ">> Testing $path..."
-    sui move test --path "$path" --statistics --coverage
+    if ! sui-debug move test --path "$path" --statistics --coverage; then
+      exit 1
+    fi
 
     if [ -f $path/.coverage_map.mvcov ]
     then
       echo ">> Printing coverage results for $path..."
       sui move coverage summary --path "$path"
+
+      if [ -z "$(sui move coverage summary --path "$path" | grep "% Move Coverage: 100.00")" ]
+      then
+        echo ">> Coverage is not at 100%!"
+        exit 1
+      fi
     fi
   done
 }
 
 function start_network() {
-  docker run -d \
-    -p 9001:7000 \
-    -p 9123:7123 \
-    --name sui-network \
-    124945441934.dkr.ecr.us-east-1.amazonaws.com/blockchain/sui/sui:devnet-afe6d26-v1.29.0
+  LOG_FILE="$PWD/sui-node.log"
+
+  stop_network
+
+  echo "Starting network in the background..."
+  echo ">> Fullnode: $FULLNODE_URL"
+  echo ">> Faucet: $FAUCET_URL"
+  echo ">> Epoch duration: $FULLNODE_EPOCH_DURATION_MS ms"
+  echo ">> Logs written to $LOG_FILE"
+
+  # Starts an in-memory node by using the `--force-regenesis` flag.
+  sui start \
+    --fullnode-rpc-port=$FULLNODE_PORT \
+    --with-faucet=$FAUCET_PORT \
+    --epoch-duration-ms=$FULLNODE_EPOCH_DURATION_MS \
+    --force-regenesis &> $LOG_FILE &
+
+  WAIT_TIME=30
+
+  echo ">> Waiting for Sui node to come online within $WAIT_TIME seconds..."
+  ELAPSED=0
+  SECONDS=0
+  while [[ "$ELAPSED" -lt "$WAIT_TIME" ]]
+  do
+    FULLNODE_HEALTHCHECK_STATUS_CODE="$(curl -k -s -o /dev/null -w %{http_code} -X POST -H 'Content-Type: application/json' -d "{\"jsonrpc\": \"2.0\", \"method\": \"suix_getLatestSuiSystemState\", \"params\": [], \"id\": 1}" $FULLNODE_URL)"
+    FAUCET_HEALTHCHECK_STATUS_CODE="$(curl -k -s -o /dev/null -w %{http_code} $FAUCET_URL)"
+
+    if [[ "$FULLNODE_HEALTHCHECK_STATUS_CODE" -eq 200 ]] && [[ "$FAUCET_HEALTHCHECK_STATUS_CODE" -eq 200 ]]; then
+      echo ">> Sui node is started after $ELAPSED seconds!"
+      exit 0
+    fi
+
+    # Add a heartbeat every 5 seconds and show status
+    if [[ $(( ELAPSED % 5 )) == 0 && "$ELAPSED" > 0 ]]; then
+      echo ">> Waiting for Sui node for $ELAPSED seconds.."
+      echo ">> Fullnode status: $FULLNODE_HEALTHCHECK_STATUS_CODE, Faucet status: $FAUCET_HEALTHCHECK_STATUS_CODE"
+    fi
+
+    # Ping every second
+    sleep 1
+    ELAPSED=$SECONDS
+  done
 }
 
 function stop_network() {
-  docker kill sui-network && docker rm sui-network
+  # Find the PID of the node using the lsof command
+  # -t = only return port number
+  # -c sui = where command name is 'sui'
+  # -a = <AND>
+  # -i:$FULLNODE_PORT = where the port is '$FULLNODE_PORT'
+  PID=$(lsof -t -c sui -a -i:$FULLNODE_PORT || true)
+
+  if [ ! -z "$PID" ]; then
+    echo "Stopping network at pid: $PID..."
+    kill "$PID" &>/dev/null
+    rm "$PWD/sui-node.log"
+  fi
 }
 
 function create_patch() {

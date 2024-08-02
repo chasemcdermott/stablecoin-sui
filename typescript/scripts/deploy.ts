@@ -42,6 +42,7 @@ export async function deployCommand(
     withUnpublishedDependencies?: boolean;
     makeImmutable?: boolean;
     writePackageId?: boolean;
+    gasBudget?: string;
   }
 ) {
   const client = new SuiClient({ url: options.rpcUrl });
@@ -63,7 +64,8 @@ export async function deployCommand(
     modules,
     dependencies,
     upgradeCapRecipient: options.upgradeCapRecipient ?? null,
-    makeImmutable: !!options.makeImmutable
+    makeImmutable: !!options.makeImmutable,
+    gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null
   });
 
   writeJsonOutput(`deploy-${packageName}`, transactionOutput);
@@ -92,6 +94,7 @@ export default program
     "Network RPC URL",
     process.env.RPC_URL
   )
+  .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .option(
     "--upgrade-cap-recipient <string>",
     "The address that will receive the UpgradeCap, optional if --make-immutable is set"

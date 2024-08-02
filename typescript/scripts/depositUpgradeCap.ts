@@ -35,6 +35,7 @@ export async function depositUpgradeCapCommand(options: {
   upgradeCapObjectId: string;
   upgradeCapOwnerKey: string;
   upgradeServiceObjectId: string;
+  gasBudget?: string;
 }) {
   const client = new SuiClient({ url: options.rpcUrl });
   log("RPC URL:", options.rpcUrl);
@@ -113,7 +114,8 @@ export async function depositUpgradeCapCommand(options: {
   const transactionOutput = await executeTransactionHelper({
     client,
     signer: upgradeCapOwner,
-    transaction
+    transaction,
+    gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null
   });
 
   writeJsonOutput("deposit-upgrade-cap", transactionOutput);
@@ -146,6 +148,7 @@ export default program
     "Network RPC URL",
     process.env.RPC_URL
   )
+  .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .action((options) => {
     depositUpgradeCapCommand(options);
   });

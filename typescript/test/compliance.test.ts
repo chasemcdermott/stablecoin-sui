@@ -23,6 +23,7 @@ import { Transaction } from "@mysten/sui/transactions";
 import {
   executeSponsoredTxHelper,
   expectError,
+  DEFAULT_GAS_BUDGET,
   getCoinBalance,
   getCreatedObjects,
   SuiTreasuryClient,
@@ -30,6 +31,7 @@ import {
 } from "../scripts/helpers";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
 import { deployCommand } from "../scripts/deploy";
+import { waitUntilNextEpoch } from "./utils";
 
 describe("Test coin transfer behavior when compliance controls are enabled", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
@@ -37,26 +39,30 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
   let treasuryClient: SuiTreasuryClient;
 
   let deployerKeys: Ed25519Keypair;
+  let upgraderKeys: Ed25519Keypair;
   let coinSenderKeys: Ed25519Keypair;
   let sponsorKeys: Ed25519Keypair;
   let coinRecipient: string;
   let mintCapId: string;
   let coinId: string;
 
-  before("Deploy USDC and create coin balance", async () => {
+  before("Setup keys", async () => {
     deployerKeys = await generateKeypairCommand({ prefund: true });
     coinSenderKeys = await generateKeypairCommand({ prefund: true });
     sponsorKeys = await generateKeypairCommand({ prefund: true });
     coinRecipient = (
       await generateKeypairCommand({ prefund: false })
     ).toSuiAddress();
+    upgraderKeys = await generateKeypairCommand({ prefund: false });
+  });
 
-    const upgraderKeys = await generateKeypairCommand({ prefund: false });
+  beforeEach("Deploy USDC, mint token to coin sender", async () => {
     const deployTxOutput = await deployCommand("usdc", {
       rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
-      withUnpublishedDependencies: true
+      withUnpublishedDependencies: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     // build a client from the usdc deploy transaction output
@@ -68,21 +74,23 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     await treasuryClient.configureNewController(
       deployerKeys, // master minter
       deployerKeys.toSuiAddress(), // controller
-      deployerKeys.toSuiAddress() // minter
+      deployerKeys.toSuiAddress(), // minter
+      { gasBudget: DEFAULT_GAS_BUDGET }
     );
     const mintAllowance = BigInt(100) * BigInt(10 ** 6); // 100 USDC
-    await treasuryClient.setMintAllowance(deployerKeys, mintAllowance);
+    await treasuryClient.setMintAllowance(deployerKeys, mintAllowance, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
     mintCapId = (await treasuryClient.getMintCapId(
       deployerKeys.toSuiAddress()
     )) as string;
-  });
 
-  beforeEach("Mint token to coin sender", async () => {
     const mintTxOutput = await treasuryClient.mint(
       deployerKeys,
       mintCapId,
       coinSenderKeys.toSuiAddress(),
-      BigInt(1) * BigInt(10 ** 6) // 1 USDC
+      BigInt(1) * BigInt(10 ** 6), // 1 USDC
+      { gasBudget: DEFAULT_GAS_BUDGET }
     );
     coinId = getCreatedObjects(mintTxOutput, {
       objectType: /(?<=coin::Coin<)\w{66}::usdc::USDC(?=>)/
@@ -104,7 +112,8 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
       client,
       coinId,
       coinSenderKeys,
-      coinRecipient
+      coinRecipient,
+      { gasBudget: DEFAULT_GAS_BUDGET }
     );
 
     assert.equal(result.effects?.status.status, "success");
@@ -123,14 +132,21 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     const coinType = treasuryClient.coinOtwType;
 
     // Accounts cannot transfer tokens immediately after being blocklisted
-    await treasuryClient.setBlocklistState(deployerKeys, sender, true);
+    await treasuryClient.setBlocklistState(deployerKeys, sender, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
     await expectError(
-      () => transferCoinHelper(client, coinId, coinSenderKeys, coinRecipient),
+      () =>
+        transferCoinHelper(client, coinId, coinSenderKeys, coinRecipient, {
+          gasBudget: DEFAULT_GAS_BUDGET
+        }),
       `Address ${sender} is denied for coin ${coinType.slice(2)}`
     );
 
     // Accounts can resume transferring tokens immediately after being unblocklisted
-    await treasuryClient.setBlocklistState(deployerKeys, sender, false);
+    await treasuryClient.setBlocklistState(deployerKeys, sender, false, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
 
     const senderBalBefore = await getCoinBalance(client, sender, coinType);
     const recipientBalBefore = await getCoinBalance(
@@ -143,7 +159,8 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
       client,
       coinId,
       coinSenderKeys,
-      coinRecipient
+      coinRecipient,
+      { gasBudget: DEFAULT_GAS_BUDGET }
     );
     assert.equal(result.effects?.status.status, "success");
     const senderBalAfter = await getCoinBalance(client, sender, coinType);
@@ -156,19 +173,40 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     assert.equal(recipientBalAfter, recipientBalBefore + 1000000);
   });
 
-  it("Outbound transfer permissions are updated immediately after pause/unpause", async () => {
+  it("Outbound transfer permissions are updated immediately after pause", async () => {
+    // Accounts cannot transfer tokens immediately after token is paused
+    await treasuryClient.setPausedState(deployerKeys, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await expectError(
+      () =>
+        transferCoinHelper(client, coinId, coinSenderKeys, coinRecipient, {
+          gasBudget: DEFAULT_GAS_BUDGET
+        }),
+      `Coin type is globally paused for use: ${treasuryClient.coinOtwType.slice(2)}`
+    );
+  });
+
+  it("Outbound transfer permissions are updated by the next epoch after unpause", async () => {
     const sender = coinSenderKeys.toSuiAddress();
     const coinType = treasuryClient.coinOtwType;
 
     // Accounts cannot transfer tokens immediately after token is paused
-    await treasuryClient.setPausedState(deployerKeys, true);
-    await expectError(
-      () => transferCoinHelper(client, coinId, coinSenderKeys, coinRecipient),
-      `Coin type is globally paused for use: ${treasuryClient.coinOtwType.slice(2)}`
-    );
+    await treasuryClient.setPausedState(deployerKeys, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await waitUntilNextEpoch(client);
 
-    // Accounts can resume transferring tokens immediately after token is unpaused
-    await treasuryClient.setPausedState(deployerKeys, false);
+    // Ensure that the pause has fully take effect for both outbound and inbound transfers.
+    assert.equal(await treasuryClient.isPaused("current"), true);
+    assert.equal(await treasuryClient.isPaused("next"), true);
+
+    // Accounts can resume transferring tokens by the next epoch after token is unpaused
+    await treasuryClient.setPausedState(deployerKeys, false, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await waitUntilNextEpoch(client);
+
     const senderBalBefore = await getCoinBalance(client, sender, coinType);
     const recipientBalBefore = await getCoinBalance(
       client,
@@ -180,7 +218,8 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
       client,
       coinId,
       coinSenderKeys,
-      coinRecipient
+      coinRecipient,
+      { gasBudget: DEFAULT_GAS_BUDGET }
     );
 
     assert.equal(result.effects?.status.status, "success");
@@ -199,7 +238,9 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     const coinType = treasuryClient.coinOtwType;
 
     // Sender cannot transfer tokens via sponsored transactions, immediately after being blocklisted
-    await treasuryClient.setBlocklistState(deployerKeys, sender, true);
+    await treasuryClient.setBlocklistState(deployerKeys, sender, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
     await expectError(
       () => {
         const txb = new Transaction();
@@ -208,14 +249,17 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
           client,
           txb,
           sender: coinSenderKeys,
-          sponsor: sponsorKeys
+          sponsor: sponsorKeys,
+          gasBudget: DEFAULT_GAS_BUDGET
         });
       },
       `Address ${sender} is denied for coin ${treasuryClient.coinOtwType.slice(2)}`
     );
 
     // Sender can transfer tokens via sponsored transactions, immediately after being unblocklisted
-    await treasuryClient.setBlocklistState(deployerKeys, sender, false);
+    await treasuryClient.setBlocklistState(deployerKeys, sender, false, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
     const senderBalBefore = await getCoinBalance(client, sender, coinType);
     const recipientBalBefore = await getCoinBalance(
       client,
@@ -229,7 +273,8 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
       client,
       txb,
       sender: coinSenderKeys,
-      sponsor: sponsorKeys
+      sponsor: sponsorKeys,
+      gasBudget: DEFAULT_GAS_BUDGET
     });
     assert.equal(result.effects?.status.status, "success");
     const senderBalAfter = await getCoinBalance(client, sender, coinType);
@@ -243,12 +288,11 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     assert.equal(recipientBalAfter, recipientBalBefore + 1000000);
   });
 
-  it("Outbound transfer permissions via sponsored transactions are updated immediately after pause/unpause", async () => {
-    const sender = coinSenderKeys.toSuiAddress();
-    const coinType = treasuryClient.coinOtwType;
-
+  it("Outbound transfer permissions via sponsored transactions are updated immediately after pause", async () => {
     // Sender cannot transfer tokens via sponsored transactions, immediately after token is paused
-    await treasuryClient.setPausedState(deployerKeys, true);
+    await treasuryClient.setPausedState(deployerKeys, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
     await expectError(
       () => {
         const txb = new Transaction();
@@ -257,14 +301,34 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
           client,
           txb,
           sender: coinSenderKeys,
-          sponsor: sponsorKeys
+          sponsor: sponsorKeys,
+          gasBudget: DEFAULT_GAS_BUDGET
         });
       },
       `Coin type is globally paused for use: ${treasuryClient.coinOtwType.slice(2)}`
     );
+  });
 
-    // Sender can transfer tokens via sponsored transactions, immediately after token is unpaused
-    await treasuryClient.setPausedState(deployerKeys, false);
+  it("Outbound transfer permissions via sponsored transactions are updated by the next epoch after unpause", async () => {
+    const sender = coinSenderKeys.toSuiAddress();
+    const coinType = treasuryClient.coinOtwType;
+
+    // Accounts cannot transfer tokens immediately after token is paused
+    await treasuryClient.setPausedState(deployerKeys, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await waitUntilNextEpoch(client);
+
+    // Ensure that the pause has fully take effect for both outbound and inbound transfers.
+    assert.equal(await treasuryClient.isPaused("current"), true);
+    assert.equal(await treasuryClient.isPaused("next"), true);
+
+    // Sender can transfer tokens via sponsored transactions by the next epoch after token is unpaused
+    await treasuryClient.setPausedState(deployerKeys, false, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await waitUntilNextEpoch(client);
+
     const senderBalBefore = await getCoinBalance(client, sender, coinType);
     const recipientBalBefore = await getCoinBalance(
       client,
@@ -278,7 +342,8 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
       client,
       txb,
       sender: coinSenderKeys,
-      sponsor: sponsorKeys
+      sponsor: sponsorKeys,
+      gasBudget: DEFAULT_GAS_BUDGET
     });
     assert.equal(result.effects?.status.status, "success");
     const senderBalAfter = await getCoinBalance(client, sender, coinType);

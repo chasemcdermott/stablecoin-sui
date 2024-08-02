@@ -21,6 +21,7 @@ import { strict as assert } from "assert";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import {
+  DEFAULT_GAS_BUDGET,
   getCreatedObjects,
   getPublishedPackages,
   resetPublishedAddressInPackageManifest
@@ -36,7 +37,8 @@ describe("Test deploy script", () => {
       rpcUrl: process.env.RPC_URL as string,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: deployerKeys.toSuiAddress(),
-      writePackageId: true
+      writePackageId: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     // Parse the transaction output to get the published package id
@@ -54,7 +56,8 @@ describe("Test deploy script", () => {
     const txOutput = await deployCommand("stablecoin", {
       rpcUrl: process.env.RPC_URL as string,
       deployerKey: deployerKeys.getSecretKey(),
-      upgradeCapRecipient: upgraderKeys.toSuiAddress()
+      upgradeCapRecipient: upgraderKeys.toSuiAddress(),
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     const createdObjects = getCreatedObjects(txOutput);
@@ -80,7 +83,8 @@ describe("Test deploy script", () => {
       rpcUrl: process.env.RPC_URL as string,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
-      makeImmutable: true
+      makeImmutable: true,
+      gasBudget: DEFAULT_GAS_BUDGET.toString()
     });
 
     const createdObjects = getCreatedObjects(txOutput);

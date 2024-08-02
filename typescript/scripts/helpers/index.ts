@@ -26,6 +26,7 @@ import {
   SuiObjectChangePublished,
   SuiTransactionBlockResponse
 } from "@mysten/sui/client";
+import { MIST_PER_SUI, normalizeSuiObjectId } from "@mysten/sui/utils";
 import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
@@ -38,7 +39,8 @@ import util from "util";
 
 export { default as SuiTreasuryClient } from "./treasuryClient";
 
-export const DENY_LIST_OBJECT_ID = "0x403";
+export const DENY_LIST_OBJECT_ID = normalizeSuiObjectId("0x403");
+export const DEFAULT_GAS_BUDGET = BigInt(1) * MIST_PER_SUI; // 1 SUI
 
 export class TransactionError extends Error {
   transactionOutput: SuiTransactionBlockResponse;
@@ -133,11 +135,11 @@ export function buildPackageHelper(args: {
     __dirname,
     `../../../packages/${args.packageName}`
   );
-  const withUnpublishedDependenciesArg = !!args.withUnpublishedDependencies
+  const withUnpublishedDependenciesArg = args.withUnpublishedDependencies
     ? "--with-unpublished-dependencies"
     : "";
   const rawCompiledPackages = execSync(
-    `sui move build --dump-bytecode-as-base64 --path ${packagePath} ${withUnpublishedDependenciesArg}`,
+    `sui move build --dump-bytecode-as-base64 --path ${packagePath} ${withUnpublishedDependenciesArg} 2> /dev/null`,
     { encoding: "utf-8" }
   );
   return JSON.parse(rawCompiledPackages);
@@ -202,6 +204,7 @@ function getMoveTomlFilepath(packageName: string) {
 export async function deployPackageHelper(args: {
   client: SuiClient;
   deployer: Ed25519Keypair;
+  gasBudget: bigint | null;
 
   modules: string[];
   dependencies: string[];
@@ -233,7 +236,8 @@ export async function deployPackageHelper(args: {
   return executeTransactionHelper({
     client: args.client,
     signer: args.deployer,
-    transaction
+    transaction,
+    gasBudget: args.gasBudget
   });
 }
 
@@ -241,7 +245,12 @@ export async function executeTransactionHelper(args: {
   client: SuiClient;
   signer: Ed25519Keypair;
   transaction: Transaction;
+  gasBudget: bigint | null;
 }): Promise<SuiTransactionBlockResponse> {
+  if (args.gasBudget) {
+    args.transaction.setGasBudget(args.gasBudget);
+  }
+
   const initialTxOutput = await args.client.signAndExecuteTransaction({
     signer: args.signer,
     transaction: args.transaction
@@ -275,6 +284,8 @@ export async function callViewFunction<T, Input = T>(args: {
 
   sender?: string;
 }) {
+  args.transaction.setGasBudget(DEFAULT_GAS_BUDGET);
+
   const { results } = await args.client.devInspectTransactionBlock({
     sender:
       args.sender ||
@@ -344,14 +355,17 @@ export async function transferCoinHelper(
   client: SuiClient,
   coinId: string,
   sender: Ed25519Keypair,
-  recipient: string
+  recipient: string,
+  options: { gasBudget: bigint | null }
 ) {
   const txb = new Transaction();
   txb.transferObjects([coinId], recipient);
+
   return executeTransactionHelper({
     client,
     signer: sender,
-    transaction: txb
+    transaction: txb,
+    gasBudget: options.gasBudget
   });
 }
 
@@ -359,24 +373,31 @@ export async function executeSponsoredTxHelper({
   client,
   txb,
   sender,
-  sponsor
+  sponsor,
+  gasBudget
 }: {
   client: SuiClient;
   txb: Transaction;
   sender: Ed25519Keypair;
   sponsor: Ed25519Keypair;
+  gasBudget: bigint | null;
 }): Promise<SuiTransactionBlockResponse> {
   const payment = await getGasCoinsFromAddress(client, sponsor.toSuiAddress());
+
   txb.setSender(sender.toSuiAddress());
   txb.setGasOwner(sponsor.toSuiAddress());
   txb.setGasPayment(payment);
+  if (gasBudget) {
+    txb.setGasBudget(gasBudget);
+  }
+
   const txBytes = await txb.build({ client });
 
   // Transaction needs to be signed by both the sender and the sponsor
   const sponsoredBytes = await sponsor.signTransaction(txBytes);
   const senderBytes = await sender.signTransaction(txBytes);
 
-  return await client.executeTransactionBlock({
+  return client.executeTransactionBlock({
     transactionBlock: txBytes,
     signature: [senderBytes.signature, sponsoredBytes.signature],
     options: {

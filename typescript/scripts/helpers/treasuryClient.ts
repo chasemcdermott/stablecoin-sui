@@ -27,8 +27,6 @@ import {
   callViewFunction
 } from ".";
 
-const GAS_BUDGET = 1_000_000_000;
-
 export default class SuiTreasuryClient {
   suiClient: SuiClient;
   treasuryObjectId: string;
@@ -128,7 +126,8 @@ export default class SuiTreasuryClient {
   async configureNewController(
     masterMinter: Ed25519Keypair,
     controllerAddress: string,
-    minterAddress: string
+    minterAddress: string,
+    options: { gasBudget: bigint | null }
   ) {
     const txb = new Transaction();
     txb.moveCall({
@@ -143,11 +142,16 @@ export default class SuiTreasuryClient {
     return executeTransactionHelper({
       client: this.suiClient,
       signer: masterMinter,
-      transaction: txb
+      transaction: txb,
+      gasBudget: options?.gasBudget ?? null
     });
   }
 
-  async setMintAllowance(controller: Ed25519Keypair, mintAllowance: bigint) {
+  async setMintAllowance(
+    controller: Ed25519Keypair,
+    mintAllowance: bigint,
+    options: { gasBudget: bigint | null }
+  ) {
     const txb = new Transaction();
     txb.moveCall({
       target: `${this.stablecoinPackageId}::treasury::configure_minter`,
@@ -161,7 +165,8 @@ export default class SuiTreasuryClient {
     return executeTransactionHelper({
       client: this.suiClient,
       signer: controller,
-      transaction: txb
+      transaction: txb,
+      gasBudget: options?.gasBudget ?? null
     });
   }
 
@@ -169,7 +174,8 @@ export default class SuiTreasuryClient {
     minter: Ed25519Keypair,
     mintCapId: string,
     recipient: string,
-    amount: bigint
+    amount: bigint,
+    options: { gasBudget: bigint | null }
   ) {
     const txb = new Transaction();
     txb.moveCall({
@@ -183,18 +189,19 @@ export default class SuiTreasuryClient {
         txb.object(recipient)
       ]
     });
-    txb.setGasBudget(GAS_BUDGET);
     return executeTransactionHelper({
       client: this.suiClient,
       signer: minter,
-      transaction: txb
+      transaction: txb,
+      gasBudget: options?.gasBudget ?? null
     });
   }
 
   async setBlocklistState(
     blocklisterKeys: Ed25519Keypair,
     addr: string,
-    blocked: boolean
+    blocked: boolean,
+    options: { gasBudget: bigint | null }
   ) {
     const txb = new Transaction();
     const target = blocked
@@ -209,15 +216,19 @@ export default class SuiTreasuryClient {
         txb.object(addr)
       ]
     });
-    txb.setGasBudget(GAS_BUDGET);
     return executeTransactionHelper({
       client: this.suiClient,
       signer: blocklisterKeys,
-      transaction: txb
+      transaction: txb,
+      gasBudget: options?.gasBudget ?? null
     });
   }
 
-  async setPausedState(pauserKeys: Ed25519Keypair, paused: boolean) {
+  async setPausedState(
+    pauserKeys: Ed25519Keypair,
+    paused: boolean,
+    options: { gasBudget: bigint | null }
+  ) {
     const txb = new Transaction();
     const target = paused
       ? `${this.stablecoinPackageId}::treasury::pause`
@@ -230,12 +241,29 @@ export default class SuiTreasuryClient {
         txb.object(DENY_LIST_OBJECT_ID)
       ]
     });
-    txb.setGasBudget(GAS_BUDGET);
     return executeTransactionHelper({
       client: this.suiClient,
       signer: pauserKeys,
-      transaction: txb
+      transaction: txb,
+      gasBudget: options?.gasBudget ?? null
     });
+  }
+
+  async isPaused(epochType: "current" | "next"): Promise<boolean> {
+    const txb = new Transaction();
+    txb.moveCall({
+      target: `0x2::coin::deny_list_v2_is_global_pause_enabled_${epochType}_epoch`,
+      typeArguments: [this.coinOtwType],
+      arguments: [txb.object(DENY_LIST_OBJECT_ID)]
+    });
+
+    const [isPaused] = await callViewFunction({
+      client: this.suiClient,
+      transaction: txb,
+      returnTypes: [bcs.Bool]
+    });
+
+    return isPaused;
   }
 
   async isBlocklisted(
@@ -261,7 +289,8 @@ export default class SuiTreasuryClient {
   async rotateController(
     masterMinter: Ed25519Keypair,
     newControllerAddress: string,
-    oldControllerAddress: string
+    oldControllerAddress: string,
+    options: { gasBudget: bigint | null }
   ) {
     const mintCapId = await this.getMintCapId(oldControllerAddress);
     if (!mintCapId) {
@@ -291,7 +320,8 @@ export default class SuiTreasuryClient {
     return executeTransactionHelper({
       client: this.suiClient,
       signer: masterMinter,
-      transaction: txb
+      transaction: txb,
+      gasBudget: options?.gasBudget ?? null
     });
   }
 
@@ -300,7 +330,8 @@ export default class SuiTreasuryClient {
     name: string,
     symbol: string,
     desc: string,
-    iconUrl: string
+    iconUrl: string,
+    options: { gasBudget: bigint | null }
   ) {
     if (!this.metadataObjectId) {
       throw new Error("Unknown metadata object ID");
@@ -322,7 +353,8 @@ export default class SuiTreasuryClient {
     return executeTransactionHelper({
       client: this.suiClient,
       signer: owner,
-      transaction: txb
+      transaction: txb,
+      gasBudget: options?.gasBudget ?? null
     });
   }
 
@@ -428,7 +460,7 @@ export default class SuiTreasuryClient {
     const bagId = roleFields.data.fields.id.id;
 
     const getBagObjectFields = async (keyType: string) => {
-      let dfo = await this.suiClient.getDynamicFieldObject({
+      const dfo = await this.suiClient.getDynamicFieldObject({
         parentId: bagId,
         name: {
           type: keyType,

@@ -42,6 +42,7 @@ export async function configureMinterHelper(
     minterAddress: string;
     mintAllowanceInDollars: bigint;
     finalControllerAddress: string;
+    gasBudget?: string;
   }
 ): Promise<string | undefined> {
   const {
@@ -51,6 +52,7 @@ export async function configureMinterHelper(
     mintAllowanceInDollars,
     finalControllerAddress
   } = options;
+  const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
 
   const hotMasterMinter = getEd25519KeypairFromPrivateKey(hotMasterMinterKey);
   const tempController = getEd25519KeypairFromPrivateKey(tempControllerKey);
@@ -110,7 +112,8 @@ export async function configureMinterHelper(
     const txOutput = await treasuryClient.configureNewController(
       hotMasterMinter,
       tempController.toSuiAddress(),
-      minterAddress
+      minterAddress,
+      { gasBudget }
     );
     writeJsonOutput("configure-new-controller", txOutput);
 
@@ -151,7 +154,8 @@ export async function configureMinterHelper(
     }
     const txOutput = await treasuryClient.setMintAllowance(
       tempController,
-      mintAllowance
+      mintAllowance,
+      { gasBudget }
     );
     writeJsonOutput("set-mint-allowance", txOutput);
   }
@@ -168,7 +172,8 @@ export async function configureMinterHelper(
   const txOutput = await treasuryClient.rotateController(
     hotMasterMinter,
     finalControllerAddress,
-    tempController.toSuiAddress()
+    tempController.toSuiAddress(),
+    { gasBudget }
   );
   writeJsonOutput("rotate-controller", txOutput);
 
@@ -212,6 +217,7 @@ export default program
     "Network RPC URL",
     process.env.RPC_URL
   )
+  .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 
