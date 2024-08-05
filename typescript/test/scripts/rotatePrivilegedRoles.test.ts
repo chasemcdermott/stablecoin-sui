@@ -28,7 +28,7 @@ import {
 } from "../../scripts/helpers";
 import { strict as assert } from "assert";
 
-describe("Test privileged key role rotation script", () => {
+describe("Test rotatate privileged roles script", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
   const client = new SuiClient({ url: RPC_URL });
   let treasuryClient: SuiTreasuryClient;
@@ -74,7 +74,7 @@ describe("Test privileged key role rotation script", () => {
     const randomKeys = await generateKeypairCommand({ prefund: false });
     await expectError(
       () =>
-        testPriviledgedKeyRoleRotation({
+        testRotatePrivilegedRoles({
           treasuryClient,
           treasuryOwner: randomKeys,
           newMasterMinter: newMasterMinterKey,
@@ -83,12 +83,12 @@ describe("Test privileged key role rotation script", () => {
           newMetadataUpdater: newMetadataUpdaterKey,
           newTreasuryOwner: newTreasuryOwnerKey
         }),
-      /Incorrect treasury owner key */
+      /Incorrect treasury owner key.*/
     );
   });
 
   it("Successfully updates all priviledged roles to given addresses", async () => {
-    await testPriviledgedKeyRoleRotation({
+    await testRotatePrivilegedRoles({
       treasuryClient,
       treasuryOwner: deployerKeys,
       newMasterMinter: newMasterMinterKey,
@@ -100,7 +100,7 @@ describe("Test privileged key role rotation script", () => {
   });
 });
 
-async function testPriviledgedKeyRoleRotation(args: {
+async function testRotatePrivilegedRoles(args: {
   treasuryClient: SuiTreasuryClient;
   treasuryOwner: Ed25519Keypair;
   newMasterMinter: Ed25519Keypair;

@@ -27,17 +27,6 @@ import {
 } from "./helpers";
 import { SuiClient } from "@mysten/sui/client";
 
-/**
- * After minter configuration is done
- *
- * Update master minter (after minter configuration is done!)
- * Update pauser
- * Update blocklister (after initial blocklisting, if necessary)
- * Update metadata updater
- * Initiate treasury owner role transfer
- *
- * @returns Transaction output
- */
 export async function rotatePrivilegedRolesHelper(
   treasuryClient: SuiTreasuryClient,
   options: {
@@ -97,9 +86,9 @@ export async function rotatePrivilegedRolesHelper(
     newTreasuryOwner,
     { gasBudget }
   );
-  writeJsonOutput("rotate-privileged-role-key", txOutput);
+  writeJsonOutput("rotate-privileged-roles", txOutput);
 
-  log("privileged role key rotation complete");
+  log("Privileged role key rotation complete");
 }
 
 export default program
