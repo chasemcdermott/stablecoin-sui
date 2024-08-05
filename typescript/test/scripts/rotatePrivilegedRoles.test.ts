@@ -28,7 +28,7 @@ import {
 } from "../../scripts/helpers";
 import { strict as assert } from "assert";
 
-describe("Test rotatate privileged roles script", () => {
+describe("Test rotate privileged roles script", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
   const client = new SuiClient({ url: RPC_URL });
   let treasuryClient: SuiTreasuryClient;
