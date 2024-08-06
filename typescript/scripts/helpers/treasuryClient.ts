@@ -499,4 +499,73 @@ export default class SuiTreasuryClient {
       metadataUpdater: metadataUpdaterFields.value
     };
   }
+
+  async rotatePrivilegedRoles(
+    owner: Ed25519Keypair,
+    newMasterMinter: string,
+    newBlockLister: string,
+    newPauser: string,
+    newMetadataUpdater: string,
+    newTreasuryOwner: string,
+    options: { gasBudget: bigint | null }
+  ) {
+    const rotatePrivilegedRolesTx = new Transaction();
+
+    // update master minter
+    rotatePrivilegedRolesTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::update_master_minter`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newMasterMinter)
+      ]
+    });
+
+    // update blocklister
+    rotatePrivilegedRolesTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::update_blocklister`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newBlockLister)
+      ]
+    });
+
+    // update pauser
+    rotatePrivilegedRolesTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::update_pauser`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newPauser)
+      ]
+    });
+
+    // update metadata updater
+    rotatePrivilegedRolesTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::update_metadata_updater`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newMetadataUpdater)
+      ]
+    });
+
+    // initiate ownership transfer
+    rotatePrivilegedRolesTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::transfer_ownership`,
+      typeArguments: [this.coinOtwType],
+      arguments: [
+        rotatePrivilegedRolesTx.object(this.treasuryObjectId),
+        rotatePrivilegedRolesTx.pure.address(newTreasuryOwner)
+      ]
+    });
+
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: owner,
+      transaction: rotatePrivilegedRolesTx,
+      gasBudget: options?.gasBudget ?? null
+    });
+  }
 }
