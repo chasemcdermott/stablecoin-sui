@@ -37,7 +37,7 @@ module sui_extensions::two_step_role_tests {
 
     fun setup(): (Scenario, TwoStepRole<TWO_STEP_ROLE_TESTS>) {
         let scenario = test_scenario::begin(ADMIN);
-        let role = two_step_role::new(ADMIN);
+        let role = two_step_role::new(TWO_STEP_ROLE_TESTS {}, ADMIN);
         (scenario, role)
     }
 
