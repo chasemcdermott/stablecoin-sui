@@ -118,7 +118,7 @@ module stablecoin::roles {
         ctx: &mut TxContext,
     ): Roles<T> {
         let mut data = bag::new(ctx);
-        data.add(OwnerKey {}, two_step_role::new<OwnerRole<T>>(OwnerRole<T> {}, owner));
+        data.add(OwnerKey {}, two_step_role::new(OwnerRole<T> {}, owner));
         data.add(MasterMinterKey {}, master_minter);
         data.add(BlocklisterKey {}, blocklister);
         data.add(PauserKey {}, pauser);

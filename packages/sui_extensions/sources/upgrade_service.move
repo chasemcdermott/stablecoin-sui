@@ -119,7 +119,7 @@ module sui_extensions::upgrade_service {
         assert!(is_one_time_witness<T>(&witness), ENotOneTimeWitness);
         let upgrade_service = UpgradeService<T> {
             id: object::new(ctx),
-            admin: two_step_role::new<AdminRole<T>>(AdminRole<T> {}, admin)
+            admin: two_step_role::new(AdminRole<T> {}, admin)
         };
         (upgrade_service, witness)
     }
