@@ -29,7 +29,7 @@ module stablecoin::roles {
     }
 
     /// Type used to specify which TwoStepRole the owner role corresponds to.
-    public struct OwnerRole<phantom T> {}
+    public struct OwnerRole<phantom T> has drop {}
 
     /// Key used to map to the mutable TwoStepRole of the owner EOA
     public struct OwnerKey {} has copy, store, drop;
@@ -118,7 +118,7 @@ module stablecoin::roles {
         ctx: &mut TxContext,
     ): Roles<T> {
         let mut data = bag::new(ctx);
-        data.add(OwnerKey {}, two_step_role::new<OwnerRole<T>>(owner));
+        data.add(OwnerKey {}, two_step_role::new(OwnerRole<T> {}, owner));
         data.add(MasterMinterKey {}, master_minter);
         data.add(BlocklisterKey {}, blocklister);
         data.add(PauserKey {}, pauser);

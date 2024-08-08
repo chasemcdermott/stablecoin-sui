@@ -74,7 +74,7 @@ module sui_extensions::two_step_role {
     // === Write functions ===
 
     /// Creates and initializes a TwoStepRole object.
-    public fun new<T>(active_address: address): TwoStepRole<T> {
+    public fun new<T: drop>(_witness: T, active_address: address): TwoStepRole<T> {
         TwoStepRole<T> {
             active_address,
             pending_address: option::none(),
