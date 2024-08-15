@@ -16,9 +16,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FULLNODE_PORT="$(jq -r .port sui.config.json)"
-FULLNODE_EPOCH_DURATION_MS="$(jq -r .epochDurationMs sui.config.json)"
-FAUCET_PORT="$(jq -r .faucetPort sui.config.json)"
+FULLNODE_PORT="9001"
+FAUCET_PORT="9123"
+FULLNODE_EPOCH_DURATION_MS="10000"
 FULLNODE_URL=http://localhost:$FULLNODE_PORT
 FAUCET_URL=http://localhost:$FAUCET_PORT
 
