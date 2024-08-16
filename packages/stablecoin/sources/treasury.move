@@ -275,8 +275,8 @@ module stablecoin::treasury {
         treasury: &Treasury<T>, 
         ctx: &mut TxContext
     ): MintCap<T> {
-        // treasury.assert_is_compatible();
-        // assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
+        treasury.assert_is_compatible();
+        assert!(treasury.roles.master_minter() == ctx.sender(), ENotMasterMinter);
         let mint_cap = MintCap { id: object::new(ctx) };
         event::emit(MintCapCreated<T> { 
             mint_cap: object::id(&mint_cap)
@@ -571,7 +571,7 @@ module stablecoin::treasury {
     /// Updates the CoinMetadata<T> object of the same type as the Treasury<T>.
     /// - Only callable by the metadata updater.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun update_metadata<T>(
+    entry fun update_metadata<T>(
         treasury: &Treasury<T>,
         metadata: &mut CoinMetadata<T>,
         name: string::String,
