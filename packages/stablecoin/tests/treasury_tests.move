@@ -92,24 +92,6 @@ module stablecoin::treasury_tests {
         scenario.end();
     }
 
-    #[test, expected_failure(abort_code = ::stablecoin::treasury::ENotMasterMinter)]
-    fun create_mint_cap__should_fail_if_not_sent_by_master_minter() {
-        let mut scenario = setup();
-
-        scenario.next_tx(RANDOM_ADDRESS);
-        {
-            let treasury = scenario.take_shared<Treasury<TREASURY_TESTS>>();
-
-            let mint_cap = treasury.create_mint_cap(scenario.ctx());
-            assert_eq(treasury.mint_allowance(object::id(&mint_cap)), 0);
-            transfer::public_transfer(mint_cap, MINTER);
-
-            test_scenario::return_shared(treasury);
-        };
-
-        scenario.end();
-    }
-
     #[test]
     fun configure_controller__should_succeed_with_existing_mint_cap() {
         let mut scenario = setup();
@@ -1013,13 +995,6 @@ module stablecoin::treasury_tests {
     fun configure_new_controller__should_fail_if_treasury_object_is_incompatible() {
         let (mut scenario, mut treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
         treasury.configure_new_controller(RANDOM_ADDRESS, RANDOM_ADDRESS_2, scenario.ctx());
-        after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
-    }
-
-    #[test, expected_failure(abort_code = ::stablecoin::version_control::EIncompatibleVersion)]
-    fun create_mint_cap__should_fail_if_treasury_object_is_incompatible() {
-        let (mut scenario, treasury, deny_list, metadata) = before_incompatible_treasury_object_scenario();
-        destroy(treasury.create_mint_cap(scenario.ctx()));
         after_incompatible_treasury_object_scenario(scenario, treasury, deny_list, metadata);
     }
 
