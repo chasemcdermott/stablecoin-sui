@@ -20,7 +20,7 @@ module sui_extensions::upgrade_service_tests {
         event,
         package::{Self, UpgradeTicket, UpgradeReceipt, UpgradeCap},
         test_scenario::{Self, Scenario},
-        test_utils::{assert_eq, assert_ref_eq, destroy, create_one_time_witness}
+        test_utils::{assert_eq, destroy, create_one_time_witness}
     };
     use sui_extensions::{
         upgrade_service::{Self, UpgradeService, AdminRole},
