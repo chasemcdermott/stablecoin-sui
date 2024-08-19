@@ -127,7 +127,7 @@ module sui_extensions::upgrade_service {
     /// Performs a one-time deposit of an `UpgradeCap` into an `UpgradeService<T>`.
     /// `UpgradeCap` must control the package that `T` is defined in.
     /// - Only callable if the `UpgradeCap` has not been used for an upgrade.
-    public fun deposit<T>(upgrade_service: &mut UpgradeService<T>, upgrade_cap: UpgradeCap) {
+    entry fun deposit<T>(upgrade_service: &mut UpgradeService<T>, upgrade_cap: UpgradeCap) {
         let package_address_of_type = address::from_ascii_bytes(
             type_name::get_with_original_ids<T>().get_address().as_bytes()
         );
@@ -143,23 +143,25 @@ module sui_extensions::upgrade_service {
         });
     }
 
-    /// Extracts the stored `UpgradeCap`.
+    /// Extracts the stored `UpgradeCap` and transfers it to a recipient address.
     /// - Only callable by the admin.
-    public fun extract<T>(upgrade_service: &mut UpgradeService<T>, ctx: &TxContext): UpgradeCap {
+    entry fun extract<T>(upgrade_service: &mut UpgradeService<T>, recipient: address, ctx: &TxContext) {
         upgrade_service.admin.assert_sender_is_active_role(ctx);
         upgrade_service.assert_upgrade_cap_exists();
 
         let upgrade_cap = remove_upgrade_cap(upgrade_service);
+        let upgrade_cap_id = object::id(&upgrade_cap);
+
+        transfer::public_transfer(upgrade_cap, recipient);
 
         event::emit(UpgradeCapExtracted<T> {
-            upgrade_cap_id: object::id(&upgrade_cap)
+            upgrade_cap_id
         });
-        upgrade_cap
     }
 
     /// Permanently destroys the `UpgradeService<T>`.
     /// - Only callable by the admin.
-    public fun destroy_empty<T>(upgrade_service: UpgradeService<T>, ctx: &TxContext) {
+    entry fun destroy_empty<T>(upgrade_service: UpgradeService<T>, ctx: &TxContext) {
         upgrade_service.admin.assert_sender_is_active_role(ctx);
         upgrade_service.assert_upgrade_cap_does_not_exist();
 
@@ -172,13 +174,13 @@ module sui_extensions::upgrade_service {
 
     /// Start admin role transfer process.
     /// - Only callable by the admin.
-    public fun change_admin<T>(upgrade_service: &mut UpgradeService<T>, new_admin: address, ctx: &TxContext) {
+    entry fun change_admin<T>(upgrade_service: &mut UpgradeService<T>, new_admin: address, ctx: &TxContext) {
         upgrade_service.admin.begin_role_transfer(new_admin, ctx)
     }
 
     /// Finalize admin role transfer process.
     /// - Only callable by the pending admin.
-    public fun accept_admin<T>(upgrade_service: &mut UpgradeService<T>, ctx: &TxContext) {
+    entry fun accept_admin<T>(upgrade_service: &mut UpgradeService<T>, ctx: &TxContext) {
         upgrade_service.admin.accept_role(ctx)
     }
 
