@@ -25,6 +25,7 @@ import depositUpgradeCap from "./depositUpgradeCap";
 import setBlocklistState from "./setBlocklistState";
 import configureMinter from "./configureMinter";
 import rotatePrivilegedRoles from "./rotatePrivilegedRoles";
+import changeUpgradeServiceAdmin from "./changeUpgradeServiceAdmin";
 
 program
   .name("scripts")
@@ -34,7 +35,8 @@ program
   .addCommand(generateKeypair)
   .addCommand(depositUpgradeCap)
   .addCommand(setBlocklistState)
-  .addCommand(rotatePrivilegedRoles);
+  .addCommand(rotatePrivilegedRoles)
+  .addCommand(changeUpgradeServiceAdmin);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();
