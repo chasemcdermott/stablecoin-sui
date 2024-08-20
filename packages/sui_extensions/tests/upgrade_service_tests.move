@@ -35,6 +35,7 @@ module sui_extensions::upgrade_service_tests {
     const DEPLOYER: address = @0x10;
     const UPGRADE_SERVICE_ADMIN: address = @0x20;
     const RANDOM_ADDRESS: address = @0x30;
+    const UPGRADE_CAP_RECIPIENT: address = @0x40;
     
     const UPGRADE_CAP_PACKAGE_ID: address = @0x1000;
     const TEST_DIGEST: vector<u8> = vector[0, 1, 2];
@@ -127,7 +128,7 @@ module sui_extensions::upgrade_service_tests {
 
         // Random address attempts to extract the `UpgradeCap`, should fail.
         scenario.next_tx(RANDOM_ADDRESS);
-        destroy(test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario));
+        test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario);
         
         scenario.end();
     }
@@ -138,13 +139,13 @@ module sui_extensions::upgrade_service_tests {
 
         // Extract the `UpgradeCap`.
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
-        destroy(test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario));
+        test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario);
 
         // Extract the `UpgradeCap` again, should fail.
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
         {
             let mut upgrade_service = scenario.take_shared<UpgradeService<UPGRADE_SERVICE_TESTS>>();
-            destroy(upgrade_service.extract(scenario.ctx()));
+            upgrade_service.extract(UPGRADE_CAP_RECIPIENT, scenario.ctx());
             test_scenario::return_shared(upgrade_service);
         };
         
@@ -156,7 +157,7 @@ module sui_extensions::upgrade_service_tests {
         let mut scenario = setup_with_shared_upgrade_service();
 
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
-        destroy(test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario));
+        test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario);
         
         scenario.end();
     }
@@ -166,7 +167,7 @@ module sui_extensions::upgrade_service_tests {
         let mut scenario = setup_with_shared_upgrade_service();
 
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
-        destroy(test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario));
+        test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario);
 
         // Random address attempts to destroy the `UpgradeService<T>`, should fail.
         scenario.next_tx(RANDOM_ADDRESS);
@@ -192,7 +193,7 @@ module sui_extensions::upgrade_service_tests {
         let mut scenario = setup_with_shared_upgrade_service();
 
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
-        destroy(test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario));
+        test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario);
 
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
         test_destroy_empty<UPGRADE_SERVICE_TESTS>(&mut scenario);
@@ -280,7 +281,7 @@ module sui_extensions::upgrade_service_tests {
 
         // Extract the `UpgradeCap`.
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
-        destroy(test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario));
+        test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario);
 
         // Attempt to authorize an upgrade after the `UpgradeCap` has been extracted, should fail.
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
@@ -401,7 +402,7 @@ module sui_extensions::upgrade_service_tests {
 
         // Extract the `UpgradeCap`.
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
-        destroy(test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario));
+        test_extract<UPGRADE_SERVICE_TESTS>(&mut scenario);
 
         // Attempt to commit the upgrade after the `UpgradeCap` has been extracted, should fail.
         scenario.next_tx(UPGRADE_SERVICE_ADMIN);
@@ -527,35 +528,36 @@ module sui_extensions::upgrade_service_tests {
         test_scenario::return_shared(upgrade_service);
     }
 
-    fun test_extract<T>(scenario: &mut Scenario): UpgradeCap {
+    fun test_extract<T>(scenario: &mut Scenario) {
         let mut upgrade_service = scenario.take_shared<UpgradeService<T>>();
-        
+
+        let prev_upgrade_cap_id = object::id(upgrade_service.borrow_upgrade_cap_for_testing());
         let prev_upgrade_cap_package = upgrade_service.borrow_upgrade_cap_for_testing().package();
         let prev_upgrade_cap_version = upgrade_service.borrow_upgrade_cap_for_testing().version();
         let prev_upgrade_cap_policy = upgrade_service.borrow_upgrade_cap_for_testing().policy();
 
-        let upgrade_cap = upgrade_service.extract(scenario.ctx());
-        let upgrade_cap_id = object::id(&upgrade_cap);
-
+        upgrade_service.extract(UPGRADE_CAP_RECIPIENT, scenario.ctx());
         assert_eq(upgrade_service.exists_upgrade_cap(), false);
 
+        // Ensure that the correct event was emitted.
+        assert_eq(event::num_events(), 1);
+        assert_eq(
+            last_event_by_type(),
+            upgrade_service::create_upgrade_cap_extracted_event<T>(prev_upgrade_cap_id)
+        );
+
         // Ensure that the extracted `UpgradeCap` has the same fields.
+        scenario.next_tx(UPGRADE_CAP_RECIPIENT);
+        let upgrade_cap = scenario.take_from_sender<UpgradeCap>();
         check_upgrade_cap(
             &upgrade_cap,
             prev_upgrade_cap_package,
             prev_upgrade_cap_version,
             prev_upgrade_cap_policy
         );
-
-        // Ensure that the correct event was emitted.
-        assert_eq(event::num_events(), 1);
-        assert_eq(
-            last_event_by_type(),
-            upgrade_service::create_upgrade_cap_extracted_event<T>(upgrade_cap_id)
-        );
+        scenario.return_to_sender(upgrade_cap);
 
         test_scenario::return_shared(upgrade_service);
-        upgrade_cap
     }
 
     fun test_destroy_empty<T>(scenario: &mut Scenario){

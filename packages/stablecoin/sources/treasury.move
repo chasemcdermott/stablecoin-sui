@@ -251,7 +251,7 @@ module stablecoin::treasury {
     /// Configures a controller of a MintCap object.
     /// - Only callable by the master minter.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun configure_controller<T>(
+    entry fun configure_controller<T>(
         treasury: &mut Treasury<T>, 
         controller: address, 
         mint_cap_id: ID,
@@ -271,7 +271,7 @@ module stablecoin::treasury {
     /// Creates a MintCap object.
     /// - Only callable by the master minter.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun create_mint_cap<T>(
+    fun create_mint_cap<T>(
         treasury: &Treasury<T>, 
         ctx: &mut TxContext
     ): MintCap<T> {
@@ -291,7 +291,7 @@ module stablecoin::treasury {
     /// 
     /// - Only callable by the master minter.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun configure_new_controller<T>(
+    entry fun configure_new_controller<T>(
         treasury: &mut Treasury<T>, 
         controller: address, 
         minter: address,
@@ -305,7 +305,7 @@ module stablecoin::treasury {
     /// Removes a controller.
     /// - Only callable by the master minter.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun remove_controller<T>(
+    entry fun remove_controller<T>(
         treasury: &mut Treasury<T>, 
         controller: address, 
         ctx: &TxContext
@@ -325,7 +325,7 @@ module stablecoin::treasury {
     /// - Only callable by the MintCap's controller.
     /// - Only callable when not paused.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun configure_minter<T>(
+    entry fun configure_minter<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &DenyList, 
         new_allowance: u64, 
@@ -357,7 +357,7 @@ module stablecoin::treasury {
     /// - Only callable by the MintCap's controller.
     /// - Only callable when not paused.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun increment_mint_allowance<T>(
+    entry fun increment_mint_allowance<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &DenyList, 
         allowance_increment: u64, 
@@ -388,7 +388,7 @@ module stablecoin::treasury {
     /// Deauthorizes a MintCap object.
     /// - Only callable by the MintCap's controller.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun remove_minter<T>(
+    entry fun remove_minter<T>(
         treasury: &mut Treasury<T>, 
         ctx: &TxContext
     ) {
@@ -476,7 +476,7 @@ module stablecoin::treasury {
     /// Blocklists an address.
     /// - Only callable by the blocklister.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun blocklist<T>(
+    entry fun blocklist<T>(
         treasury: &mut Treasury<T>,
         deny_list: &mut DenyList,
         addr: address,
@@ -496,7 +496,7 @@ module stablecoin::treasury {
     /// Unblocklists an address.
     /// - Only callable by the blocklister.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun unblocklist<T>(
+    entry fun unblocklist<T>(
         treasury: &mut Treasury<T>,
         deny_list: &mut DenyList,
         addr: address,
@@ -516,7 +516,7 @@ module stablecoin::treasury {
     /// Triggers stopped state; pause all transfers.
     /// - Only callable by the pauser.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun pause<T>(
+    entry fun pause<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &mut DenyList,
         ctx: &mut TxContext
@@ -535,7 +535,7 @@ module stablecoin::treasury {
     /// Restores normal state; unpause all transfers.
     /// - Only callable by the pauser.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun unpause<T>(
+    entry fun unpause<T>(
         treasury: &mut Treasury<T>, 
         deny_list: &mut DenyList,
         ctx: &mut TxContext
@@ -571,7 +571,7 @@ module stablecoin::treasury {
     /// Updates the CoinMetadata<T> object of the same type as the Treasury<T>.
     /// - Only callable by the metadata updater.
     /// - Only callable if the Treasury object is compatible with this package.
-    public fun update_metadata<T>(
+    entry fun update_metadata<T>(
         treasury: &Treasury<T>,
         metadata: &mut CoinMetadata<T>,
         name: string::String,
