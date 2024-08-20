@@ -1,0 +1,6 @@
+{
+  "port": 9001,
+  "faucetPort": 9123,
+  "epochDurationMs": 10000,
+  "compilerVersion": "1.30.1"
+}

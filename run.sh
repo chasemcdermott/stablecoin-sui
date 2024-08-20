@@ -143,7 +143,7 @@ function create_patch() {
 }
 
 function _get_packages() {
-  find "packages" -type d -mindepth 1 -maxdepth 1
+  find "packages" -type f -name "Move.toml" -exec dirname {} \; | sort | uniq
 }
 
 # This script takes in a function name as the first argument, 

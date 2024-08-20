@@ -351,24 +351,6 @@ function getObjectsByType<T extends SuiObjectChange>(
   return objects || [];
 }
 
-export async function transferCoinHelper(
-  client: SuiClient,
-  coinId: string,
-  sender: Ed25519Keypair,
-  recipient: string,
-  options: { gasBudget: bigint | null }
-) {
-  const txb = new Transaction();
-  txb.transferObjects([coinId], recipient);
-
-  return executeTransactionHelper({
-    client,
-    signer: sender,
-    transaction: txb,
-    gasBudget: options.gasBudget
-  });
-}
-
 export async function executeSponsoredTxHelper({
   client,
   txb,
@@ -397,7 +379,7 @@ export async function executeSponsoredTxHelper({
   const sponsoredBytes = await sponsor.signTransaction(txBytes);
   const senderBytes = await sender.signTransaction(txBytes);
 
-  return client.executeTransactionBlock({
+  const txOutput = await client.executeTransactionBlock({
     transactionBlock: txBytes,
     signature: [senderBytes.signature, sponsoredBytes.signature],
     options: {
@@ -406,6 +388,12 @@ export async function executeSponsoredTxHelper({
       showObjectChanges: true
     }
   });
+
+  if (txOutput.effects?.status.status === "failure") {
+    throw new TransactionError(txOutput.effects.status.error, txOutput);
+  }
+
+  return txOutput;
 }
 
 export async function getCoinBalance(
