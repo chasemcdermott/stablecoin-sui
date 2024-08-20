@@ -27,11 +27,13 @@ import {
   getCoinBalance,
   getCreatedObjects,
   SuiTreasuryClient,
-  transferCoinHelper
+  executeTransactionHelper
 } from "../scripts/helpers";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
 import { deployCommand } from "../scripts/deploy";
 import { waitUntilNextEpoch } from "./utils";
+
+const AMOUNT: number = 1000000; // 1 USDC
 
 describe("Test coin transfer behavior when compliance controls are enabled", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
@@ -89,7 +91,7 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
       deployerKeys,
       mintCapId,
       coinSenderKeys.toSuiAddress(),
-      BigInt(1) * BigInt(10 ** 6), // 1 USDC
+      BigInt(AMOUNT), // 1 USDC
       { gasBudget: DEFAULT_GAS_BUDGET }
     );
     coinId = getCreatedObjects(mintTxOutput, {
@@ -98,33 +100,12 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
   });
 
   it("Account can transfer tokens under normal circumstance", async () => {
-    const sender = coinSenderKeys.toSuiAddress();
-    const coinType = treasuryClient.coinOtwType;
-
-    const senderBalBefore = await getCoinBalance(client, sender, coinType);
-    const recipientBalBefore = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
-    );
-
-    const result = await transferCoinHelper(
-      client,
-      coinId,
-      coinSenderKeys,
-      coinRecipient,
-      { gasBudget: DEFAULT_GAS_BUDGET }
-    );
-
-    assert.equal(result.effects?.status.status, "success");
-    const senderBalAfter = await getCoinBalance(client, sender, coinType);
-    const recipientBalAfter = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
-    );
-    assert.equal(senderBalAfter, senderBalBefore - 1000000);
-    assert.equal(recipientBalAfter, recipientBalBefore + 1000000);
+    await testTransferCoinAndValidateBalanceChange({
+      treasuryClient,
+      sender: coinSenderKeys,
+      recipient: coinRecipient,
+      coinId
+    });
   });
 
   it("Outbound transfer permissions are updated immediately after blocklist/unblocklist", async () => {
@@ -137,8 +118,11 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     });
     await expectError(
       () =>
-        transferCoinHelper(client, coinId, coinSenderKeys, coinRecipient, {
-          gasBudget: DEFAULT_GAS_BUDGET
+        testTransferCoinAndValidateBalanceChange({
+          treasuryClient,
+          sender: coinSenderKeys,
+          recipient: coinRecipient,
+          coinId
         }),
       `Address ${sender} is denied for coin ${coinType.slice(2)}`
     );
@@ -147,30 +131,123 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     await treasuryClient.setBlocklistState(deployerKeys, sender, false, {
       gasBudget: DEFAULT_GAS_BUDGET
     });
+    await testTransferCoinAndValidateBalanceChange({
+      treasuryClient,
+      sender: coinSenderKeys,
+      recipient: coinRecipient,
+      coinId
+    });
+  });
 
-    const senderBalBefore = await getCoinBalance(client, sender, coinType);
-    const recipientBalBefore = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
+  it("Inbound transfer permissions are updated by the next epoch after blocklist/unblocklist", async () => {
+    await treasuryClient.setBlocklistState(deployerKeys, coinRecipient, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+
+    await waitUntilNextEpoch(client);
+
+    assert.equal(
+      await treasuryClient.isBlocklisted(coinRecipient, "current"),
+      true
+    );
+    assert.equal(
+      await treasuryClient.isBlocklisted(coinRecipient, "next"),
+      true
+    );
+    await expectError(
+      () =>
+        testTransferCoinAndValidateBalanceChange({
+          treasuryClient,
+          sender: coinSenderKeys,
+          recipient: coinRecipient,
+          coinId
+        }),
+      `AddressDeniedForCoin { address: ${coinRecipient}, coin_type: "${treasuryClient.coinOtwType.slice(2)}" }`
     );
 
-    const result = await transferCoinHelper(
-      client,
+    // Accounts can resume receiving tokens by the next epoch, after being unblocklisted
+    await treasuryClient.setBlocklistState(deployerKeys, coinRecipient, false, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await waitUntilNextEpoch(client);
+    await testTransferCoinAndValidateBalanceChange({
+      treasuryClient,
+      sender: coinSenderKeys,
+      recipient: coinRecipient,
+      coinId
+    });
+  });
+
+  it("Outbound transfer permissions via sponsored transactions are updated immediately after blocklist/unblocklist", async () => {
+    const sender = coinSenderKeys.toSuiAddress();
+
+    // Sender cannot transfer tokens via sponsored transactions, immediately after being blocklisted
+    await treasuryClient.setBlocklistState(deployerKeys, sender, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await expectError(
+      () =>
+        testTransferCoinAndValidateBalanceChange({
+          treasuryClient,
+          sender: coinSenderKeys,
+          recipient: coinRecipient,
+          coinId,
+          sponsor: sponsorKeys
+        }),
+      `Address ${sender} is denied for coin ${treasuryClient.coinOtwType.slice(2)}`
+    );
+
+    // Sender can transfer tokens via sponsored transactions, immediately after being unblocklisted
+    await treasuryClient.setBlocklistState(deployerKeys, sender, false, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await testTransferCoinAndValidateBalanceChange({
+      treasuryClient,
+      sender: coinSenderKeys,
+      recipient: coinRecipient,
       coinId,
-      coinSenderKeys,
-      coinRecipient,
-      { gasBudget: DEFAULT_GAS_BUDGET }
+      sponsor: sponsorKeys
+    });
+  });
+
+  it("Inbound transfer permissions via sponsored transactions are updated by the next epoch after blocklist/unblocklist", async () => {
+    await treasuryClient.setBlocklistState(deployerKeys, coinRecipient, true, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await waitUntilNextEpoch(client);
+
+    assert.equal(
+      await treasuryClient.isBlocklisted(coinRecipient, "current"),
+      true
     );
-    assert.equal(result.effects?.status.status, "success");
-    const senderBalAfter = await getCoinBalance(client, sender, coinType);
-    const recipientBalAfter = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
+    assert.equal(
+      await treasuryClient.isBlocklisted(coinRecipient, "next"),
+      true
     );
-    assert.equal(senderBalAfter, senderBalBefore - 1000000);
-    assert.equal(recipientBalAfter, recipientBalBefore + 1000000);
+    await expectError(
+      () =>
+        testTransferCoinAndValidateBalanceChange({
+          treasuryClient,
+          sender: coinSenderKeys,
+          recipient: coinRecipient,
+          coinId,
+          sponsor: sponsorKeys
+        }),
+      `AddressDeniedForCoin { address: ${coinRecipient}, coin_type: "${treasuryClient.coinOtwType.slice(2)}" }`
+    );
+
+    // Accounts can resume receiving tokens by the next epoch, after being unblocklisted
+    await treasuryClient.setBlocklistState(deployerKeys, coinRecipient, false, {
+      gasBudget: DEFAULT_GAS_BUDGET
+    });
+    await waitUntilNextEpoch(client);
+    await testTransferCoinAndValidateBalanceChange({
+      treasuryClient,
+      sender: coinSenderKeys,
+      recipient: coinRecipient,
+      coinId,
+      sponsor: sponsorKeys
+    });
   });
 
   it("Outbound transfer permissions are updated immediately after pause", async () => {
@@ -180,18 +257,17 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     });
     await expectError(
       () =>
-        transferCoinHelper(client, coinId, coinSenderKeys, coinRecipient, {
-          gasBudget: DEFAULT_GAS_BUDGET
+        testTransferCoinAndValidateBalanceChange({
+          treasuryClient,
+          sender: coinSenderKeys,
+          recipient: coinRecipient,
+          coinId
         }),
       `Coin type is globally paused for use: ${treasuryClient.coinOtwType.slice(2)}`
     );
   });
 
   it("Outbound transfer permissions are updated by the next epoch after unpause", async () => {
-    const sender = coinSenderKeys.toSuiAddress();
-    const coinType = treasuryClient.coinOtwType;
-
-    // Accounts cannot transfer tokens immediately after token is paused
     await treasuryClient.setPausedState(deployerKeys, true, {
       gasBudget: DEFAULT_GAS_BUDGET
     });
@@ -206,86 +282,12 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
       gasBudget: DEFAULT_GAS_BUDGET
     });
     await waitUntilNextEpoch(client);
-
-    const senderBalBefore = await getCoinBalance(client, sender, coinType);
-    const recipientBalBefore = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
-    );
-
-    const result = await transferCoinHelper(
-      client,
-      coinId,
-      coinSenderKeys,
-      coinRecipient,
-      { gasBudget: DEFAULT_GAS_BUDGET }
-    );
-
-    assert.equal(result.effects?.status.status, "success");
-    const senderBalAfter = await getCoinBalance(client, sender, coinType);
-    const recipientBalAfter = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
-    );
-    assert.equal(senderBalAfter, senderBalBefore - 1000000);
-    assert.equal(recipientBalAfter, recipientBalBefore + 1000000);
-  });
-
-  it("Outbound transfer permissions via sponsored transactions are updated immediately after blocklist/unblocklist", async () => {
-    const sender = coinSenderKeys.toSuiAddress();
-    const coinType = treasuryClient.coinOtwType;
-
-    // Sender cannot transfer tokens via sponsored transactions, immediately after being blocklisted
-    await treasuryClient.setBlocklistState(deployerKeys, sender, true, {
-      gasBudget: DEFAULT_GAS_BUDGET
-    });
-    await expectError(
-      () => {
-        const txb = new Transaction();
-        txb.transferObjects([coinId], coinRecipient);
-        return executeSponsoredTxHelper({
-          client,
-          txb,
-          sender: coinSenderKeys,
-          sponsor: sponsorKeys,
-          gasBudget: DEFAULT_GAS_BUDGET
-        });
-      },
-      `Address ${sender} is denied for coin ${treasuryClient.coinOtwType.slice(2)}`
-    );
-
-    // Sender can transfer tokens via sponsored transactions, immediately after being unblocklisted
-    await treasuryClient.setBlocklistState(deployerKeys, sender, false, {
-      gasBudget: DEFAULT_GAS_BUDGET
-    });
-    const senderBalBefore = await getCoinBalance(client, sender, coinType);
-    const recipientBalBefore = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
-    );
-
-    const txb = new Transaction();
-    txb.transferObjects([coinId], coinRecipient);
-    const result = await executeSponsoredTxHelper({
-      client,
-      txb,
+    await testTransferCoinAndValidateBalanceChange({
+      treasuryClient,
       sender: coinSenderKeys,
-      sponsor: sponsorKeys,
-      gasBudget: DEFAULT_GAS_BUDGET
+      recipient: coinRecipient,
+      coinId
     });
-    assert.equal(result.effects?.status.status, "success");
-    const senderBalAfter = await getCoinBalance(client, sender, coinType);
-    const recipientBalAfter = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
-    );
-
-    assert.equal(senderBalAfter, senderBalBefore - 1000000);
-    assert.equal(recipientBalAfter, recipientBalBefore + 1000000);
   });
 
   it("Outbound transfer permissions via sponsored transactions are updated immediately after pause", async () => {
@@ -294,26 +296,19 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
       gasBudget: DEFAULT_GAS_BUDGET
     });
     await expectError(
-      () => {
-        const txb = new Transaction();
-        txb.transferObjects([coinId], coinRecipient);
-        return executeSponsoredTxHelper({
-          client,
-          txb,
+      () =>
+        testTransferCoinAndValidateBalanceChange({
+          treasuryClient,
           sender: coinSenderKeys,
-          sponsor: sponsorKeys,
-          gasBudget: DEFAULT_GAS_BUDGET
-        });
-      },
+          recipient: coinRecipient,
+          coinId,
+          sponsor: sponsorKeys
+        }),
       `Coin type is globally paused for use: ${treasuryClient.coinOtwType.slice(2)}`
     );
   });
 
   it("Outbound transfer permissions via sponsored transactions are updated by the next epoch after unpause", async () => {
-    const sender = coinSenderKeys.toSuiAddress();
-    const coinType = treasuryClient.coinOtwType;
-
-    // Accounts cannot transfer tokens immediately after token is paused
     await treasuryClient.setPausedState(deployerKeys, true, {
       gasBudget: DEFAULT_GAS_BUDGET
     });
@@ -329,30 +324,75 @@ describe("Test coin transfer behavior when compliance controls are enabled", () 
     });
     await waitUntilNextEpoch(client);
 
-    const senderBalBefore = await getCoinBalance(client, sender, coinType);
-    const recipientBalBefore = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
-    );
-
-    const txb = new Transaction();
-    txb.transferObjects([coinId], coinRecipient);
-    const result = await executeSponsoredTxHelper({
-      client,
-      txb,
+    await testTransferCoinAndValidateBalanceChange({
+      treasuryClient,
       sender: coinSenderKeys,
-      sponsor: sponsorKeys,
-      gasBudget: DEFAULT_GAS_BUDGET
+      recipient: coinRecipient,
+      coinId,
+      sponsor: sponsorKeys
     });
-    assert.equal(result.effects?.status.status, "success");
-    const senderBalAfter = await getCoinBalance(client, sender, coinType);
-    const recipientBalAfter = await getCoinBalance(
-      client,
-      coinRecipient,
-      coinType
-    );
-    assert.equal(senderBalAfter, senderBalBefore - 1000000);
-    assert.equal(recipientBalAfter, recipientBalBefore + 1000000);
   });
 });
+
+async function testTransferCoinAndValidateBalanceChange({
+  treasuryClient,
+  sender,
+  recipient,
+  coinId,
+  sponsor,
+  gasBudget = DEFAULT_GAS_BUDGET,
+  amount = AMOUNT
+}: {
+  treasuryClient: SuiTreasuryClient;
+  sender: Ed25519Keypair;
+  recipient: string;
+  coinId: string;
+  sponsor?: Ed25519Keypair;
+  gasBudget?: bigint;
+  amount?: number;
+}) {
+  const { suiClient: client, coinOtwType } = treasuryClient;
+
+  const senderBalBefore = await getCoinBalance(
+    client,
+    sender.toSuiAddress(),
+    coinOtwType
+  );
+  const recipientBalBefore = await getCoinBalance(
+    client,
+    recipient,
+    coinOtwType
+  );
+
+  const txb = new Transaction();
+  txb.transferObjects([coinId], recipient);
+
+  if (!sponsor) {
+    await executeTransactionHelper({
+      client,
+      signer: sender,
+      transaction: txb,
+      gasBudget
+    });
+  } else {
+    await executeSponsoredTxHelper({
+      client,
+      txb,
+      sender,
+      sponsor,
+      gasBudget
+    });
+  }
+  const senderBalAfter = await getCoinBalance(
+    client,
+    sender.toSuiAddress(),
+    coinOtwType
+  );
+  const recipientBalAfter = await getCoinBalance(
+    client,
+    recipient,
+    coinOtwType
+  );
+  assert.equal(senderBalAfter, senderBalBefore - amount);
+  assert.equal(recipientBalAfter, recipientBalBefore + amount);
+}
