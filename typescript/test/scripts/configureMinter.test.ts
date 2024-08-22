@@ -28,6 +28,7 @@ import {
   SuiTreasuryClient
 } from "../../scripts/helpers";
 import { random } from "lodash";
+import { rotateControllerHelper } from "../../scripts/rotateController";
 
 const USDC_DECIMALS = 6;
 
@@ -131,6 +132,37 @@ describe("Test configure minter script", () => {
       mintAllowanceInDollars: BigInt(random(100_000_000, 200_000_000)),
       finalController: newFinalController
     });
+    currentControllerKeys = newFinalController;
+  });
+
+  it("Fails to rotate controller if the master minter is incorrect", async () => {
+    const randomKeys = await generateKeypairCommand({ prefund: false });
+    await expectError(
+      () =>
+        testRotateController({
+          treasuryClient,
+          masterMinter: randomKeys,
+          oldController: currentControllerKeys,
+          newController: randomKeys
+        }),
+      "Incorrect master minter key"
+    );
+  });
+
+  it("Successfully rotates the controller keys twice", async () => {
+    const newController = await generateKeypairCommand({ prefund: false });
+    await testRotateController({
+      treasuryClient,
+      masterMinter: deployerKeys,
+      oldController: currentControllerKeys,
+      newController: newController
+    });
+    await testRotateController({
+      treasuryClient,
+      masterMinter: deployerKeys,
+      oldController: newController,
+      newController: currentControllerKeys
+    });
   });
 });
 
@@ -172,6 +204,36 @@ async function testConfigureMinter(args: {
   // assert that the temp controller is no longer a controller
   const tempControllerMintCapId = await args.treasuryClient.getMintCapId(
     args.tempController.toSuiAddress()
+  );
+  assert.equal(tempControllerMintCapId, null);
+}
+
+async function testRotateController(args: {
+  treasuryClient: SuiTreasuryClient;
+  masterMinter: Ed25519Keypair;
+  oldController: Ed25519Keypair;
+  newController: Ed25519Keypair;
+}) {
+  const originalMintCapId = await args.treasuryClient.getMintCapId(
+    args.oldController.toSuiAddress()
+  );
+
+  await rotateControllerHelper(args.treasuryClient, {
+    hotMasterMinterKey: args.masterMinter.getSecretKey(),
+    oldControllerAddress: args.oldController.getSecretKey(),
+    newControllerAddress: args.newController.toSuiAddress(),
+    gasBudget: DEFAULT_GAS_BUDGET.toString()
+  });
+
+  // assert that final controller address is controller of the MintCap
+  const newControllerMintCapId = await args.treasuryClient.getMintCapId(
+    args.newController.toSuiAddress()
+  );
+  assert.equal(newControllerMintCapId, originalMintCapId);
+
+  // assert that the old controller is no longer a controller
+  const tempControllerMintCapId = await args.treasuryClient.getMintCapId(
+    args.oldController.toSuiAddress()
   );
   assert.equal(tempControllerMintCapId, null);
 }
