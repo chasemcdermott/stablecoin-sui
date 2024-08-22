@@ -220,7 +220,7 @@ async function testRotateController(args: {
 
   await rotateControllerHelper(args.treasuryClient, {
     hotMasterMinterKey: args.masterMinter.getSecretKey(),
-    oldControllerAddress: args.oldController.getSecretKey(),
+    oldControllerAddress: args.oldController.toSuiAddress(),
     newControllerAddress: args.newController.toSuiAddress(),
     gasBudget: DEFAULT_GAS_BUDGET.toString()
   });
