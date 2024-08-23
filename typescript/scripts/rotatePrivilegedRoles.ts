@@ -159,5 +159,5 @@ export default program
       );
     }
 
-    rotatePrivilegedRolesHelper(treasuryClient, options);
+    await rotatePrivilegedRolesHelper(treasuryClient, options);
   });

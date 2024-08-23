@@ -109,6 +109,6 @@ export default program
     "--write-package-id",
     "Write the deployed package ID to the package manifest"
   )
-  .action((packageName, options) => {
-    deployCommand(packageName, options);
+  .action(async (packageName, options) => {
+    await deployCommand(packageName, options);
   });

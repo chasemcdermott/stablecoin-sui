@@ -146,5 +146,5 @@ export default program
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .action(async (options) => {
-    changeUpgradeServiceAdminHelper(options);
+    await changeUpgradeServiceAdminHelper(options);
   });

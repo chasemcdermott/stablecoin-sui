@@ -128,5 +128,5 @@ export default program
       );
     }
 
-    rotateControllerHelper(treasuryClient, options);
+    await rotateControllerHelper(treasuryClient, options);
   });

@@ -236,5 +236,5 @@ export default program
       );
     }
 
-    configureMinterHelper(treasuryClient, options);
+    await configureMinterHelper(treasuryClient, options);
   });
