@@ -37,7 +37,6 @@ describe("Test configure minter script", () => {
   let deployerKeys: Ed25519Keypair;
   let upgraderKeys: Ed25519Keypair;
   let currentControllerKeys: Ed25519Keypair;
-  let currentMinter: Ed25519Keypair;
 
   before("Deploy USDC and configure a minter", async () => {
     deployerKeys = await generateKeypairCommand({ prefund: true });
@@ -68,7 +67,6 @@ describe("Test configure minter script", () => {
       finalController: finalControllerKeys
     });
     currentControllerKeys = finalControllerKeys;
-    currentMinter = minterKeys;
   });
 
   it("Fails to rotate controller if the master minter is incorrect", async () => {
