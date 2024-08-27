@@ -132,39 +132,27 @@ export async function configureMinterHelper(
 
   // === STEP 2: MINT ALLOWANCE CONFIGURATION ===
 
-  // Check if the mint allowance has already been set. If so, continue to STEP 3.
-  let skipSetMintAllowance = false;
+  // Set the mint allowance, using the configured temp controller
   const decimals = (await treasuryClient.getMetadata()).decimals;
   const mintAllowance = BigInt(mintAllowanceInDollars) * BigInt(10 ** decimals);
-  const currentMintAllowance = await treasuryClient.getMintAllowance(mintCapId);
-  if (currentMintAllowance == mintAllowance) {
-    log(
-      `The current mint allowance is already $${mintAllowanceInDollars}. Skipping mint allowance configuration...`
-    );
-    skipSetMintAllowance = true;
+  log(
+    `Going to set the mint allowance to $${mintAllowanceInDollars} for MintCap ${mintCapId} currently held by ${minterAddress}`
+  );
+  if (!(await waitForUserConfirmation())) {
+    throw new Error("Terminating...");
   }
-
-  // Set the mint allowance, using the configured temp controller
-  if (!skipSetMintAllowance) {
-    log(
-      `Going to set the mint allowance to $${mintAllowanceInDollars} for MintCap ${mintCapId} currently held by ${minterAddress}`
-    );
-    if (!(await waitForUserConfirmation())) {
-      throw new Error("Terminating...");
-    }
-    const txOutput = await treasuryClient.setMintAllowance(
-      tempController,
-      mintAllowance,
-      { gasBudget }
-    );
-    writeJsonOutput("set-mint-allowance", txOutput);
-  }
+  const mintAllowanceTxOutput = await treasuryClient.setMintAllowance(
+    tempController,
+    mintAllowance,
+    { gasBudget }
+  );
+  writeJsonOutput("set-mint-allowance", mintAllowanceTxOutput);
 
   // === STEP 3: CONTROLLER KEY ROTATION ===
 
   // Rotate the controller to the final controller address, using the hot master minter
   log(
-    `Going to rotate the temp controller key from ${tempController.toSuiAddress()} to ${finalControllerAddress}}`
+    `Going to rotate the temp controller key from ${tempController.toSuiAddress()} to ${finalControllerAddress}`
   );
   if (!(await waitForUserConfirmation())) {
     throw new Error("Terminating...");
@@ -248,5 +236,5 @@ export default program
       );
     }
 
-    configureMinterHelper(treasuryClient, options);
+    await configureMinterHelper(treasuryClient, options);
   });

@@ -131,10 +131,11 @@ describe("Test configure minter script", () => {
       mintAllowanceInDollars: BigInt(random(100_000_000, 200_000_000)),
       finalController: newFinalController
     });
+    currentControllerKeys = newFinalController;
   });
 });
 
-async function testConfigureMinter(args: {
+export async function testConfigureMinter(args: {
   treasuryClient: SuiTreasuryClient;
   masterMinter: Ed25519Keypair;
   tempController: Ed25519Keypair;

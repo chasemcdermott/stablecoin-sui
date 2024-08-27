@@ -20,108 +20,77 @@ import { program } from "commander";
 import {
   getEd25519KeypairFromPrivateKey,
   writeJsonOutput,
-  SuiTreasuryClient,
+  log,
   waitForUserConfirmation,
-  readTransactionOutput,
-  log
+  SuiTreasuryClient,
+  readTransactionOutput
 } from "./helpers";
 import { SuiClient } from "@mysten/sui/client";
 
-export async function rotatePrivilegedRolesHelper(
+/**
+ * Rotates an existing controller to a new controller and removes the old controller.
+ *
+ * @returns Transaction output
+ */
+export async function rotateControllerHelper(
   treasuryClient: SuiTreasuryClient,
   options: {
-    treasuryOwnerKey: string;
-    newMasterMinter: string;
-    newBlocklister: string;
-    newPauser: string;
-    newMetadataUpdater: string;
-    newTreasuryOwner: string;
+    hotMasterMinterKey: string;
+    oldControllerAddress: string;
+    newControllerAddress: string;
     gasBudget?: string;
   }
 ) {
-  const {
-    treasuryOwnerKey,
-    newMasterMinter,
-    newBlocklister,
-    newPauser,
-    newMetadataUpdater,
-    newTreasuryOwner
-  } = options;
-  const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
+  const { hotMasterMinterKey, oldControllerAddress, newControllerAddress } =
+    options;
 
-  // Ensure owner key is correct
-  const treasuryOwner = getEd25519KeypairFromPrivateKey(treasuryOwnerKey);
-  const {
-    owner,
-    masterMinter,
-    blocklister,
-    pauser,
-    metadataUpdater,
-    pendingOwner
-  } = await treasuryClient.getRoles();
-  if (owner !== treasuryOwner.toSuiAddress()) {
+  const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
+  const hotMasterMinter = getEd25519KeypairFromPrivateKey(hotMasterMinterKey);
+
+  // Ensure that the master minter key is correct
+  const { masterMinter } = await treasuryClient.getRoles();
+  if (masterMinter !== hotMasterMinter.toSuiAddress()) {
     throw new Error(
-      `Incorrect treasury owner key, given ${treasuryOwner.toSuiAddress()}, expected ${owner}`
+      `Incorrect master minter key, given ${hotMasterMinter.toSuiAddress()}, expected ${masterMinter}`
     );
   }
 
-  // Get user confirmation
-  log(`Going to update \n 
-    master minter from ${masterMinter} to ${newMasterMinter} \n 
-    blocklister from ${blocklister} to ${newBlocklister} \n 
-    pauser from ${pauser} to ${newPauser} \n
-    metadata updater from ${metadataUpdater} to ${newMetadataUpdater} \n
-    And initiate ownership transfer from ${pendingOwner} to ${newTreasuryOwner} \n`);
+  log(
+    `Going to rotate the controller from ${oldControllerAddress} to ${newControllerAddress}`
+  );
   if (!(await waitForUserConfirmation())) {
     throw new Error("Terminating...");
   }
-
-  // Update roles
-  const txOutput = await treasuryClient.rotatePrivilegedRoles(
-    treasuryOwner,
-    newMasterMinter,
-    newBlocklister,
-    newPauser,
-    newMetadataUpdater,
-    newTreasuryOwner,
+  const txOutput = await treasuryClient.rotateController(
+    hotMasterMinter,
+    newControllerAddress,
+    oldControllerAddress,
     { gasBudget }
   );
-  writeJsonOutput("rotate-privileged-roles", txOutput);
+  writeJsonOutput("rotate-controller", txOutput);
 
-  log("Privileged role key rotation complete");
+  return txOutput;
 }
 
 export default program
-  .createCommand("rotate-privileged-roles")
-  .description("Rotate privileged role keys to input addresses")
+  .createCommand("rotate-controller")
+  .description("Rotates a minter controller address")
   .option(
     "--treasury-deploy-file <string>",
     "Path to a file containing the treasury deploy output in JSON format"
   )
   .option("--treasury-object-id <string>", "The ID of the treasury object")
   .requiredOption(
-    "--treasury-owner-key <string>",
-    "The private key of the treasury object's owner"
+    "--hot-master-minter-key <string>",
+    "The private key of the treasury object's master minter"
   )
   .requiredOption(
-    "--new-master-minter <string>",
-    "The address where the master minter role will be transferred"
+    "--old-controller-address <string>",
+    "The old controller address to be removed"
   )
   .requiredOption(
-    "--new-blocklister <string>",
-    "The address where the blocklister role will be transferred"
-  )
-  .requiredOption(
-    "--new-pauser <string>",
-    "The address where the pauser role will be transferred"
-  )
-  .requiredOption(
-    "--new-metadata-updater <string>",
-    "The address where the metadata updater role will be transferred"
-  )
-  .requiredOption(
-    "--new-treasury-owner <string>",
-    "The address where the pending owner role will be transferred"
+    "--new-controller-address <string>",
+    "The new controller address to be added"
   )
   .requiredOption(
     "-r, --rpc-url <string>",
@@ -159,5 +128,5 @@ export default program
       );
     }
 
-    await rotatePrivilegedRolesHelper(treasuryClient, options);
+    await rotateControllerHelper(treasuryClient, options);
   });

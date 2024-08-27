@@ -26,6 +26,7 @@ import setBlocklistState from "./setBlocklistState";
 import configureMinter from "./configureMinter";
 import rotatePrivilegedRoles from "./rotatePrivilegedRoles";
 import changeUpgradeServiceAdmin from "./changeUpgradeServiceAdmin";
+import rotateController from "./rotateController";
 
 program
   .name("scripts")
@@ -36,7 +37,8 @@ program
   .addCommand(depositUpgradeCap)
   .addCommand(setBlocklistState)
   .addCommand(rotatePrivilegedRoles)
-  .addCommand(changeUpgradeServiceAdmin);
+  .addCommand(changeUpgradeServiceAdmin)
+  .addCommand(rotateController);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();

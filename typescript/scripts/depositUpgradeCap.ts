@@ -149,6 +149,6 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
-  .action((options) => {
-    depositUpgradeCapCommand(options);
+  .action(async (options) => {
+    await depositUpgradeCapCommand(options);
   });

@@ -44,7 +44,9 @@ export async function changeUpgradeServiceAdminHelper(options: {
     newUpgradeServiceAdmin
   } = options;
   const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
-  const upgradeServiceAdmin = getEd25519KeypairFromPrivateKey(upgradeServiceAdminKey);
+  const upgradeServiceAdmin = getEd25519KeypairFromPrivateKey(
+    upgradeServiceAdminKey
+  );
 
   // Parse out object type with given object id
   const upgradeServiceObject = await suiClient.getObject({
@@ -144,5 +146,5 @@ export default program
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .action(async (options) => {
-    changeUpgradeServiceAdminHelper(options);
+    await changeUpgradeServiceAdminHelper(options);
   });
