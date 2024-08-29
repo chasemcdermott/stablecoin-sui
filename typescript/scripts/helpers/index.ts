@@ -19,8 +19,12 @@
 import { strict as assert } from "assert";
 import { BcsType } from "@mysten/sui/bcs";
 import {
+  SuiEvent,
   SuiClient,
+  PaginatedEvents,
   SuiObjectChange,
+  DynamicFieldInfo,
+  DynamicFieldPage,
   SuiObjectChangeCreated,
   SuiObjectChangeMutated,
   SuiObjectChangePublished,
@@ -426,4 +430,63 @@ export async function getGasCoinsFromAddress(client: SuiClient, owner: string) {
     version: coin.version,
     digest: coin.digest
   }));
+}
+
+// TODO: Add tests to validate pagination
+export async function getEventsByType(
+  suiClient: SuiClient,
+  stablecoinPackageId: string,
+  coinOtwType: string,
+  eventType: string
+) {
+  let events: SuiEvent[] = [];
+  let nextCursor: PaginatedEvents["nextCursor"] = undefined;
+
+  do {
+    log(
+      `Querying events of type '${eventType}' from cursor '${JSON.stringify(nextCursor)}'`
+    );
+
+    const response = await suiClient.queryEvents({
+      query: {
+        MoveEventType: `${stablecoinPackageId}::treasury::${eventType}<${coinOtwType}>`
+      },
+      cursor: nextCursor
+    });
+
+    events = events.concat(response.data);
+    nextCursor = response.hasNextPage ? response.nextCursor : undefined;
+  } while (nextCursor != null);
+
+  if (!events) {
+    throw new Error(`Can't find event for ${eventType}`);
+  }
+
+  return events;
+}
+
+/**
+ * Exhaustively reads a table's entries.
+ * TODO: Add tests to validate pagination.
+ */
+export async function getTableContent(
+  suiClient: SuiClient,
+  tableId: string
+): Promise<DynamicFieldInfo[]> {
+  let dfo: DynamicFieldInfo[] = [];
+  let nextCursor: DynamicFieldPage["nextCursor"] = null;
+
+  do {
+    log(`Querying table of id '${tableId}' from cursor '${nextCursor}'`);
+
+    const response = await suiClient.getDynamicFields({
+      parentId: tableId,
+      cursor: nextCursor
+    });
+
+    dfo = dfo.concat(response.data);
+    nextCursor = response.hasNextPage ? response.nextCursor : null;
+  } while (nextCursor != null);
+
+  return dfo;
 }

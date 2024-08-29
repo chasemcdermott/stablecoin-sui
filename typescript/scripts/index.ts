@@ -26,6 +26,7 @@ import setBlocklistState from "./setBlocklistState";
 import configureMinter from "./configureMinter";
 import rotatePrivilegedRoles from "./rotatePrivilegedRoles";
 import changeUpgradeServiceAdmin from "./changeUpgradeServiceAdmin";
+import validateTreasuryStates from "./validateTreasuryStates";
 import rotateController from "./rotateController";
 import usdcDeploySummary from "./usdcDeploySummary";
 
@@ -39,6 +40,7 @@ program
   .addCommand(setBlocklistState)
   .addCommand(rotatePrivilegedRoles)
   .addCommand(changeUpgradeServiceAdmin)
+  .addCommand(validateTreasuryStates)
   .addCommand(rotateController)
   .addCommand(usdcDeploySummary);
 

@@ -500,6 +500,30 @@ export default class SuiTreasuryClient {
     };
   }
 
+  async getTreasuryObjectFields() {
+    const treasuryObject = await this.suiClient.getObject({
+      id: this.treasuryObjectId,
+      options: {
+        showContent: true
+      }
+    });
+    if (treasuryObject.data?.content?.dataType !== "moveObject") {
+      throw new Error(
+        `Expected 'moveObject', got '${treasuryObject.data?.content?.dataType}'`
+      );
+    }
+
+    const treasuryFields = treasuryObject.data.content.fields as any;
+    return treasuryFields;
+  }
+
+  async getTotalSupply() {
+    const totalSupplyObject = await this.suiClient.getTotalSupply({
+      coinType: this.coinOtwType
+    });
+    return BigInt(totalSupplyObject.value);
+  }
+
   async rotatePrivilegedRoles(
     owner: Ed25519Keypair,
     newMasterMinter: string,
@@ -567,5 +591,20 @@ export default class SuiTreasuryClient {
       transaction: rotatePrivilegedRolesTx,
       gasBudget: options?.gasBudget ?? null
     });
+  }
+
+  async getCompatibleVersions() {
+    const getCurrentVersionTx = new Transaction();
+    getCurrentVersionTx.moveCall({
+      target: `${this.stablecoinPackageId}::treasury::compatible_versions`,
+      typeArguments: [this.coinOtwType],
+      arguments: [getCurrentVersionTx.object(this.treasuryObjectId)]
+    });
+    const [compatibleVersions] = await callViewFunction({
+      client: this.suiClient,
+      transaction: getCurrentVersionTx,
+      returnTypes: [bcs.vector(bcs.U64)]
+    });
+    return compatibleVersions;
   }
 }
