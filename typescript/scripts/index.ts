@@ -27,6 +27,7 @@ import configureMinter from "./configureMinter";
 import rotatePrivilegedRoles from "./rotatePrivilegedRoles";
 import changeUpgradeServiceAdmin from "./changeUpgradeServiceAdmin";
 import rotateController from "./rotateController";
+import usdcDeploySummary from "./usdcDeploySummary";
 
 program
   .name("scripts")
@@ -38,7 +39,8 @@ program
   .addCommand(setBlocklistState)
   .addCommand(rotatePrivilegedRoles)
   .addCommand(changeUpgradeServiceAdmin)
-  .addCommand(rotateController);
+  .addCommand(rotateController)
+  .addCommand(usdcDeploySummary);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();

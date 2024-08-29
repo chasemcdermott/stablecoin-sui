@@ -405,7 +405,7 @@ export async function getCoinBalance(
 }
 
 export async function expectError(
-  errBlock: () => Promise<any>,
+  errBlock: () => Promise<any> | any,
   errDescription: string | RegExp
 ) {
   await assert.rejects(errBlock, (err: any) => {
