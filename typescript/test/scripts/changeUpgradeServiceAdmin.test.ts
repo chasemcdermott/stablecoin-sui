@@ -17,8 +17,6 @@
  */
 
 import { SuiClient } from "@mysten/sui/client";
-import { Transaction } from "@mysten/sui/transactions";
-import { bcs } from "@mysten/sui/bcs";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
@@ -26,10 +24,10 @@ import { changeUpgradeServiceAdminHelper } from "../../scripts/changeUpgradeServ
 import {
   expectError,
   getCreatedObjects,
-  DEFAULT_GAS_BUDGET,
-  callViewFunction
+  DEFAULT_GAS_BUDGET
 } from "../../scripts/helpers";
 import { strict as assert } from "assert";
+import UpgradeServiceClient from "../../scripts/helpers/upgradeServiceClient";
 
 describe("Test change upgrade service admin script", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
@@ -136,40 +134,12 @@ async function testChangeUpgradeServiceAdmin(args: {
     gasBudget: DEFAULT_GAS_BUDGET.toString()
   });
   const suiClient = new SuiClient({ url: args.rpcUrl });
+  const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
+    suiClient,
+    args.upgradeServiceObjectId
+  );
 
   // Get upgrade service pending admin
-  const upgradeServiceObject = await suiClient.getObject({
-    id: args.upgradeServiceObjectId,
-    options: {
-      showType: true
-    }
-  });
-  if (!upgradeServiceObject.data?.type) {
-    throw new Error("Failed to retrieve treasury object type");
-  }
-  const upgradeServiceObjectType = upgradeServiceObject.data.type;
-  const upgradeServiceObjectOtwType = upgradeServiceObjectType.match(
-    /(?<=upgrade_service::UpgradeService<)\w{66}::\w*::\w*(?=>)/
-  )?.[0];
-  if (!upgradeServiceObjectOtwType) {
-    throw new Error("Cannot find correct otw");
-  }
-
-  const suiExtensionsPackageId = upgradeServiceObjectType.split("::")[0];
-
-  const getUpgradeServicePendingAdmin = new Transaction();
-  getUpgradeServicePendingAdmin.moveCall({
-    target: `${suiExtensionsPackageId}::upgrade_service::pending_admin`,
-    typeArguments: [upgradeServiceObjectOtwType],
-    arguments: [
-      getUpgradeServicePendingAdmin.object(args.upgradeServiceObjectId)
-    ]
-  });
-  const [pendingAdmin] = await callViewFunction({
-    client: suiClient,
-    transaction: getUpgradeServicePendingAdmin,
-    returnTypes: [bcs.option(bcs.Address)]
-  });
-
+  const pendingAdmin = await upgradeServiceClient.getPendingAdmin();
   assert.equal(pendingAdmin, args.newUpgradeServiceAdmin.toSuiAddress());
 }

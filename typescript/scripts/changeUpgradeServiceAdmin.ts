@@ -21,14 +21,11 @@ import {
   getEd25519KeypairFromPrivateKey,
   writeJsonOutput,
   waitForUserConfirmation,
-  executeTransactionHelper,
-  callViewFunction,
   inspectObject,
   log
 } from "./helpers";
 import { SuiClient } from "@mysten/sui/client";
-import { bcs } from "@mysten/sui/bcs";
-import { Transaction } from "@mysten/sui/transactions";
+import UpgradeServiceClient from "./helpers/upgradeServiceClient";
 
 export async function changeUpgradeServiceAdminHelper(options: {
   upgradeServiceAdminKey: string;
@@ -38,6 +35,11 @@ export async function changeUpgradeServiceAdminHelper(options: {
   gasBudget?: string;
 }) {
   const suiClient = new SuiClient({ url: options.rpcUrl });
+  const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
+    suiClient,
+    options.upgradeServiceObjectId
+  );
+
   const {
     upgradeServiceAdminKey,
     upgradeServiceObjectId,
@@ -70,28 +72,8 @@ export async function changeUpgradeServiceAdminHelper(options: {
     throw new Error("Terminating...");
   }
 
-  // Parse params for executing transaction
-  const upgradeServiceObjectOtwType = upgradeServiceObjectType.match(
-    /(?<=upgrade_service::UpgradeService<)\w{66}::\w*::\w*(?=>)/
-  )?.[0];
-  if (!upgradeServiceObjectOtwType) {
-    throw new Error("Cannot find correct otw");
-  }
-  const suiExtensionsPackageId = upgradeServiceObjectType.split("::")[0];
-
   // Check given upgrade service admin key is consistent with current admin
-  const getAdminTx = new Transaction();
-  getAdminTx.moveCall({
-    target: `${suiExtensionsPackageId}::upgrade_service::admin`,
-    typeArguments: [upgradeServiceObjectOtwType],
-    arguments: [getAdminTx.object(upgradeServiceObjectId)]
-  });
-  const [adminAddress] = await callViewFunction({
-    client: suiClient,
-    transaction: getAdminTx,
-    returnTypes: [bcs.Address]
-  });
-
+  const adminAddress = await upgradeServiceClient.getAdmin();
   if (adminAddress !== upgradeServiceAdmin.toSuiAddress()) {
     throw new Error(
       `Incorrect private key supplied. Given private key for '${upgradeServiceAdmin.toSuiAddress()}', but expected private key for '${adminAddress}'`
@@ -99,23 +81,11 @@ export async function changeUpgradeServiceAdminHelper(options: {
   }
 
   // Change admin for upgrade service
-  const changeUpgradeServiceAdminTx = new Transaction();
-  changeUpgradeServiceAdminTx.moveCall({
-    target: `${suiExtensionsPackageId}::upgrade_service::change_admin`,
-    typeArguments: [upgradeServiceObjectOtwType],
-    arguments: [
-      changeUpgradeServiceAdminTx.object(upgradeServiceObjectId),
-      changeUpgradeServiceAdminTx.pure.address(newUpgradeServiceAdmin)
-    ]
-  });
-
-  // Initiate change upgrade service admin roles
-  const txOutput = await executeTransactionHelper({
-    client: suiClient,
-    signer: upgradeServiceAdmin,
-    transaction: changeUpgradeServiceAdminTx,
-    gasBudget
-  });
+  const txOutput = await upgradeServiceClient.changeAdmin(
+    upgradeServiceAdmin,
+    newUpgradeServiceAdmin,
+    { gasBudget }
+  );
 
   writeJsonOutput("change-upgrade-service-admin", txOutput);
 
