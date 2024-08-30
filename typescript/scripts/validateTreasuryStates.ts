@@ -17,7 +17,6 @@
  */
 
 import { SuiClient } from "@mysten/sui/client";
-import { isValidSuiAddress } from "@mysten/sui/utils";
 import { strict as assert } from "assert";
 import { program } from "commander";
 import * as fs from "fs";
@@ -27,15 +26,10 @@ import {
   SuiTreasuryClient,
   log,
   getEventsByType,
-  getTableContent
+  getTableContent,
+  yupSuiAddress,
+  yupSuiAddressOrEmpty
 } from "./helpers";
-
-const yupSuiAddress = () =>
-  yup.string().test({
-    name: "is-sui-address",
-    message: "${path} must be a valid Sui address",
-    test: (value) => !!value && isValidSuiAddress(value)
-  });
 
 const treasuryStatesSchema = yup.object().shape({
   stablecoinPackageId: yupSuiAddress().required(),
@@ -61,7 +55,7 @@ const treasuryStatesSchema = yup.object().shape({
   ),
   roles: yup.object().required().shape({
     owner: yupSuiAddress().required(),
-    pendingOwner: yupSuiAddress(),
+    pendingOwner: yupSuiAddressOrEmpty().required(),
     masterMinter: yupSuiAddress().required(),
     blocklister: yupSuiAddress().required(),
     pauser: yupSuiAddress().required(),
