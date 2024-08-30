@@ -29,7 +29,7 @@ import {
 import { strict as assert } from "assert";
 import { acceptTreasuryOwnerHelper } from "../../scripts/acceptTreasuryOwner";
 
-describe("Test rotate privileged roles script", () => {
+describe("Test accept pending treasury owner", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
   const client = new SuiClient({ url: RPC_URL });
   let treasuryClient: SuiTreasuryClient;
@@ -99,5 +99,5 @@ async function testRotatePrivilegedRoles(args: {
 
   const { owner, pendingOwner } = await args.treasuryClient.getRoles();
   assert.equal(owner, args.newTreasuryOwner.toSuiAddress());
-  assert.equal(pendingOwner, '');
+  assert.equal(pendingOwner, null);
 }
