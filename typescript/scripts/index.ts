@@ -29,6 +29,7 @@ import changeUpgradeServiceAdmin from "./changeUpgradeServiceAdmin";
 import validateTreasuryStates from "./validateTreasuryStates";
 import rotateController from "./rotateController";
 import usdcDeploySummary from "./usdcDeploySummary";
+import acceptTreasuryOwner from "./acceptTreasuryOwner";
 
 program
   .name("scripts")
@@ -42,7 +43,8 @@ program
   .addCommand(changeUpgradeServiceAdmin)
   .addCommand(validateTreasuryStates)
   .addCommand(rotateController)
-  .addCommand(usdcDeploySummary);
+  .addCommand(usdcDeploySummary)
+  .addCommand(acceptTreasuryOwner);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();

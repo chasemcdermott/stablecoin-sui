@@ -1,14 +1,14 @@
 /**
- * Copyright 2024 Circle Internet Group, Inc. All rights reserved.
- *
+ * Copyright 2024 Circle Internet Financial, LTD. All rights reserved.
+ * 
  * SPDX-License-Identifier: Apache-2.0
- *
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,71 +27,46 @@ import {
 } from "./helpers";
 import { SuiClient } from "@mysten/sui/client";
 
-export async function rotatePrivilegedRolesHelper(
+export async function acceptTreasuryOwnerHelper(
   treasuryClient: SuiTreasuryClient,
   options: {
-    treasuryOwnerKey: string;
-    newMasterMinter: string;
-    newBlocklister: string;
-    newPauser: string;
-    newMetadataUpdater: string;
-    newTreasuryOwner: string;
+    pendingOwnerKey: string;
     gasBudget?: string;
   }
 ) {
-  const {
-    treasuryOwnerKey,
-    newMasterMinter,
-    newBlocklister,
-    newPauser,
-    newMetadataUpdater,
-    newTreasuryOwner
-  } = options;
+  const pendingOwnerKey = options.pendingOwnerKey;
   const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
 
-  // Ensure owner key is correct
-  const treasuryOwner = getEd25519KeypairFromPrivateKey(treasuryOwnerKey);
+  // Ensure pending owner key is correct
+  const pendingTreasuryOwner = getEd25519KeypairFromPrivateKey(pendingOwnerKey);
   const {
     owner,
-    masterMinter,
-    blocklister,
-    pauser,
-    metadataUpdater,
+    pendingOwner
   } = await treasuryClient.getRoles();
-  if (owner !== treasuryOwner.toSuiAddress()) {
+  if (pendingOwner !== pendingTreasuryOwner.toSuiAddress()) {
     throw new Error(
-      `Incorrect treasury owner key, given ${treasuryOwner.toSuiAddress()}, expected ${owner}`
+      `Incorrect pending treasury owner key, given ${pendingTreasuryOwner.toSuiAddress()}, expected ${pendingOwner}`
     );
   }
 
   // Get user confirmation
-  log(`Going to update \n 
-    master minter from ${masterMinter} to ${newMasterMinter} \n 
-    blocklister from ${blocklister} to ${newBlocklister} \n 
-    pauser from ${pauser} to ${newPauser} \n
-    metadata updater from ${metadataUpdater} to ${newMetadataUpdater} \n
-    And initiate ownership transfer from ${owner} to ${newTreasuryOwner} \n`);
+  log(`Going to accept ownership transfer from ${owner} to ${pendingOwner} \n`);
   if (!(await waitForUserConfirmation())) {
     throw new Error("Terminating...");
   }
 
   // Update roles
-  const txOutput = await treasuryClient.rotatePrivilegedRoles(
-    treasuryOwner,
-    newMasterMinter,
-    newBlocklister,
-    newPauser,
-    newMetadataUpdater,
-    newTreasuryOwner,
+  const txOutput = await treasuryClient.acceptTreasuryOwner(
+    pendingTreasuryOwner,
     { gasBudget }
   );
-  writeJsonOutput("rotate-privileged-roles", txOutput);
+  writeJsonOutput("accept-treasury-owner", txOutput);
 
-  log("Privileged role key rotation complete");
+  log("New treasury owner accepted");
 }
 
 export default program
-  .createCommand("rotate-privileged-roles")
+  .createCommand("accept-treasury-owner")
   .description("Rotate privileged role keys to input addresses")
   .option(
     "--treasury-deploy-file <string>",
@@ -99,28 +74,8 @@ export default program
   )
   .option("--treasury-object-id <string>", "The ID of the treasury object")
   .requiredOption(
-    "--treasury-owner-key <string>",
-    "The private key of the treasury object's owner"
-  )
-  .requiredOption(
-    "--new-master-minter <string>",
-    "The address where the master minter role will be transferred"
-  )
-  .requiredOption(
-    "--new-blocklister <string>",
-    "The address where the blocklister role will be transferred"
-  )
-  .requiredOption(
-    "--new-pauser <string>",
-    "The address where the pauser role will be transferred"
-  )
-  .requiredOption(
-    "--new-metadata-updater <string>",
-    "The address where the metadata updater role will be transferred"
-  )
-  .requiredOption(
-    "--new-treasury-owner <string>",
-    "The address where the pending owner role will be transferred"
+    "--pending-owner-key <string>",
+    "The private key of the treasury object's pending owner"
   )
   .requiredOption(
     "-r, --rpc-url <string>",
@@ -158,5 +113,5 @@ export default program
       );
     }
 
-    await rotatePrivilegedRolesHelper(treasuryClient, options);
+    await acceptTreasuryOwnerHelper(treasuryClient, options);
   });
