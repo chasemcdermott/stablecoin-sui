@@ -500,7 +500,7 @@ export function yupSuiAddressOrEmpty() {
   return yupString().test({
     name: "is-sui-address-or-empty",
     message: "${path} must be a valid Sui address or empty string",
-    test: (value) => !!value && (isValidSuiAddress(value) || value === "")
+    test: (value) => value === "" || (!!value && isValidSuiAddress(value))
   });
 }
 

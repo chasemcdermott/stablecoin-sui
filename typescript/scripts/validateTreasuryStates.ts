@@ -55,7 +55,7 @@ const treasuryStatesSchema = yup.object().shape({
   ),
   roles: yup.object().required().shape({
     owner: yupSuiAddress().required(),
-    pendingOwner: yupSuiAddressOrEmpty().required(),
+    pendingOwner: yupSuiAddressOrEmpty(),
     masterMinter: yupSuiAddress().required(),
     blocklister: yupSuiAddress().required(),
     pauser: yupSuiAddress().required(),

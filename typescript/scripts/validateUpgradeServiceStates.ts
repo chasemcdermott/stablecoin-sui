@@ -29,7 +29,7 @@ const upgradeServiceStatesSchema = yup.object().shape({
   suiExtensionsPackageId: yupSuiAddress().required(),
   upgradeServiceOtwType: yup.string().required(),
   admin: yupSuiAddress().required(),
-  pendingAdmin: yupSuiAddressOrEmpty().required(),
+  pendingAdmin: yupSuiAddressOrEmpty(),
   upgradeCapPackageId: yupSuiAddress().required(),
   upgradeCapVersion: yup.string().required(),
   upgradeCapPolicy: yup.number().required()
