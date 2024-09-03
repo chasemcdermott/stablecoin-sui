@@ -607,4 +607,24 @@ export default class SuiTreasuryClient {
     });
     return compatibleVersions;
   }
+
+  async acceptTreasuryOwner(
+    pendingOwner: Ed25519Keypair,
+    options: { gasBudget: bigint | null }
+  ) {
+    const acceptTreasuryOwnerTx = new Transaction();
+
+    acceptTreasuryOwnerTx.moveCall({
+      target: `${this.stablecoinPackageId}::entry::accept_ownership`,
+      typeArguments: [this.coinOtwType],
+      arguments: [acceptTreasuryOwnerTx.object(this.treasuryObjectId)]
+    });
+
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: pendingOwner,
+      transaction: acceptTreasuryOwnerTx,
+      gasBudget: options?.gasBudget ?? null
+    });
+  }
 }

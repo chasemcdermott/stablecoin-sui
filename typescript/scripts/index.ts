@@ -30,6 +30,7 @@ import validateTreasuryStates from "./validateTreasuryStates";
 import validateUpgradeServiceStates from "./validateUpgradeServiceStates";
 import rotateController from "./rotateController";
 import usdcDeploySummary from "./usdcDeploySummary";
+import acceptTreasuryOwner from "./acceptTreasuryOwner";
 
 program
   .name("scripts")
@@ -44,7 +45,8 @@ program
   .addCommand(validateTreasuryStates)
   .addCommand(validateUpgradeServiceStates)
   .addCommand(rotateController)
-  .addCommand(usdcDeploySummary);
+  .addCommand(usdcDeploySummary)
+  .addCommand(acceptTreasuryOwner);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();
