@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import { bcs } from "@mysten/sui/bcs";
+import { bcs, BcsType } from "@mysten/sui/bcs";
 import { SuiClient } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { callViewFunction, executeTransactionHelper } from ".";
@@ -130,77 +130,49 @@ export default class UpgradeServiceClient {
   }
 
   public async getAdmin(): Promise<string> {
-    const tx = new Transaction();
-    tx.moveCall({
-      target: `${this.suiExtensionsPackageId}::upgrade_service::admin`,
-      typeArguments: [this.upgradeServiceOtwType],
-      arguments: [tx.object(this.upgradeServiceObjectId)]
-    });
-    const [adminAddress] = await callViewFunction({
-      client: this.suiClient,
-      transaction: tx,
-      returnTypes: [bcs.Address]
-    });
-    return adminAddress;
+    return this.callSimpleViewFunction("admin", bcs.Address);
   }
 
   public async getPendingAdmin(): Promise<string | null | undefined> {
-    const tx = new Transaction();
-    tx.moveCall({
-      target: `${this.suiExtensionsPackageId}::upgrade_service::pending_admin`,
-      typeArguments: [this.upgradeServiceOtwType],
-      arguments: [tx.object(this.upgradeServiceObjectId)]
-    });
-    const [pendingAdmin] = await callViewFunction({
-      client: this.suiClient,
-      transaction: tx,
-      returnTypes: [bcs.option(bcs.Address)]
-    });
-    return pendingAdmin;
+    return this.callSimpleViewFunction(
+      "pending_admin",
+      bcs.option(bcs.Address)
+    );
   }
 
   public async getUpgradeCapPackageId(): Promise<string> {
-    const tx = new Transaction();
-    tx.moveCall({
-      target: `${this.suiExtensionsPackageId}::upgrade_service::upgrade_cap_package`,
-      typeArguments: [this.upgradeServiceOtwType],
-      arguments: [tx.object(this.upgradeServiceObjectId)]
-    });
-    const [packageId] = await callViewFunction({
-      client: this.suiClient,
-      transaction: tx,
-      returnTypes: [bcs.Address]
-    });
-    return packageId;
+    return this.callSimpleViewFunction("upgrade_cap_package", bcs.Address);
   }
 
   public async getUpgradeCapVersion(): Promise<string> {
-    const tx = new Transaction();
-    tx.moveCall({
-      target: `${this.suiExtensionsPackageId}::upgrade_service::upgrade_cap_version`,
-      typeArguments: [this.upgradeServiceOtwType],
-      arguments: [tx.object(this.upgradeServiceObjectId)]
-    });
-    const [version] = await callViewFunction({
-      client: this.suiClient,
-      transaction: tx,
-      returnTypes: [bcs.U64]
-    });
-    return version;
+    return this.callSimpleViewFunction("upgrade_cap_version", bcs.U64);
   }
 
   public async getUpgradeCapPolicy(): Promise<number> {
+    return this.callSimpleViewFunction("upgrade_cap_policy", bcs.U8);
+  }
+
+  /**
+   * Calls a view funciton on the upgrade_service module that takes no arguments and returns a single value.
+   * @param functionName the name of the function on the upgrade_service module
+   * @param returnType the type of the returned value
+   * @returns the queried value
+   */
+  private async callSimpleViewFunction<T, Input = T>(
+    functionName: string,
+    returnType: BcsType<T, Input>
+  ): Promise<T> {
     const tx = new Transaction();
     tx.moveCall({
-      target: `${this.suiExtensionsPackageId}::upgrade_service::upgrade_cap_policy`,
+      target: `${this.suiExtensionsPackageId}::upgrade_service::${functionName}`,
       typeArguments: [this.upgradeServiceOtwType],
       arguments: [tx.object(this.upgradeServiceObjectId)]
     });
-    const [policy] = await callViewFunction({
+    const [value] = await callViewFunction({
       client: this.suiClient,
       transaction: tx,
-      returnTypes: [bcs.U8]
+      returnTypes: [returnType]
     });
-    return policy;
+    return value;
   }
 }

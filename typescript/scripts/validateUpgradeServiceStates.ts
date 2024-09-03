@@ -20,7 +20,6 @@ import { SuiClient } from "@mysten/sui/client";
 import { strict as assert } from "assert";
 import { program } from "commander";
 import * as fs from "fs";
-import _ from "lodash";
 import * as yup from "yup";
 import { log, yupSuiAddress, yupSuiAddressOrEmpty } from "./helpers";
 import UpgradeServiceClient from "./helpers/upgradeServiceClient";
