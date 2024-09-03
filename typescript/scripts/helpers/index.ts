@@ -30,7 +30,11 @@ import {
   SuiObjectChangePublished,
   SuiTransactionBlockResponse
 } from "@mysten/sui/client";
-import { MIST_PER_SUI, normalizeSuiObjectId } from "@mysten/sui/utils";
+import {
+  isValidSuiAddress,
+  MIST_PER_SUI,
+  normalizeSuiObjectId
+} from "@mysten/sui/utils";
 import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
@@ -40,6 +44,7 @@ import fs from "fs";
 import path from "path";
 import readline from "readline/promises";
 import util from "util";
+import { string as yupString } from "yup";
 
 export { default as SuiTreasuryClient } from "./treasuryClient";
 
@@ -414,7 +419,7 @@ export async function expectError(
 ) {
   await assert.rejects(errBlock, (err: any) => {
     if (_.isRegExp(errDescription)) {
-      assert(err.message.match(errDescription));
+      assert.match(err.message, errDescription);
     } else {
       assert(err.message.includes(errDescription));
     }
@@ -489,4 +494,20 @@ export async function getTableContent(
   } while (nextCursor != null);
 
   return dfo;
+}
+
+export function yupSuiAddressOrEmpty() {
+  return yupString().test({
+    name: "is-sui-address-or-empty",
+    message: "${path} must be a valid Sui address or empty string",
+    test: (value) => value === "" || (!!value && isValidSuiAddress(value))
+  });
+}
+
+export function yupSuiAddress() {
+  return yupSuiAddressOrEmpty().test({
+    name: "is-sui-address",
+    message: "${path} must be a valid Sui address",
+    test: (value) => value !== ""
+  });
 }

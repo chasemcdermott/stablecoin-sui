@@ -27,6 +27,7 @@ import configureMinter from "./configureMinter";
 import rotatePrivilegedRoles from "./rotatePrivilegedRoles";
 import changeUpgradeServiceAdmin from "./changeUpgradeServiceAdmin";
 import validateTreasuryStates from "./validateTreasuryStates";
+import validateUpgradeServiceStates from "./validateUpgradeServiceStates";
 import rotateController from "./rotateController";
 import usdcDeploySummary from "./usdcDeploySummary";
 import acceptTreasuryOwner from "./acceptTreasuryOwner";
@@ -42,6 +43,7 @@ program
   .addCommand(rotatePrivilegedRoles)
   .addCommand(changeUpgradeServiceAdmin)
   .addCommand(validateTreasuryStates)
+  .addCommand(validateUpgradeServiceStates)
   .addCommand(rotateController)
   .addCommand(usdcDeploySummary)
   .addCommand(acceptTreasuryOwner);

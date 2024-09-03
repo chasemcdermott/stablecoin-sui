@@ -94,7 +94,6 @@ describe("Test deposit-upgrade-cap script", () => {
   it("Deposits an UpgradeCap into an UpgradeService<T> for the 'stablecoin' package correctly", async () => {
     const depositUpgradeCapTx = await depositUpgradeCapCommand({
       rpcUrl: RPC_URL,
-      suiExtensionsPackageId,
       upgradeCapObjectId: stablecoinUpgradeCapId,
       upgradeCapOwnerKey: stablecoinUpgradeCapOwner.getSecretKey(),
       upgradeServiceObjectId: stablecoinUpgradeServiceId,

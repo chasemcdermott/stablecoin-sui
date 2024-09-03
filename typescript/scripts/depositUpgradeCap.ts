@@ -17,27 +17,28 @@
  */
 
 import { SuiClient } from "@mysten/sui/client";
-import { Transaction } from "@mysten/sui/transactions";
-import { strict as assert } from "assert";
 import { program } from "commander";
 import {
-  executeTransactionHelper,
   getEd25519KeypairFromPrivateKey,
   inspectObject,
   log,
   waitForUserConfirmation,
   writeJsonOutput
 } from "./helpers";
+import UpgradeServiceClient from "./helpers/upgradeServiceClient";
 
 export async function depositUpgradeCapCommand(options: {
   rpcUrl: string;
-  suiExtensionsPackageId: string;
   upgradeCapObjectId: string;
   upgradeCapOwnerKey: string;
   upgradeServiceObjectId: string;
   gasBudget?: string;
 }) {
   const client = new SuiClient({ url: options.rpcUrl });
+  const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
+    client,
+    options.upgradeServiceObjectId
+  );
   log("RPC URL:", options.rpcUrl);
 
   const upgradeCapOwner = getEd25519KeypairFromPrivateKey(
@@ -81,45 +82,22 @@ export async function depositUpgradeCapCommand(options: {
     return;
   }
 
-  assert(
-    upgradeServiceInfo.data?.content?.dataType == "moveObject",
-    "Expected 'moveObject' field but is missing!"
-  );
-
-  const typeArgument = upgradeServiceInfo.data.content.type.match(
-    /(?<=UpgradeService<)\w{66}::\w*::\w*(?=>)/
-  )?.[0];
-  assert(
-    typeArgument != null,
-    "Expected typeArgument to be found but is missing or empty! Value: " +
-      typeArgument
-  );
-
   log(
-    `Storing UpgradeCap of id '${options.upgradeCapObjectId}' in UpgradeService<${typeArgument}> of id '${options.upgradeServiceObjectId}'...`
+    `Storing UpgradeCap of id '${options.upgradeCapObjectId}' in UpgradeService<${upgradeServiceClient.upgradeServiceOtwType}> of id '${options.upgradeServiceObjectId}'...`
   );
 
-  const transaction = new Transaction();
-
-  // Command #1: Deposit UpgradeCap into UpgradeService<T>
-  transaction.moveCall({
-    target: `${options.suiExtensionsPackageId}::upgrade_service::deposit`,
-    typeArguments: [typeArgument],
-    arguments: [
-      transaction.object(options.upgradeServiceObjectId),
-      transaction.object(options.upgradeCapObjectId)
-    ]
-  });
-
-  const transactionOutput = await executeTransactionHelper({
-    client,
-    signer: upgradeCapOwner,
-    transaction,
-    gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null
-  });
+  const transactionOutput = upgradeServiceClient.depositUpgradeCap(
+    upgradeCapOwner,
+    options.upgradeCapObjectId,
+    {
+      gasBudget: options.gasBudget ? BigInt(options.gasBudget) : null
+    }
+  );
 
   writeJsonOutput("deposit-upgrade-cap", transactionOutput);
-  log(`Deposited UpgradeCap into UpgradeService<${typeArgument}> !`);
+  log(
+    `Deposited UpgradeCap into UpgradeService<${upgradeServiceClient.upgradeServiceOtwType}> !`
+  );
 
   return transactionOutput;
 }
@@ -127,10 +105,6 @@ export async function depositUpgradeCapCommand(options: {
 export default program
   .createCommand("deposit-upgrade-cap")
   .description("Deposit an UpgradeCap in an UpgradeService<T>")
-  .requiredOption(
-    "--sui-extensions-package-id <string>",
-    "The package id for sui_extensions"
-  )
   .requiredOption(
     "--upgrade-cap-object-id <string>",
     "The id of the UpgradeCap to wrap"
