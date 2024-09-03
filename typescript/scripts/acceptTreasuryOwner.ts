@@ -1,14 +1,14 @@
 /**
  * Copyright 2024 Circle Internet Financial, LTD. All rights reserved.
- * 
+ *
  * SPDX-License-Identifier: Apache-2.0
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *     http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,10 +39,7 @@ export async function acceptTreasuryOwnerHelper(
 
   // Ensure pending owner key is correct
   const pendingTreasuryOwner = getEd25519KeypairFromPrivateKey(pendingOwnerKey);
-  const {
-    owner,
-    pendingOwner
-  } = await treasuryClient.getRoles();
+  const { owner, pendingOwner } = await treasuryClient.getRoles();
   if (pendingOwner !== pendingTreasuryOwner.toSuiAddress()) {
     throw new Error(
       `Incorrect pending treasury owner key, given ${pendingTreasuryOwner.toSuiAddress()}, expected ${pendingOwner}`
@@ -67,7 +64,7 @@ export async function acceptTreasuryOwnerHelper(
 
 export default program
   .createCommand("accept-treasury-owner")
-  .description("Rotate privileged role keys to input addresses")
+  .description("Accept the owner role. Can only be called by the pendingOwner.")
   .option(
     "--treasury-deploy-file <string>",
     "Path to a file containing the treasury deploy output in JSON format"

@@ -617,10 +617,8 @@ export default class SuiTreasuryClient {
     acceptTreasuryOwnerTx.moveCall({
       target: `${this.stablecoinPackageId}::entry::accept_ownership`,
       typeArguments: [this.coinOtwType],
-      arguments: [
-        acceptTreasuryOwnerTx.object(this.treasuryObjectId),
-      ]
-    })
+      arguments: [acceptTreasuryOwnerTx.object(this.treasuryObjectId)]
+    });
 
     return executeTransactionHelper({
       client: this.suiClient,

@@ -51,13 +51,8 @@ export async function rotatePrivilegedRolesHelper(
 
   // Ensure owner key is correct
   const treasuryOwner = getEd25519KeypairFromPrivateKey(treasuryOwnerKey);
-  const {
-    owner,
-    masterMinter,
-    blocklister,
-    pauser,
-    metadataUpdater,
-  } = await treasuryClient.getRoles();
+  const { owner, masterMinter, blocklister, pauser, metadataUpdater } =
+    await treasuryClient.getRoles();
   if (owner !== treasuryOwner.toSuiAddress()) {
     throw new Error(
       `Incorrect treasury owner key, given ${treasuryOwner.toSuiAddress()}, expected ${owner}`
