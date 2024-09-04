@@ -39,7 +39,7 @@ export async function acceptUpgradeServiceAdminHelper(
     pendingUpgradeServiceAdminKey
   );
 
-  const upgradeServiceObjectType = upgradeServiceClient.upgradeServiceOtwType;
+  const upgradeServiceObjectType = `UpgradeService<${upgradeServiceClient.upgradeServiceOtwType}>`;
 
   // Get user confirmation
   const currentAdminAddress = await upgradeServiceClient.getAdmin();
