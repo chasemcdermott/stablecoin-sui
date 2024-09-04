@@ -85,7 +85,7 @@ export default program
     "Object id of the target upgrade service object"
   )
   .requiredOption(
-    "--pending-admin-key <string>",
+    "--pending-upgrade-service-admin-key <string>",
     "The private key of the upgrade service's pending admin"
   )
   .requiredOption(
