@@ -120,7 +120,7 @@ describe("Test change upgrade service admin script", () => {
   });
 });
 
-async function testChangeUpgradeServiceAdmin(args: {
+export async function testChangeUpgradeServiceAdmin(args: {
   upgradeServiceAdmin: Ed25519Keypair;
   upgradeServiceObjectId: string;
   newUpgradeServiceAdmin: Ed25519Keypair;

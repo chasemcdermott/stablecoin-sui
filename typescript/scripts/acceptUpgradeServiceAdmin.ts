@@ -21,47 +21,30 @@ import {
   getEd25519KeypairFromPrivateKey,
   writeJsonOutput,
   waitForUserConfirmation,
-  inspectObject,
   log
 } from "./helpers";
 import { SuiClient } from "@mysten/sui/client";
 import UpgradeServiceClient from "./helpers/upgradeServiceClient";
 
-export async function acceptUpgradeServiceAdminHelper(options: {
-  pendingUpgradeServiceAdminKey: string;
-  upgradeServiceObjectId: string;
-  rpcUrl: string;
-  gasBudget?: string;
-}) {
-  const { pendingUpgradeServiceAdminKey, upgradeServiceObjectId, rpcUrl } =
-    options;
+export async function acceptUpgradeServiceAdminHelper(
+  upgradeServiceClient: UpgradeServiceClient,
+  options: {
+    pendingUpgradeServiceAdminKey: string;
+    gasBudget?: string;
+  }
+) {
+  const pendingUpgradeServiceAdminKey = options.pendingUpgradeServiceAdminKey;
   const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
   const pendingUpgradeServiceAdmin = getEd25519KeypairFromPrivateKey(
     pendingUpgradeServiceAdminKey
   );
-  const suiClient = new SuiClient({ url: rpcUrl });
-  const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
-    suiClient,
-    upgradeServiceObjectId
-  );
 
-  // Parse out object type with given object id
-  const upgradeServiceObject = await suiClient.getObject({
-    id: upgradeServiceObjectId,
-    options: {
-      showType: true
-    }
-  });
-  if (!upgradeServiceObject.data?.type) {
-    throw new Error("Failed to retrieve upgrade service object type");
-  }
-  const upgradeServiceObjectType = upgradeServiceObject.data.type;
+  const upgradeServiceObjectType = upgradeServiceClient.upgradeServiceOtwType;
 
   // Get user confirmation
   const currentAdminAddress = await upgradeServiceClient.getAdmin();
   log(
-    `Accepting the pending admin for ${upgradeServiceObjectType}. The admin will be updated from ${currentAdminAddress} to ${pendingUpgradeServiceAdmin}`,
-    inspectObject(upgradeServiceObject)
+    `Accepting the pending admin for ${upgradeServiceObjectType}. The admin will be updated from ${currentAdminAddress} to ${pendingUpgradeServiceAdmin}`
   );
   if (!(await waitForUserConfirmation())) {
     throw new Error("Terminating...");
@@ -69,6 +52,11 @@ export async function acceptUpgradeServiceAdminHelper(options: {
 
   // Check given upgrade service admin key is consistent with current pending admin
   const pendingAdminAddress = await upgradeServiceClient.getPendingAdmin();
+  if (pendingAdminAddress == null) {
+    throw new Error(
+      `There is no currently pending admin on the upgrade service.`
+    );
+  }
   if (pendingAdminAddress !== pendingUpgradeServiceAdmin.toSuiAddress()) {
     throw new Error(
       `Incorrect private key supplied. Given private key for '${pendingUpgradeServiceAdmin.toSuiAddress()}', but expected private key for '${pendingAdminAddress}'`
@@ -107,5 +95,10 @@ export default program
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .action(async (options) => {
-    await acceptUpgradeServiceAdminHelper(options);
+    const client = new SuiClient({ url: options.rpcUrl });
+    const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
+      client,
+      options.upgradeServiceObjectId
+    );
+    await acceptUpgradeServiceAdminHelper(upgradeServiceClient, options);
   });

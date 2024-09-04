@@ -20,7 +20,6 @@ import { SuiClient } from "@mysten/sui/client";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
-import { changeUpgradeServiceAdminHelper } from "../../scripts/changeUpgradeServiceAdmin";
 import { acceptUpgradeServiceAdminHelper } from "../../scripts/acceptUpgradeServiceAdmin";
 import {
   expectError,
@@ -29,6 +28,7 @@ import {
 } from "../../scripts/helpers";
 import { strict as assert } from "assert";
 import UpgradeServiceClient from "../../scripts/helpers/upgradeServiceClient";
+import { testChangeUpgradeServiceAdmin } from "./changeUpgradeServiceAdmin.test";
 
 describe("Test accept upgrade service admin script", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
@@ -88,7 +88,7 @@ describe("Test accept upgrade service admin script", () => {
     });
 
     // USDC package: initiate admin role transfer to new USDC upgrade service admin
-    await changeUpgradeServiceAdminWithAssert({
+    await testChangeUpgradeServiceAdmin({
       upgradeServiceAdmin: deployerKeys,
       upgradeServiceObjectId: upgradeServiceUsdcObjectId,
       newUpgradeServiceAdmin: newUsdcUpgradeServiceAdmin,
@@ -96,7 +96,7 @@ describe("Test accept upgrade service admin script", () => {
     });
 
     // Stablecoin package: initiate admin role transfer to new Stablecoin upgrade service admin
-    await changeUpgradeServiceAdminWithAssert({
+    await testChangeUpgradeServiceAdmin({
       upgradeServiceAdmin: deployerKeys,
       upgradeServiceObjectId: upgradeServiceStablecoinObjectId,
       newUpgradeServiceAdmin: newStablecoinUpgradeServiceAdmin,
@@ -147,47 +147,22 @@ describe("Test accept upgrade service admin script", () => {
   });
 });
 
-async function changeUpgradeServiceAdminWithAssert(args: {
-  upgradeServiceAdmin: Ed25519Keypair;
-  upgradeServiceObjectId: string;
-  newUpgradeServiceAdmin: Ed25519Keypair;
-  rpcUrl: string;
-}) {
-  await changeUpgradeServiceAdminHelper({
-    upgradeServiceAdminKey: args.upgradeServiceAdmin.getSecretKey(),
-    upgradeServiceObjectId: args.upgradeServiceObjectId,
-    newUpgradeServiceAdmin: args.newUpgradeServiceAdmin.toSuiAddress(),
-    rpcUrl: args.rpcUrl,
-    gasBudget: DEFAULT_GAS_BUDGET.toString()
-  });
-  const suiClient = new SuiClient({ url: args.rpcUrl });
-  const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
-    suiClient,
-    args.upgradeServiceObjectId
-  );
-
-  // Get upgrade service pending admin
-  const pendingAdmin = await upgradeServiceClient.getPendingAdmin();
-  assert.equal(pendingAdmin, args.newUpgradeServiceAdmin.toSuiAddress());
-}
-
 async function testAcceptUpgradeServiceAdmin(args: {
   pendingUpgradeServiceAdmin: Ed25519Keypair;
   upgradeServiceObjectId: string;
   rpcUrl: string;
 }) {
-  await acceptUpgradeServiceAdminHelper({
-    pendingUpgradeServiceAdminKey:
-      args.pendingUpgradeServiceAdmin.getSecretKey(),
-    upgradeServiceObjectId: args.upgradeServiceObjectId,
-    rpcUrl: args.rpcUrl,
-    gasBudget: DEFAULT_GAS_BUDGET.toString()
-  });
   const suiClient = new SuiClient({ url: args.rpcUrl });
   const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
     suiClient,
     args.upgradeServiceObjectId
   );
+
+  await acceptUpgradeServiceAdminHelper(upgradeServiceClient, {
+    pendingUpgradeServiceAdminKey:
+      args.pendingUpgradeServiceAdmin.getSecretKey(),
+    gasBudget: DEFAULT_GAS_BUDGET.toString()
+  });
 
   // Pending admin should now be null
   const pendingAdmin = await upgradeServiceClient.getPendingAdmin();
