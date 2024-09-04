@@ -140,6 +140,28 @@ export default class UpgradeServiceClient {
     );
   }
 
+  public async acceptPendingAdmin(
+    pendingAdmin: Ed25519Keypair,
+    options: { gasBudget: bigint | null }
+  ) {
+    const acceptUpgradeServiceAdminTx = new Transaction();
+    acceptUpgradeServiceAdminTx.moveCall({
+      target: `${this.suiExtensionsPackageId}::upgrade_service::accept_admin`,
+      typeArguments: [this.upgradeServiceOtwType],
+      arguments: [
+        acceptUpgradeServiceAdminTx.object(this.upgradeServiceObjectId)
+      ]
+    });
+
+    // Accept the pending admin as the new admin
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: pendingAdmin,
+      transaction: acceptUpgradeServiceAdminTx,
+      gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null
+    });
+  }
+
   public async getUpgradeCapPackageId(): Promise<string> {
     return this.callSimpleViewFunction("upgrade_cap_package", bcs.Address);
   }

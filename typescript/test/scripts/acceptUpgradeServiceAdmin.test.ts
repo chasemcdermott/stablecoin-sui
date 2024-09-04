@@ -20,7 +20,7 @@ import { SuiClient } from "@mysten/sui/client";
 import { deployCommand } from "../../scripts/deploy";
 import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import { Ed25519Keypair } from "@mysten/sui/dist/cjs/keypairs/ed25519";
-import { changeUpgradeServiceAdminHelper } from "../../scripts/changeUpgradeServiceAdmin";
+import { acceptUpgradeServiceAdminHelper } from "../../scripts/acceptUpgradeServiceAdmin";
 import {
   expectError,
   getCreatedObjects,
@@ -28,8 +28,9 @@ import {
 } from "../../scripts/helpers";
 import { strict as assert } from "assert";
 import UpgradeServiceClient from "../../scripts/helpers/upgradeServiceClient";
+import { testChangeUpgradeServiceAdmin } from "./changeUpgradeServiceAdmin.test";
 
-describe("Test change upgrade service admin script", () => {
+describe("Test accept upgrade service admin script", () => {
   const RPC_URL: string = process.env.RPC_URL as string;
 
   let deployerKeys: Ed25519Keypair;
@@ -80,29 +81,13 @@ describe("Test change upgrade service admin script", () => {
 
     // Generate shared keys for testing
     newUsdcUpgradeServiceAdmin = await generateKeypairCommand({
-      prefund: false
+      prefund: true
     });
     newStablecoinUpgradeServiceAdmin = await generateKeypairCommand({
-      prefund: false
+      prefund: true
     });
-  });
 
-  it("Fails when the owner is inconsistent with actual owner", async () => {
-    const randomKeys = await generateKeypairCommand({ prefund: false });
-    await expectError(
-      () =>
-        testChangeUpgradeServiceAdmin({
-          upgradeServiceAdmin: randomKeys,
-          upgradeServiceObjectId: upgradeServiceUsdcObjectId,
-          newUpgradeServiceAdmin: newUsdcUpgradeServiceAdmin,
-          rpcUrl: RPC_URL
-        }),
-      /Incorrect private key supplied.*/
-    );
-  });
-
-  it("Successfully updates upgrade service admin to given addresses", async () => {
-    // Test changing for Usdc upgrade service admin
+    // USDC package: initiate admin role transfer to new USDC upgrade service admin
     await testChangeUpgradeServiceAdmin({
       upgradeServiceAdmin: deployerKeys,
       upgradeServiceObjectId: upgradeServiceUsdcObjectId,
@@ -110,7 +95,7 @@ describe("Test change upgrade service admin script", () => {
       rpcUrl: RPC_URL
     });
 
-    // Test changing for stablecoin upgrade service admin
+    // Stablecoin package: initiate admin role transfer to new Stablecoin upgrade service admin
     await testChangeUpgradeServiceAdmin({
       upgradeServiceAdmin: deployerKeys,
       upgradeServiceObjectId: upgradeServiceStablecoinObjectId,
@@ -118,28 +103,72 @@ describe("Test change upgrade service admin script", () => {
       rpcUrl: RPC_URL
     });
   });
+
+  it("Fails when the signing owner is inconsistent with actual pending owner", async () => {
+    const randomKeys = await generateKeypairCommand({ prefund: false });
+
+    // Test USDC package
+    await expectError(
+      () =>
+        testAcceptUpgradeServiceAdmin({
+          pendingUpgradeServiceAdmin: randomKeys,
+          upgradeServiceObjectId: upgradeServiceUsdcObjectId,
+          rpcUrl: RPC_URL
+        }),
+      /Incorrect private key supplied.*/
+    );
+
+    // Test stablecoin package
+    await expectError(
+      () =>
+        testAcceptUpgradeServiceAdmin({
+          pendingUpgradeServiceAdmin: randomKeys,
+          upgradeServiceObjectId: upgradeServiceStablecoinObjectId,
+          rpcUrl: RPC_URL
+        }),
+      /Incorrect private key supplied.*/
+    );
+  });
+
+  it("Successfully updates upgrade service admin to given addresses", async () => {
+    // Test USDC package
+    await testAcceptUpgradeServiceAdmin({
+      pendingUpgradeServiceAdmin: newUsdcUpgradeServiceAdmin,
+      upgradeServiceObjectId: upgradeServiceUsdcObjectId,
+      rpcUrl: RPC_URL
+    });
+
+    // Test stablecoin package
+    await testAcceptUpgradeServiceAdmin({
+      pendingUpgradeServiceAdmin: newStablecoinUpgradeServiceAdmin,
+      upgradeServiceObjectId: upgradeServiceStablecoinObjectId,
+      rpcUrl: RPC_URL
+    });
+  });
 });
 
-export async function testChangeUpgradeServiceAdmin(args: {
-  upgradeServiceAdmin: Ed25519Keypair;
+async function testAcceptUpgradeServiceAdmin(args: {
+  pendingUpgradeServiceAdmin: Ed25519Keypair;
   upgradeServiceObjectId: string;
-  newUpgradeServiceAdmin: Ed25519Keypair;
   rpcUrl: string;
 }) {
-  await changeUpgradeServiceAdminHelper({
-    upgradeServiceAdminKey: args.upgradeServiceAdmin.getSecretKey(),
-    upgradeServiceObjectId: args.upgradeServiceObjectId,
-    newUpgradeServiceAdmin: args.newUpgradeServiceAdmin.toSuiAddress(),
-    rpcUrl: args.rpcUrl,
-    gasBudget: DEFAULT_GAS_BUDGET.toString()
-  });
   const suiClient = new SuiClient({ url: args.rpcUrl });
   const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
     suiClient,
     args.upgradeServiceObjectId
   );
 
-  // Get upgrade service pending admin
+  await acceptUpgradeServiceAdminHelper(upgradeServiceClient, {
+    pendingUpgradeServiceAdminKey:
+      args.pendingUpgradeServiceAdmin.getSecretKey(),
+    gasBudget: DEFAULT_GAS_BUDGET.toString()
+  });
+
+  // Pending admin should now be null
   const pendingAdmin = await upgradeServiceClient.getPendingAdmin();
-  assert.equal(pendingAdmin, args.newUpgradeServiceAdmin.toSuiAddress());
+  assert.equal(pendingAdmin, null);
+
+  // The provided pending admin should now be the admin
+  const admin = await upgradeServiceClient.getAdmin();
+  assert.equal(admin, args.pendingUpgradeServiceAdmin.toSuiAddress());
 }
