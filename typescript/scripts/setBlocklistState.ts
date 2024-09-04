@@ -79,7 +79,7 @@ export default program
     "Path to a file containing the treasury deploy output in JSON format"
   )
   .option("--treasury-object-id <string>", "The ID of the treasury object")
-  .option("--unblock", "Set true to block, false to unblock")
+  .option("--unblock", "If this flag is set, unblocklist the address. If this flag is omitted, blocklist the address.")
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
   .action(async (address, options) => {
     const client = new SuiClient({ url: options.rpcUrl });
