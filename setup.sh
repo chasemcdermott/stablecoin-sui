@@ -25,7 +25,7 @@ else
   OS="macos-arm64"
 fi
 
-SUI_VERSION="1.30.1"
+SUI_VERSION="1.32.2"
 SUI_INSTALLATION_DIRECTORY="$HOME/.sui/bin"
 
 if ! command -v sui &> /dev/null || ! sui -V | grep -q "sui $SUI_VERSION-"
