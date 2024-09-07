@@ -140,6 +140,11 @@ export function buildPackageHelper(args: {
   dependencies: string[];
   digest: number[];
 } {
+  const configPath = path.join(
+    __dirname,
+    "../../../.sui/sui_config/client-localnet.yaml"
+  )
+
   const packagePath = path.join(
     __dirname,
     `../../../packages/${args.packageName}`
@@ -147,11 +152,17 @@ export function buildPackageHelper(args: {
   const withUnpublishedDependenciesArg = args.withUnpublishedDependencies
     ? "--with-unpublished-dependencies"
     : "";
-  const rawCompiledPackages = execSync(
-    `sui move build --dump-bytecode-as-base64 --path ${packagePath} ${withUnpublishedDependenciesArg} 2> /dev/null`,
-    { encoding: "utf-8" }
-  );
-  return JSON.parse(rawCompiledPackages);
+
+  try {
+    const rawCompiledPackages = execSync(
+      `sui move --client.config ${configPath} build --dump-bytecode-as-base64 --path ${packagePath} ${withUnpublishedDependenciesArg} 2> /dev/null`,
+      { encoding: "utf-8" }
+    );
+    return JSON.parse(rawCompiledPackages);
+  } catch (error) {
+    console.log(JSON.stringify(error));
+    throw error;
+  }
 }
 
 export function writePublishedAddressToPackageManifest(
