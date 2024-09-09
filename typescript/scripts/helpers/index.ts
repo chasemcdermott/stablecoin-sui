@@ -140,6 +140,10 @@ export function buildPackageHelper(args: {
   dependencies: string[];
   digest: number[];
 } {
+  // As of Sui v1.32.2, we need to fetch the sui client config because a config is required to use --dump-bytecode-as-base64.
+  // The sui CLI uses this to fetch the chainId as a key to look up managed addresses (see https://docs.sui.io/concepts/sui-move-concepts/packages/automated-address-management).
+  // If managed addresses are not being used at all, the command falls back to using the "published-at" fields in the Move.toml of dependent packages.
+  // Because we don't use managed addresses yet, it should be safe to use a localnet config, even for testnet or mainnet environments.
   const configPath = path.join(
     __dirname,
     "../../../.sui/sui_config/client-localnet.yaml"
