@@ -17,17 +17,50 @@
  */
 
 import { SuiClient } from "@mysten/sui/client";
+import { strict as assert } from "assert";
+
+const DEFAULT_TIMEOUT_MS = 10000;
+const DEFAULT_INTERVAL_MS = 500;
 
 /**
  * Polls every 500ms until the next epoch starts.
  */
 export async function waitUntilNextEpoch(client: SuiClient) {
-  const systemState = await client.getLatestSuiSystemState();
-  const currentEpoch = Number(systemState.epoch);
+  const startEpoch = Number((await client.getLatestSuiSystemState()).epoch);
+  return waitUntil(
+    "Next epoch",
+    async () => {
+      const currentEpoch = Number(
+        (await client.getLatestSuiSystemState()).epoch
+      );
+      assert.equal(currentEpoch > startEpoch, true);
+    },
+    30000, // 30 second timeout
+    500
+  );
+}
 
+/**
+ * Executes the runnable until it succeeds or the timeout is reached.
+ */
+export async function waitUntil(
+  title: string,
+  runnable: () => Promise<void>,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  delayMs = DEFAULT_INTERVAL_MS
+) {
+  const start = Date.now();
   while (true) {
-    const systemState = await client.getLatestSuiSystemState();
-    if (Number(systemState.epoch) > currentEpoch) break;
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      await runnable();
+      break;
+    } catch (error) {
+      const timeSinceStart = start - Date.now();
+      if (timeSinceStart > timeoutMs) {
+        throw Error(`Timed out before '${title}'. ${error}`);
+      }
+      // else continue
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 }

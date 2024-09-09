@@ -143,7 +143,7 @@ export function buildPackageHelper(args: {
   const configPath = path.join(
     __dirname,
     "../../../.sui/sui_config/client-localnet.yaml"
-  )
+  );
 
   const packagePath = path.join(
     __dirname,
@@ -405,7 +405,8 @@ export async function executeSponsoredTxHelper({
     options: {
       showEffects: true,
       showEvents: true,
-      showObjectChanges: true
+      showObjectChanges: true,
+      showBalanceChanges: true
     }
   });
 
