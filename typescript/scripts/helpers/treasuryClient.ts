@@ -627,4 +627,26 @@ export default class SuiTreasuryClient {
       gasBudget: options?.gasBudget ?? null
     });
   }
+
+  async upgradeMigration(
+    owner: Ed25519Keypair,
+    newPackageId: string, // TODO, refactor treasury client to be smarter about packageIDs
+    functionName: string,
+    options: { gasBudget: bigint | null }
+  ) {
+    const migrationTx = new Transaction();
+
+    migrationTx.moveCall({
+      target: `${newPackageId}::treasury::${functionName}`,
+      typeArguments: [this.coinOtwType],
+      arguments: [migrationTx.object(this.treasuryObjectId)]
+    });
+
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: owner,
+      transaction: migrationTx,
+      gasBudget: options?.gasBudget ?? null
+    });
+  }
 }

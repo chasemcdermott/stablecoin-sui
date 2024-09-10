@@ -32,6 +32,8 @@ import rotateController from "./rotateController";
 import usdcDeploySummary from "./usdcDeploySummary";
 import acceptTreasuryOwner from "./acceptTreasuryOwner";
 import acceptUpgradeServiceAdmin from "./acceptUpgradeServiceAdmin";
+import upgrade from "./upgrade";
+import upgradeMigration from "./upgradeMigration";
 
 program
   .name("scripts")
@@ -48,7 +50,9 @@ program
   .addCommand(rotateController)
   .addCommand(usdcDeploySummary)
   .addCommand(acceptTreasuryOwner)
-  .addCommand(acceptUpgradeServiceAdmin);
+  .addCommand(acceptUpgradeServiceAdmin)
+  .addCommand(upgrade)
+  .addCommand(upgradeMigration);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();
