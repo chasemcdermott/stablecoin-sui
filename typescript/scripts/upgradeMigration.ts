@@ -97,9 +97,5 @@ export default program
       client,
       options.treasuryObjectId
     );
-    await upgradeMigrationHelper(
-      treasuryClient,
-      action,
-      options
-    );
+    await upgradeMigrationHelper(treasuryClient, action, options);
   });

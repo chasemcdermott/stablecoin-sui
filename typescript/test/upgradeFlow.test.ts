@@ -73,7 +73,7 @@ describe("Test v1 -> v2 upgrade flow", () => {
 
     const stablecoinOtwType = `${monoUsdcPackageId}::stablecoin::STABLECOIN`;
     const upgradeServices = getCreatedObjects(usdcDeployTxOutput, {
-      objectType: `${monoUsdcPackageId}::upgrade_service::UpgradeService<${otwType}>`
+      objectType: `${monoUsdcPackageId}::upgrade_service::UpgradeService<${stablecoinOtwType}>`
     });
     assert.equal(upgradeServices.length, 1);
     upgradeServiceId = upgradeServices[0].objectId;
@@ -92,13 +92,23 @@ describe("Test v1 -> v2 upgrade flow", () => {
       treasuryId
     });
 
-    upgradeServiceClient = new UpgradeServiceClient(client, upgradeServiceId, monoUsdcPackageId, stablecoinOtwType);
-    treasuryClient = new SuiTreasuryClient(client, treasuryId, monoUsdcPackageId, coinOtwType);
+    upgradeServiceClient = new UpgradeServiceClient(
+      client,
+      upgradeServiceId,
+      monoUsdcPackageId,
+      stablecoinOtwType
+    );
+    treasuryClient = new SuiTreasuryClient(
+      client,
+      treasuryId,
+      monoUsdcPackageId,
+      coinOtwType
+    );
 
     console.log(">>> Deposit upgradeCap into upgradeService");
     await upgradeServiceClient.depositUpgradeCap(deployerKeys, upgradeCapId, {
       gasBudget: DEFAULT_GAS_BUDGET
-    })
+    });
 
     console.log(">>> Update source code to stablecoin v2");
     execSync(`cd .. && git apply packages/stablecoin/examples/v2_base.patch`);
@@ -115,9 +125,14 @@ describe("Test v1 -> v2 upgrade flow", () => {
     console.log(">>> Building stablecoin v2");
 
     console.log(">>> Upgrading stablecoin package...");
-    const upgradeTxOutput = await upgradeHelper(upgradeServiceClient, suiWrapper, 'usdc', {
-      adminKey: deployerKeys.getSecretKey()
-    });
+    const upgradeTxOutput = await upgradeHelper(
+      upgradeServiceClient,
+      suiWrapper,
+      "usdc",
+      {
+        adminKey: deployerKeys.getSecretKey()
+      }
+    );
 
     const published = getPublishedPackages(upgradeTxOutput);
     assert.equal(published.length, 1);
@@ -126,28 +141,34 @@ describe("Test v1 -> v2 upgrade flow", () => {
     console.log(">>> New package id:", monoUsdcPackageId);
 
     console.log(">>> Starting migration...");
-    await upgradeMigrationHelper(treasuryClient, 'start', {
+    await upgradeMigrationHelper(treasuryClient, "start", {
       newStablecoinPackageId: monoUsdcPackageId,
       ownerKey: deployerKeys.getSecretKey()
     });
-    assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), ["1", "2"]);
+    assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), [
+      "1",
+      "2"
+    ]);
 
     console.log(">>> Aborting migration...");
-    await upgradeMigrationHelper(treasuryClient, 'abort', {
+    await upgradeMigrationHelper(treasuryClient, "abort", {
       newStablecoinPackageId: monoUsdcPackageId,
       ownerKey: deployerKeys.getSecretKey()
     });
     assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), ["1"]);
 
     console.log(">>> Starting migration again...");
-    await upgradeMigrationHelper(treasuryClient, 'start', {
+    await upgradeMigrationHelper(treasuryClient, "start", {
       newStablecoinPackageId: monoUsdcPackageId,
       ownerKey: deployerKeys.getSecretKey()
     });
-    assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), ["1", "2"]);
+    assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), [
+      "1",
+      "2"
+    ]);
 
     console.log(">>> Completing migration...");
-    await upgradeMigrationHelper(treasuryClient, 'complete', {
+    await upgradeMigrationHelper(treasuryClient, "complete", {
       newStablecoinPackageId: monoUsdcPackageId,
       ownerKey: deployerKeys.getSecretKey()
     });
