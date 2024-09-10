@@ -6,20 +6,18 @@ Source repository for smart contracts used by Circle's stablecoins on Sui blockc
 
 ### Prerequisites
 
-Before you can start working with the contracts in this repository, make sure to:
+Before you can start working with the contracts in this repository, make sure to set up your local environment using the script below.
 
-1. Install Rust ([refer to documentations](https://doc.rust-lang.org/book/ch01-01-installation.html#installing-rustup-on-linux-or-macos))
-2. Install Sui from source
-   ```bash
-   bash setup.sh
-   ```
+```bash
+bash setup.sh
+```
 
 ### IDE
 
 - VSCode is recommended for developing Move contracts.
 - [Move (Extension)](https://marketplace.visualstudio.com/items?itemName=mysten.move) is a language server extension for Move.
 
-### Build and Test move contracts
+### Build and Test Move contracts
 
 1. Compile Move contracts from project root:
 
