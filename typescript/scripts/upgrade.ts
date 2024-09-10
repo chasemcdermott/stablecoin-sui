@@ -35,6 +35,7 @@ export async function upgradeHelper(
   options: {
     adminKey: string;
     gasBudget?: string;
+    withUnpublishedDependencies?: boolean
   }
 ) {
   const admin = getEd25519KeypairFromPrivateKey(options.adminKey);
@@ -48,7 +49,7 @@ export async function upgradeHelper(
   log("Building package");
   const { modules, dependencies, digest } = suiWrapper.buildPackage({
     packageName,
-    withUnpublishedDependencies: false
+    withUnpublishedDependencies: !!options.withUnpublishedDependencies
   });
 
   // Use the latest published package ID, not the original.

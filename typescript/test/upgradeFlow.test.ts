@@ -33,7 +33,7 @@ import UpgradeServiceClient from "../scripts/helpers/upgradeServiceClient";
 import { upgradeHelper } from "../scripts/upgrade";
 import { upgradeMigrationHelper } from "../scripts/upgradeMigration";
 
-describe("Test v1 -> v2 upgrade flow", () => {
+describe.only("Test v1 -> v2 upgrade flow", () => {
   const RPC_URL = process.env.RPC_URL as string;
 
   let client: SuiClient;
@@ -130,7 +130,8 @@ describe("Test v1 -> v2 upgrade flow", () => {
       suiWrapper,
       "usdc",
       {
-        adminKey: deployerKeys.getSecretKey()
+        adminKey: deployerKeys.getSecretKey(),
+        withUnpublishedDependencies: true
       }
     );
 
