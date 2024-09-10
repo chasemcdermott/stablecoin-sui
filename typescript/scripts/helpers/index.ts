@@ -38,7 +38,6 @@ import {
 import { decodeSuiPrivateKey } from "@mysten/sui/cryptography";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
-import { execSync } from "child_process";
 import _ from "lodash";
 import fs from "fs";
 import path from "path";
@@ -129,99 +128,6 @@ export function readTransactionOutput(
 export function getEd25519KeypairFromPrivateKey(privateKey: string) {
   return Ed25519Keypair.fromSecretKey(
     decodeSuiPrivateKey(privateKey).secretKey
-  );
-}
-
-export function buildPackageHelper(args: {
-  packageName: string;
-  withUnpublishedDependencies: boolean;
-}): {
-  modules: string[];
-  dependencies: string[];
-  digest: number[];
-} {
-  // As of Sui v1.32.2, we need to fetch the sui client config because a config is required to use --dump-bytecode-as-base64.
-  // The sui CLI uses this to fetch the chainId as a key to look up managed addresses (see https://docs.sui.io/concepts/sui-move-concepts/packages/automated-address-management).
-  // If managed addresses are not being used at all, the command falls back to using the "published-at" fields in the Move.toml of dependent packages.
-  // Because we don't use managed addresses yet, it should be safe to use a localnet config, even for testnet or mainnet environments.
-  const configPath = path.join(
-    __dirname,
-    "../../../.sui/sui_config/client-localnet.yaml"
-  );
-
-  const packagePath = path.join(
-    __dirname,
-    `../../../packages/${args.packageName}`
-  );
-  const withUnpublishedDependenciesArg = args.withUnpublishedDependencies
-    ? "--with-unpublished-dependencies"
-    : "";
-
-  try {
-    const rawCompiledPackages = execSync(
-      `sui move --client.config ${configPath} build --dump-bytecode-as-base64 --path ${packagePath} ${withUnpublishedDependenciesArg} 2> /dev/null`,
-      { encoding: "utf-8" }
-    );
-    return JSON.parse(rawCompiledPackages);
-  } catch (error) {
-    console.log(JSON.stringify(error));
-    throw error;
-  }
-}
-
-export function writePublishedAddressToPackageManifest(
-  packageName: string,
-  address: string
-) {
-  const moveTomlFilepath = getMoveTomlFilepath(packageName);
-  let existingContent = fs.readFileSync(moveTomlFilepath, "utf-8");
-
-  // Add published-at field.
-  existingContent = existingContent.replace(
-    "[package]",
-    `[package]\npublished-at = "${address}"`
-  );
-
-  // Set package alias to address.
-  existingContent = existingContent.replace(
-    `${packageName} = "0x0"`,
-    `${packageName} = "${address}"`
-  );
-
-  fs.writeFileSync(moveTomlFilepath, existingContent);
-
-  // Run a build to update the Move.lock file.
-  buildPackageHelper({ packageName, withUnpublishedDependencies: false });
-}
-
-export function resetPublishedAddressInPackageManifest(packageName: string) {
-  const moveTomlFilepath = getMoveTomlFilepath(packageName);
-  let existingContent = fs.readFileSync(moveTomlFilepath, "utf-8");
-
-  // Remove published-at field.
-  existingContent = existingContent.replace(/\npublished-at.*\w{66}.*/, "");
-
-  // Reset package alias to 0x0.
-  existingContent = existingContent.replace(
-    new RegExp(`\\n${packageName}.*\\w{66}.*`),
-    `\n${packageName} = "0x0"`
-  );
-
-  fs.writeFileSync(moveTomlFilepath, existingContent);
-
-  // Run a build to update the Move.lock file.
-  buildPackageHelper({ packageName, withUnpublishedDependencies: false });
-}
-
-function getMoveTomlFilepath(packageName: string) {
-  return path.join(
-    __dirname,
-    "..",
-    "..",
-    "..",
-    "packages",
-    packageName,
-    "Move.toml"
   );
 }
 

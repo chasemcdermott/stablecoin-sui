@@ -25,12 +25,15 @@ import {
   DEFAULT_GAS_BUDGET,
   getCreatedObjects,
   getMutatedObjects,
-  getPublishedPackages,
-  resetPublishedAddressInPackageManifest
+  getPublishedPackages
 } from "../../scripts/helpers";
+import SuiWrapper from "../../scripts/helpers/suiWrapper";
 
 describe("Test deposit-upgrade-cap script", () => {
   const RPC_URL = process.env.RPC_URL as string;
+  const suiWrapper = new SuiWrapper({
+    rpcUrl: process.env.RPC_URL as string
+  });
 
   let deployerKeys: Ed25519Keypair;
 
@@ -58,7 +61,7 @@ describe("Test deposit-upgrade-cap script", () => {
   });
 
   after(() => {
-    resetPublishedAddressInPackageManifest("sui_extensions");
+    suiWrapper.resetPublishedAddressInPackageManifest("sui_extensions");
   });
 
   beforeEach("Deploy 'stablecoin' package", async () => {

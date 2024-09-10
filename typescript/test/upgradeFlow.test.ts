@@ -25,18 +25,19 @@ import { execSync } from "child_process";
 import { deployCommand } from "../scripts/deploy";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
 import {
-  buildPackageHelper,
   callViewFunction,
   executeTransactionHelper,
   DEFAULT_GAS_BUDGET,
   getCreatedObjects,
   getPublishedPackages
 } from "../scripts/helpers";
+import SuiWrapper from "../scripts/helpers/suiWrapper";
 
 describe("Test v1 -> v2 upgrade flow", () => {
   const RPC_URL = process.env.RPC_URL as string;
 
   let client: SuiClient;
+  let suiWrapper: SuiWrapper;
   let deployerKeys: Ed25519Keypair;
   let monoUsdcPackageId: string;
   let upgradeCapId: string;
@@ -45,6 +46,7 @@ describe("Test v1 -> v2 upgrade flow", () => {
 
   beforeEach(async () => {
     client = new SuiClient({ url: RPC_URL });
+    suiWrapper = new SuiWrapper({ rpcUrl: RPC_URL });
     deployerKeys = await generateKeypairCommand({ prefund: true });
 
     console.log(">>> Deploying a consolidated usdc package");
@@ -116,7 +118,7 @@ describe("Test v1 -> v2 upgrade flow", () => {
 
   it("should successfully upgrade from v1 to v2, and migrate to v2", async () => {
     console.log(">>> Building stablecoin v2");
-    const { modules, dependencies, digest } = buildPackageHelper({
+    const { modules, dependencies, digest } = suiWrapper.buildPackage({
       packageName: "usdc",
       withUnpublishedDependencies: true
     });

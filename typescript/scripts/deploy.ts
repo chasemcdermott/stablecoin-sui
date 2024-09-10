@@ -19,14 +19,13 @@
 import { SuiClient } from "@mysten/sui/client";
 import { program } from "commander";
 import {
-  buildPackageHelper,
   deployPackageHelper,
   getEd25519KeypairFromPrivateKey,
   getPublishedPackages,
   log,
-  writeJsonOutput,
-  writePublishedAddressToPackageManifest
+  writeJsonOutput
 } from "./helpers";
+import SuiWrapper from "./helpers/suiWrapper";
 
 /**
  * Deploys a package and transfers the package UpgradeCap to upgradeCapRecipient
@@ -46,13 +45,16 @@ export async function deployCommand(
   }
 ) {
   const client = new SuiClient({ url: options.rpcUrl });
+  const suiWrapper = new SuiWrapper({
+    rpcUrl: options.rpcUrl
+  });
   log(`RPC URL: ${options.rpcUrl}`);
 
   const deployer = getEd25519KeypairFromPrivateKey(options.deployerKey);
   log(`Deployer: ${deployer.toSuiAddress()}`);
 
   log(`Building package '${packageName}'...`);
-  const { modules, dependencies } = buildPackageHelper({
+  const { modules, dependencies } = suiWrapper.buildPackage({
     packageName,
     withUnpublishedDependencies: !!options.withUnpublishedDependencies
   });
@@ -75,7 +77,7 @@ export async function deployCommand(
     if (publishedPackageIds.length != 1) {
       throw new Error("Unexpected number of package IDs published");
     }
-    writePublishedAddressToPackageManifest(
+    suiWrapper.writePublishedAddressToPackageManifest(
       packageName,
       publishedPackageIds[0].packageId
     );
