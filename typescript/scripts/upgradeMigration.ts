@@ -49,7 +49,7 @@ export async function upgradeMigrationHelper(
   }
 
   const migrationFunctionName = `${action}_migration`;
-  log(`Going to run ${migrationFunctionName}_migration`);
+  log(`Going to run ${migrationFunctionName}`);
   if (!(await waitForUserConfirmation())) {
     throw new Error("Terminating...");
   }
