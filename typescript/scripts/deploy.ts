@@ -25,7 +25,7 @@ import {
   log,
   writeJsonOutput
 } from "./helpers";
-import SuiWrapper from "./helpers/suiWrapper";
+import SuiCliWrapper from "./helpers/suiCliWrapper";
 
 /**
  * Deploys a package and transfers the package UpgradeCap to upgradeCapRecipient
@@ -45,7 +45,7 @@ export async function deployCommand(
   }
 ) {
   const client = new SuiClient({ url: options.rpcUrl });
-  const suiWrapper = new SuiWrapper({
+  const suiWrapper = new SuiCliWrapper({
     rpcUrl: options.rpcUrl
   });
   log(`RPC URL: ${options.rpcUrl}`);

@@ -27,11 +27,11 @@ import {
   getMutatedObjects,
   getPublishedPackages
 } from "../../scripts/helpers";
-import SuiWrapper from "../../scripts/helpers/suiWrapper";
+import SuiCliWrapper from "../../scripts/helpers/suiCliWrapper";
 
 describe("Test deposit-upgrade-cap script", () => {
   const RPC_URL = process.env.RPC_URL as string;
-  const suiWrapper = new SuiWrapper({
+  const suiWrapper = new SuiCliWrapper({
     rpcUrl: process.env.RPC_URL as string
   });
 

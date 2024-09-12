@@ -26,11 +26,11 @@ import {
 } from "./helpers";
 import UpgradeServiceClient from "./helpers/upgradeServiceClient";
 import { SuiClient } from "@mysten/sui/client";
-import SuiWrapper from "./helpers/suiWrapper";
+import SuiCliWrapper from "./helpers/suiCliWrapper";
 
 export async function upgradeHelper(
   upgradeServiceClient: UpgradeServiceClient,
-  suiWrapper: SuiWrapper,
+  suiWrapper: SuiCliWrapper,
   packageName: string,
   options: {
     adminKey: string;
@@ -109,6 +109,6 @@ export default program
       client,
       options.upgradeServiceObjectId
     );
-    const suiWrapper = new SuiWrapper({ rpcUrl: options.rpcUrl });
+    const suiWrapper = new SuiCliWrapper({ rpcUrl: options.rpcUrl });
     await upgradeHelper(upgradeServiceClient, suiWrapper, packageName, options);
   });

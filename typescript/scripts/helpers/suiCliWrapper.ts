@@ -21,7 +21,11 @@ import { parse } from "yaml";
 import fs from "fs";
 import { execSync } from "child_process";
 
-export default class SuiWrapper {
+/**
+ * Wrapper around the sui CLI tool for use in scripts.
+ * Maintains a config file that controls the environments that the CLI is connected to.
+ */
+export default class SuiCliWrapper {
   configPath: string;
 
   public constructor(options: { configPath?: string; rpcUrl?: string }) {

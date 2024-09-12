@@ -28,7 +28,7 @@ import {
   getPublishedPackages,
   SuiTreasuryClient
 } from "../scripts/helpers";
-import SuiWrapper from "../scripts/helpers/suiWrapper";
+import SuiCliWrapper from "../scripts/helpers/suiCliWrapper";
 import UpgradeServiceClient from "../scripts/helpers/upgradeServiceClient";
 import { upgradeHelper } from "../scripts/upgrade";
 import { upgradeMigrationHelper } from "../scripts/upgradeMigration";
@@ -39,7 +39,7 @@ describe.only("Test v1 -> v2 upgrade flow", () => {
   let client: SuiClient;
   let upgradeServiceClient: UpgradeServiceClient;
   let treasuryClient: SuiTreasuryClient;
-  let suiWrapper: SuiWrapper;
+  let suiWrapper: SuiCliWrapper;
   let deployerKeys: Ed25519Keypair;
   let monoUsdcPackageId: string;
   let upgradeCapId: string;
@@ -48,7 +48,7 @@ describe.only("Test v1 -> v2 upgrade flow", () => {
 
   beforeEach(async () => {
     client = new SuiClient({ url: RPC_URL });
-    suiWrapper = new SuiWrapper({ rpcUrl: RPC_URL });
+    suiWrapper = new SuiCliWrapper({ rpcUrl: RPC_URL });
     deployerKeys = await generateKeypairCommand({ prefund: true });
 
     console.log(">>> Deploying a consolidated usdc package");
