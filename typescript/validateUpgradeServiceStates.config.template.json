@@ -1,0 +1,12 @@
+{
+  "upgradeServiceObjectId": "",
+  "expectedStates": {
+    "suiExtensionsPackageId": "",
+    "upgradeServiceOtwType": "",
+    "admin": "",
+    "pendingAdmin": "",
+    "upgradeCapPackageId": "",
+    "upgradeCapVersion": "1",
+    "upgradeCapPolicy": 0
+  }
+}

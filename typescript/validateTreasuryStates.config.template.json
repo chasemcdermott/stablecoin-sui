@@ -1,0 +1,41 @@
+{
+  "treasuryObjectId": "",
+  "expectedStates": {
+    "stablecoinPackageId": "",
+    "coinType": "",
+    "controllers": {
+      "_controllerAddress": {
+        "mintCapId": ""
+      }
+    },
+    "mintAllowances": {
+      "_mintCapId": {
+        "minter": "",
+        "allowance": ""
+      }
+    },
+    "roles": {
+      "owner": "",
+      "pendingOwner": "",
+      "masterMinter": "",
+      "blocklister": "",
+      "pauser": "",
+      "metadataUpdater": ""
+    },
+    "totalSupply": "",
+    "pauseState": {
+      "current": "false",
+      "next": "false"
+    },
+    "metadata": {
+      "id": "",
+      "decimals": "6",
+      "name": "USDC",
+      "symbol": "USDC",
+      "description": "USDC is a US dollar-backed stablecoin issued by Circle. USDC is designed to provide a faster, safer, and more efficient way to send, spend, and exchange money around the world.",
+      "iconUrl": "https://www.circle.com/hubfs/Brand/USDC/USDC_icon_32x32.png"
+    },
+    "compatibleVersions": ["1"],
+    "blocklist": []
+  }
+}

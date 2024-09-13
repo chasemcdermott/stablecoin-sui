@@ -24,19 +24,21 @@ import * as yup from "yup";
 import { log, yupSuiAddress, yupSuiAddressOrEmpty } from "./helpers";
 import UpgradeServiceClient from "./helpers/upgradeServiceClient";
 
-const upgradeServiceStatesSchema = yup.object().shape({
-  suiExtensionsPackageId: yupSuiAddress().required(),
-  upgradeServiceOtwType: yup.string().required(),
-  admin: yupSuiAddress().required(),
-  pendingAdmin: yupSuiAddressOrEmpty(),
-  upgradeCapPackageId: yupSuiAddress().required(),
-  upgradeCapVersion: yup.string().required(),
-  upgradeCapPolicy: yup.number().required()
+const configSchema = yup.object().shape({
+  upgradeServiceObjectId: yupSuiAddress().required(),
+  expectedStates: yup.object().shape({
+    suiExtensionsPackageId: yupSuiAddress().required(),
+    upgradeServiceOtwType: yup.string().required(),
+    admin: yupSuiAddress().required(),
+    pendingAdmin: yupSuiAddressOrEmpty(),
+    upgradeCapPackageId: yupSuiAddress().required(),
+    upgradeCapVersion: yup.string().required(),
+    upgradeCapPolicy: yup.number().required()
+  })
 });
 
-export type UpgradeServiceStates = yup.InferType<
-  typeof upgradeServiceStatesSchema
->;
+export type ConfigFile = yup.InferType<typeof configSchema>;
+export type UpgradeServiceStates = ConfigFile["expectedStates"];
 
 export async function validateUpgradeServiceStates(
   client: UpgradeServiceClient,
@@ -60,34 +62,28 @@ export async function validateUpgradeServiceStates(
 export default program
   .createCommand("validate-upgrade-service-states")
   .description("Validates all upgrade service states match the expected input")
-  .requiredOption(
-    "--upgrade-service-object-id <string>",
-    "The ID of the upgrade service object"
-  )
-  .requiredOption(
-    "--expected-states-file <string>",
-    "Path to a file containing the controllers and relevant information in JSON format"
-  )
+  .argument("<string>", "Path to a validateUpgradeServiceStates config file")
   .requiredOption(
     "-r, --rpc-url <string>",
     "Network RPC URL",
     process.env.RPC_URL
   )
-  .action(async (options) => {
+  .action(async (configFile, options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 
-    const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
-      client,
-      options.upgradeServiceObjectId
-    );
-
-    // parse the data here
-    const rawData = fs.readFileSync(options.expectedStatesFile, "utf-8");
-    const expectedStates: UpgradeServiceStates = JSON.parse(rawData);
-
-    await upgradeServiceStatesSchema.validate(expectedStates, {
+    const config: ConfigFile = JSON.parse(fs.readFileSync(configFile, "utf-8"));
+    await configSchema.validate(config, {
       abortEarly: false,
       strict: true
     });
-    await validateUpgradeServiceStates(upgradeServiceClient, expectedStates);
+
+    const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
+      client,
+      config.upgradeServiceObjectId
+    );
+
+    await validateUpgradeServiceStates(
+      upgradeServiceClient,
+      config.expectedStates
+    );
   });

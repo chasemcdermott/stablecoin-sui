@@ -31,54 +31,58 @@ import {
   yupSuiAddressOrEmpty
 } from "./helpers";
 
-const treasuryStatesSchema = yup.object().shape({
-  stablecoinPackageId: yupSuiAddress().required(),
-  coinType: yup.string().required(),
-  controllers: yup.lazy((rawControllers) =>
-    yup.object(
-      _.mapValues(rawControllers, () =>
-        yup.object().shape({
-          mintCapId: yupSuiAddress().required()
-        })
+const configSchema = yup.object().shape({
+  treasuryObjectId: yupSuiAddress().required(),
+  expectedStates: yup.object().shape({
+    stablecoinPackageId: yupSuiAddress().required(),
+    coinType: yup.string().required(),
+    controllers: yup.lazy((rawControllers) =>
+      yup.object(
+        _.mapValues(rawControllers, () =>
+          yup.object().shape({
+            mintCapId: yupSuiAddress().required()
+          })
+        )
       )
-    )
-  ),
-  mintAllowances: yup.lazy((mintAllowances) =>
-    yup.object(
-      _.mapValues(mintAllowances, () =>
-        yup.object().shape({
-          minter: yupSuiAddress().required(),
-          allowance: yup.string().required()
-        })
+    ),
+    mintAllowances: yup.lazy((mintAllowances) =>
+      yup.object(
+        _.mapValues(mintAllowances, () =>
+          yup.object().shape({
+            minter: yupSuiAddress().required(),
+            allowance: yup.string().required()
+          })
+        )
       )
-    )
-  ),
-  roles: yup.object().required().shape({
-    owner: yupSuiAddress().required(),
-    pendingOwner: yupSuiAddressOrEmpty(),
-    masterMinter: yupSuiAddress().required(),
-    blocklister: yupSuiAddress().required(),
-    pauser: yupSuiAddress().required(),
-    metadataUpdater: yupSuiAddress().required()
-  }),
-  totalSupply: yup.string().required(),
-  pauseState: yup.object().required().shape({
-    current: yup.string().required(),
-    next: yup.string().required()
-  }),
-  metadata: yup.object().required().shape({
-    id: yup.string().required(),
-    decimals: yup.string().required(),
-    name: yup.string().required(),
-    symbol: yup.string().required(),
-    description: yup.string().required(),
-    iconUrl: yup.string().url().required()
-  }),
-  compatibleVersions: yup.array().of(yup.string().required()).required(),
-  blocklist: yup.array().of(yupSuiAddress().required()).required()
+    ),
+    roles: yup.object().required().shape({
+      owner: yupSuiAddress().required(),
+      pendingOwner: yupSuiAddressOrEmpty(),
+      masterMinter: yupSuiAddress().required(),
+      blocklister: yupSuiAddress().required(),
+      pauser: yupSuiAddress().required(),
+      metadataUpdater: yupSuiAddress().required()
+    }),
+    totalSupply: yup.string().required(),
+    pauseState: yup.object().required().shape({
+      current: yup.string().required(),
+      next: yup.string().required()
+    }),
+    metadata: yup.object().required().shape({
+      id: yup.string().required(),
+      decimals: yup.string().required(),
+      name: yup.string().required(),
+      symbol: yup.string().required(),
+      description: yup.string().required(),
+      iconUrl: yup.string().url().required()
+    }),
+    compatibleVersions: yup.array().of(yup.string().required()).required(),
+    blocklist: yup.array().of(yupSuiAddress().required()).required()
+  })
 });
 
-export type TreasuryStates = yup.InferType<typeof treasuryStatesSchema>;
+export type ConfigFile = yup.InferType<typeof configSchema>;
+export type TreasuryStates = ConfigFile["expectedStates"];
 
 export async function validateTreasuryStatesHelper(
   treasuryClient: SuiTreasuryClient,
@@ -255,34 +259,25 @@ async function constructBlocklistHelper(
 export default program
   .createCommand("validate-treasury-states")
   .description("Validates all treasury states match the expected input")
-  .requiredOption(
-    "--treasury-object-id <string>",
-    "The ID of the treasury object"
-  )
-  .requiredOption(
-    "--expected-states-file <string>",
-    "Path to a file containing the controllers and relevant information in JSON format"
-  )
+  .argument("<string>", "Path to a validateTreasuryStates config file")
   .requiredOption(
     "-r, --rpc-url <string>",
     "Network RPC URL",
     process.env.RPC_URL
   )
-  .action(async (options) => {
+  .action(async (configFile, options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 
-    const treasuryClient = await SuiTreasuryClient.buildFromId(
-      client,
-      options.treasuryObjectId
-    );
-
-    // parse the data here
-    const rawData = fs.readFileSync(options.expectedStatesFile, "utf-8");
-    const expectedTreasuryState: TreasuryStates = JSON.parse(rawData);
-
-    await treasuryStatesSchema.validate(expectedTreasuryState, {
+    const config: ConfigFile = JSON.parse(fs.readFileSync(configFile, "utf-8"));
+    await configSchema.validate(config, {
       abortEarly: false,
       strict: true
     });
-    await validateTreasuryStatesHelper(treasuryClient, expectedTreasuryState);
+
+    const treasuryClient = await SuiTreasuryClient.buildFromId(
+      client,
+      config.treasuryObjectId
+    );
+
+    await validateTreasuryStatesHelper(treasuryClient, config.expectedStates);
   });
