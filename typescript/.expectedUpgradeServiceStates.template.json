@@ -1,9 +1,0 @@
-{
-  "suiExtensionsPackageId": "0x8753ef8c662dd9b2452405d433c7720e0b0f4732e1ddffc70b552fe206216742",
-  "upgradeServiceOtwType": "0x351d4809944868c286ae92bf9751acfca14fb018b153afa9d65039f69e5daadb::stablecoin::STABLECOIN",
-  "admin": "0x01dbbffe98ee004d720cc9d58f1e40772d5c8587d7ea5b4380a5b280c81c31a1",
-  "pendingAdmin": "",
-  "upgradeCapPackageId": "0x351d4809944868c286ae92bf9751acfca14fb018b153afa9d65039f69e5daadb",
-  "upgradeCapVersion": "1",
-  "upgradeCapPolicy": 0
-}

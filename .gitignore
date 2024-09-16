@@ -4,5 +4,9 @@ node_modules/
 .coverage_map.mvcov
 .trace
 typescript/.env
+typescript/validateTreasuryStates.*.config.json
+typescript/validateUpgradeServiceStates.*.config.json
+!typescript/validateTreasuryStates.config.template.json
+!typescript/validateUpgradeServiceStates.config.template.json
 logs/
 *.log
