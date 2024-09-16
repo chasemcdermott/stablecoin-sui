@@ -25,11 +25,10 @@ import {
   log
 } from "./helpers";
 import { SuiClient } from "@mysten/sui/client";
-import { MigrationAction } from "./helpers/treasuryClient";
 
 export async function upgradeMigrationHelper(
   treasuryClient: SuiTreasuryClient,
-  action: MigrationAction,
+  action: string,
   options: {
     newStablecoinPackageId: string;
     ownerKey: string;

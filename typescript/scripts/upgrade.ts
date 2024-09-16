@@ -35,7 +35,7 @@ export async function upgradeHelper(
   options: {
     adminKey: string;
     gasBudget?: string;
-    withUnpublishedDependencies?: boolean
+    withUnpublishedDependencies?: boolean;
   }
 ) {
   const admin = getEd25519KeypairFromPrivateKey(options.adminKey);
