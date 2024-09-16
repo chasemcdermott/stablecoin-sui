@@ -81,7 +81,7 @@ export default program
   )
   .requiredOption(
     "--owner-key <string>",
-    "The private key of the treasury object's pending owner"
+    "The private key of the treasury object's owner"
   )
   .requiredOption(
     "-r, --rpc-url <string>",

@@ -87,7 +87,7 @@ export async function upgradeHelper(
 
 export default program
   .createCommand("upgrade")
-  .description("Upgrade the given package ID")
+  .description("Publishes an upgraded version of the package at a new ID")
   .argument("<packageName>", "The name of the package to upgrade")
   .requiredOption(
     "--upgrade-service-object-id <string>",
@@ -95,7 +95,7 @@ export default program
   )
   .requiredOption(
     "--admin-key <string>",
-    "The private key of the upgrade service's pending admin"
+    "The private key of the upgrade service's admin"
   )
   .requiredOption(
     "-r, --rpc-url <string>",
