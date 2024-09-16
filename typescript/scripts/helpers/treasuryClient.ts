@@ -645,7 +645,7 @@ export default class SuiTreasuryClient {
     }
 
     migrationTx.moveCall({
-      target: `${newPackageId}::treasury::${migrationAction}_upgrade`,
+      target: `${newPackageId}::treasury::${migrationAction}_migration`,
       typeArguments: [this.coinOtwType],
       arguments: [migrationTx.object(this.treasuryObjectId)]
     });
