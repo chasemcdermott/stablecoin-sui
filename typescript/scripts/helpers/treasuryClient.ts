@@ -27,6 +27,8 @@ import {
   callViewFunction
 } from ".";
 
+export type MigrationAction = "start" | "complete" | "abort";
+
 export default class SuiTreasuryClient {
   suiClient: SuiClient;
   treasuryObjectId: string;
@@ -631,13 +633,13 @@ export default class SuiTreasuryClient {
   async upgradeMigration(
     owner: Ed25519Keypair,
     newPackageId: string, // TODO, refactor treasury client to be smarter about packageIDs
-    functionName: string,
+    functionName: MigrationAction,
     options: { gasBudget: bigint | null }
   ) {
     const migrationTx = new Transaction();
 
     migrationTx.moveCall({
-      target: `${newPackageId}::treasury::${functionName}`,
+      target: `${newPackageId}::treasury::${functionName}_upgrade`,
       typeArguments: [this.coinOtwType],
       arguments: [migrationTx.object(this.treasuryObjectId)]
     });

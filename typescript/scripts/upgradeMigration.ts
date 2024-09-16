@@ -25,8 +25,7 @@ import {
   log
 } from "./helpers";
 import { SuiClient } from "@mysten/sui/client";
-
-type MigrationAction = "start" | "complete" | "abort";
+import { MigrationAction } from "./helpers/treasuryClient";
 
 export async function upgradeMigrationHelper(
   treasuryClient: SuiTreasuryClient,
@@ -48,8 +47,7 @@ export async function upgradeMigrationHelper(
     );
   }
 
-  const migrationFunctionName = `${action}_migration`;
-  log(`Going to run ${migrationFunctionName}`);
+  log(`Going to run ${action}_migration`);
   if (!(await waitForUserConfirmation())) {
     throw new Error("Terminating...");
   }
@@ -57,13 +55,13 @@ export async function upgradeMigrationHelper(
   const txOutput = await treasuryClient.upgradeMigration(
     ownerKey,
     options.newStablecoinPackageId,
-    migrationFunctionName,
+    action,
     { gasBudget }
   );
 
   writeJsonOutput("upgrade-migration", txOutput);
 
-  log(`Migration step ${migrationFunctionName} executed`);
+  log(`Migration step ${action} executed`);
 }
 
 export default program
