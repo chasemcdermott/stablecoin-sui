@@ -27,6 +27,8 @@ import {
   callViewFunction
 } from ".";
 
+export const MIGRATION_ACTIONS = ["start", "complete", "abort"];
+
 export default class SuiTreasuryClient {
   suiClient: SuiClient;
   treasuryObjectId: string;
@@ -624,6 +626,34 @@ export default class SuiTreasuryClient {
       client: this.suiClient,
       signer: pendingOwner,
       transaction: acceptTreasuryOwnerTx,
+      gasBudget: options?.gasBudget ?? null
+    });
+  }
+
+  async upgradeMigration(
+    owner: Ed25519Keypair,
+    newPackageId: string, // TODO, refactor treasury client to be smarter about packageIDs
+    migrationAction: string,
+    options: { gasBudget: bigint | null }
+  ) {
+    const migrationTx = new Transaction();
+
+    if (!MIGRATION_ACTIONS.includes(migrationAction)) {
+      throw new Error(
+        `Migration action must be one of ${MIGRATION_ACTIONS}, got ${migrationAction}`
+      );
+    }
+
+    migrationTx.moveCall({
+      target: `${newPackageId}::treasury::${migrationAction}_migration`,
+      typeArguments: [this.coinOtwType],
+      arguments: [migrationTx.object(this.treasuryObjectId)]
+    });
+
+    return executeTransactionHelper({
+      client: this.suiClient,
+      signer: owner,
+      transaction: migrationTx,
       gasBudget: options?.gasBudget ?? null
     });
   }

@@ -1,0 +1,18 @@
+---
+keystore:
+  File: "./sui.keystore"
+envs:
+  - alias: localnet
+    rpc: "http://127.0.0.1:9001"
+    ws: ~
+    basic_auth: ~
+  - alias: circle-testnet
+    rpc: "https://prod-sui-testnet-us-east-1.blockchain.circle.com:7000"
+    ws: ~
+    basic_auth: ~
+  - alias: circle-mainnet
+    rpc: "https://prod-sui-mainnet-us-east-1.blockchain.circle.com:7000"
+    ws: ~
+    basic_auth: ~
+active_env: localnet
+active_address: ~

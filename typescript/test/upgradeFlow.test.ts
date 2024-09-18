@@ -16,27 +16,30 @@
  * limitations under the License.
  */
 
-import { bcs } from "@mysten/sui/bcs";
 import { SuiClient } from "@mysten/sui/client";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { Transaction } from "@mysten/sui/transactions";
 import { strict as assert } from "assert";
 import { execSync } from "child_process";
 import { deployCommand } from "../scripts/deploy";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
 import {
-  buildPackageHelper,
-  callViewFunction,
-  executeTransactionHelper,
   DEFAULT_GAS_BUDGET,
   getCreatedObjects,
-  getPublishedPackages
+  getPublishedPackages,
+  SuiTreasuryClient
 } from "../scripts/helpers";
+import SuiCliWrapper from "../scripts/helpers/suiCliWrapper";
+import UpgradeServiceClient from "../scripts/helpers/upgradeServiceClient";
+import { upgradeHelper } from "../scripts/upgrade";
+import { upgradeMigrationHelper } from "../scripts/upgradeMigration";
 
 describe("Test v1 -> v2 upgrade flow", () => {
   const RPC_URL = process.env.RPC_URL as string;
 
   let client: SuiClient;
+  let upgradeServiceClient: UpgradeServiceClient;
+  let treasuryClient: SuiTreasuryClient;
+  let suiWrapper: SuiCliWrapper;
   let deployerKeys: Ed25519Keypair;
   let monoUsdcPackageId: string;
   let upgradeCapId: string;
@@ -45,6 +48,7 @@ describe("Test v1 -> v2 upgrade flow", () => {
 
   beforeEach(async () => {
     client = new SuiClient({ url: RPC_URL });
+    suiWrapper = new SuiCliWrapper({ rpcUrl: RPC_URL });
     deployerKeys = await generateKeypairCommand({ prefund: true });
 
     console.log(">>> Deploying a consolidated usdc package");
@@ -67,14 +71,16 @@ describe("Test v1 -> v2 upgrade flow", () => {
     assert.equal(upgradeCaps.length, 1);
     upgradeCapId = upgradeCaps[0].objectId;
 
+    const stablecoinOtwType = `${monoUsdcPackageId}::stablecoin::STABLECOIN`;
     const upgradeServices = getCreatedObjects(usdcDeployTxOutput, {
-      objectType: `${monoUsdcPackageId}::upgrade_service::UpgradeService<${monoUsdcPackageId}::stablecoin::STABLECOIN>`
+      objectType: `${monoUsdcPackageId}::upgrade_service::UpgradeService<${stablecoinOtwType}>`
     });
     assert.equal(upgradeServices.length, 1);
     upgradeServiceId = upgradeServices[0].objectId;
 
+    const coinOtwType = `${monoUsdcPackageId}::usdc::USDC`;
     const treasury = getCreatedObjects(usdcDeployTxOutput, {
-      objectType: `${monoUsdcPackageId}::treasury::Treasury<${monoUsdcPackageId}::usdc::USDC>`
+      objectType: `${monoUsdcPackageId}::treasury::Treasury<${coinOtwType}>`
     });
     assert.equal(treasury.length, 1);
     treasuryId = treasury[0].objectId;
@@ -86,20 +92,21 @@ describe("Test v1 -> v2 upgrade flow", () => {
       treasuryId
     });
 
-    console.log(">>> Deposit upgradeCap into upgradeService");
-    const depositTx = new Transaction();
-    depositTx.moveCall({
-      target: `${monoUsdcPackageId}::upgrade_service::deposit`,
-      typeArguments: [`${monoUsdcPackageId}::stablecoin::STABLECOIN`],
-      arguments: [
-        depositTx.object(upgradeServiceId),
-        depositTx.object(upgradeCapId)
-      ]
-    });
-    await executeTransactionHelper({
+    upgradeServiceClient = new UpgradeServiceClient(
       client,
-      signer: deployerKeys,
-      transaction: depositTx,
+      upgradeServiceId,
+      monoUsdcPackageId,
+      stablecoinOtwType
+    );
+    treasuryClient = new SuiTreasuryClient(
+      client,
+      treasuryId,
+      monoUsdcPackageId,
+      coinOtwType
+    );
+
+    console.log(">>> Deposit upgradeCap into upgradeService");
+    await upgradeServiceClient.depositUpgradeCap(deployerKeys, upgradeCapId, {
       gasBudget: DEFAULT_GAS_BUDGET
     });
 
@@ -116,50 +123,17 @@ describe("Test v1 -> v2 upgrade flow", () => {
 
   it("should successfully upgrade from v1 to v2, and migrate to v2", async () => {
     console.log(">>> Building stablecoin v2");
-    const { modules, dependencies, digest } = buildPackageHelper({
-      packageName: "usdc",
-      withUnpublishedDependencies: true
-    });
 
     console.log(">>> Upgrading stablecoin package...");
-    const upgradeTx = new Transaction();
-
-    const [compatiblePolicyRef] = upgradeTx.moveCall({
-      target: "0x2::package::compatible_policy"
-    });
-
-    const [upgradeTicket] = upgradeTx.moveCall({
-      target: `${monoUsdcPackageId}::upgrade_service::authorize_upgrade`,
-      typeArguments: [`${monoUsdcPackageId}::stablecoin::STABLECOIN`],
-      arguments: [
-        upgradeTx.object(upgradeServiceId),
-        compatiblePolicyRef,
-        upgradeTx.makeMoveVec({
-          type: "u8",
-          elements: digest.map((byte) => upgradeTx.pure.u8(byte))
-        })
-      ]
-    });
-
-    const [upgradeReceipt] = upgradeTx.upgrade({
-      modules,
-      dependencies,
-      package: monoUsdcPackageId,
-      ticket: upgradeTicket
-    });
-
-    upgradeTx.moveCall({
-      target: `${monoUsdcPackageId}::upgrade_service::commit_upgrade`,
-      typeArguments: [`${monoUsdcPackageId}::stablecoin::STABLECOIN`],
-      arguments: [upgradeTx.object(upgradeServiceId), upgradeReceipt]
-    });
-
-    const upgradeTxOutput = await executeTransactionHelper({
-      client,
-      signer: deployerKeys,
-      transaction: upgradeTx,
-      gasBudget: DEFAULT_GAS_BUDGET
-    });
+    const upgradeTxOutput = await upgradeHelper(
+      upgradeServiceClient,
+      suiWrapper,
+      "usdc",
+      {
+        adminKey: deployerKeys.getSecretKey(),
+        withUnpublishedDependencies: true
+      }
+    );
 
     const published = getPublishedPackages(upgradeTxOutput);
     assert.equal(published.length, 1);
@@ -168,46 +142,37 @@ describe("Test v1 -> v2 upgrade flow", () => {
     console.log(">>> New package id:", monoUsdcPackageId);
 
     console.log(">>> Starting migration...");
-    const startMigrationTx = new Transaction();
-    startMigrationTx.moveCall({
-      target: `${monoUsdcPackageId}::treasury::start_migration`,
-      typeArguments: [`${monoUsdcPackageId}::usdc::USDC`],
-      arguments: [startMigrationTx.object(treasuryId)]
+    await upgradeMigrationHelper(treasuryClient, "start", {
+      newStablecoinPackageId: monoUsdcPackageId,
+      ownerKey: deployerKeys.getSecretKey()
     });
-    await executeTransactionHelper({
-      client,
-      signer: deployerKeys,
-      transaction: startMigrationTx,
-      gasBudget: DEFAULT_GAS_BUDGET
+    assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), [
+      "1",
+      "2"
+    ]);
+
+    console.log(">>> Aborting migration...");
+    await upgradeMigrationHelper(treasuryClient, "abort", {
+      newStablecoinPackageId: monoUsdcPackageId,
+      ownerKey: deployerKeys.getSecretKey()
     });
+    assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), ["1"]);
+
+    console.log(">>> Starting migration again...");
+    await upgradeMigrationHelper(treasuryClient, "start", {
+      newStablecoinPackageId: monoUsdcPackageId,
+      ownerKey: deployerKeys.getSecretKey()
+    });
+    assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), [
+      "1",
+      "2"
+    ]);
 
     console.log(">>> Completing migration...");
-    const completeMigrationTx = new Transaction();
-    completeMigrationTx.moveCall({
-      target: `${monoUsdcPackageId}::treasury::complete_migration`,
-      typeArguments: [`${monoUsdcPackageId}::usdc::USDC`],
-      arguments: [completeMigrationTx.object(treasuryId)]
+    await upgradeMigrationHelper(treasuryClient, "complete", {
+      newStablecoinPackageId: monoUsdcPackageId,
+      ownerKey: deployerKeys.getSecretKey()
     });
-    await executeTransactionHelper({
-      client,
-      signer: deployerKeys,
-      transaction: completeMigrationTx,
-      gasBudget: DEFAULT_GAS_BUDGET
-    });
-
-    console.log(">>> Checking compatible_versions ...");
-    const checkCompatibleVersionsTx = new Transaction();
-    checkCompatibleVersionsTx.moveCall({
-      target: `${monoUsdcPackageId}::treasury::compatible_versions`,
-      typeArguments: [`${monoUsdcPackageId}::usdc::USDC`],
-      arguments: [checkCompatibleVersionsTx.object(treasuryId)]
-    });
-    const [compatibleVersions] = await callViewFunction({
-      client,
-      transaction: checkCompatibleVersionsTx,
-      returnTypes: [bcs.vector(bcs.U64)]
-    });
-
-    assert.deepStrictEqual(compatibleVersions, ["2"]);
+    assert.deepStrictEqual(await treasuryClient.getCompatibleVersions(), ["2"]);
   });
 });

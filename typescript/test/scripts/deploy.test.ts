@@ -23,18 +23,23 @@ import { generateKeypairCommand } from "../../scripts/generateKeypair";
 import {
   DEFAULT_GAS_BUDGET,
   getCreatedObjects,
-  getPublishedPackages,
-  resetPublishedAddressInPackageManifest
+  getPublishedPackages
 } from "../../scripts/helpers";
+import SuiCliWrapper from "../../scripts/helpers/suiCliWrapper";
 
 describe("Test deploy script", () => {
+  const RPC_URL = process.env.RPC_URL as string;
+  const suiWrapper = new SuiCliWrapper({
+    rpcUrl: RPC_URL
+  });
+
   let deployerKeys: Ed25519Keypair;
 
   before("Deploy 'sui_extensions' package", async () => {
     deployerKeys = await generateKeypairCommand({ prefund: true });
 
     const deployTx = await deployCommand("sui_extensions", {
-      rpcUrl: process.env.RPC_URL as string,
+      rpcUrl: RPC_URL,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: deployerKeys.toSuiAddress(),
       writePackageId: true,
@@ -47,14 +52,14 @@ describe("Test deploy script", () => {
   });
 
   after(() => {
-    resetPublishedAddressInPackageManifest("sui_extensions");
+    suiWrapper.resetPublishedAddressInPackageManifest("sui_extensions");
   });
 
   it("Deploys stablecoin package successfully", async () => {
     const upgraderKeys = await generateKeypairCommand({ prefund: false });
 
     const txOutput = await deployCommand("stablecoin", {
-      rpcUrl: process.env.RPC_URL as string,
+      rpcUrl: RPC_URL as string,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
       gasBudget: DEFAULT_GAS_BUDGET.toString()
@@ -80,7 +85,7 @@ describe("Test deploy script", () => {
     const upgraderKeys = await generateKeypairCommand({ prefund: false });
 
     const txOutput = await deployCommand("stablecoin", {
-      rpcUrl: process.env.RPC_URL as string,
+      rpcUrl: RPC_URL as string,
       deployerKey: deployerKeys.getSecretKey(),
       upgradeCapRecipient: upgraderKeys.toSuiAddress(),
       makeImmutable: true,

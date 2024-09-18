@@ -129,6 +129,54 @@ export default class UpgradeServiceClient {
     });
   }
 
+  public async upgrade(
+    admin: Ed25519Keypair,
+    latestPackageId: string,
+    modules: string[],
+    dependencies: string[],
+    digest: number[],
+    options: { gasBudget: bigint | null }
+  ) {
+    const upgradeTx = new Transaction();
+
+    const [compatiblePolicyRef] = upgradeTx.moveCall({
+      target: "0x2::package::compatible_policy"
+    });
+
+    const [upgradeTicket] = upgradeTx.moveCall({
+      target: `${this.suiExtensionsPackageId}::upgrade_service::authorize_upgrade`,
+      typeArguments: [this.upgradeServiceOtwType],
+      arguments: [
+        upgradeTx.object(this.upgradeServiceObjectId),
+        compatiblePolicyRef,
+        upgradeTx.makeMoveVec({
+          type: "u8",
+          elements: digest.map((byte) => upgradeTx.pure.u8(byte))
+        })
+      ]
+    });
+
+    const [upgradeReceipt] = upgradeTx.upgrade({
+      modules,
+      dependencies,
+      package: latestPackageId,
+      ticket: upgradeTicket
+    });
+
+    upgradeTx.moveCall({
+      target: `${this.suiExtensionsPackageId}::upgrade_service::commit_upgrade`,
+      typeArguments: [this.upgradeServiceOtwType],
+      arguments: [upgradeTx.object(this.upgradeServiceObjectId), upgradeReceipt]
+    });
+
+    return await executeTransactionHelper({
+      client: this.suiClient,
+      signer: admin,
+      transaction: upgradeTx,
+      gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null
+    });
+  }
+
   public async getAdmin(): Promise<string> {
     return this.callSimpleViewFunction("admin", bcs.Address);
   }
