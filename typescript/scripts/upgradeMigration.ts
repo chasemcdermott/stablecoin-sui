@@ -35,6 +35,8 @@ export async function upgradeMigrationHelper(
     gasBudget?: string;
   }
 ) {
+  log(`Executing migration step ${action}`);
+
   const ownerKey = getEd25519KeypairFromPrivateKey(options.ownerKey);
   const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
 

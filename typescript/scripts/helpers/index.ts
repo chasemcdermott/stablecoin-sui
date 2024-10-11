@@ -131,46 +131,6 @@ export function getEd25519KeypairFromPrivateKey(privateKey: string) {
   );
 }
 
-export async function deployPackageHelper(args: {
-  client: SuiClient;
-  deployer: Ed25519Keypair;
-  gasBudget: bigint | null;
-
-  modules: string[];
-  dependencies: string[];
-
-  upgradeCapRecipient: string | null;
-  makeImmutable: boolean;
-}): Promise<SuiTransactionBlockResponse> {
-  const transaction = new Transaction();
-
-  // Command #1: Publish packages
-  const upgradeCap = transaction.publish({
-    modules: args.modules,
-    dependencies: args.dependencies
-  });
-
-  // Command #2: Transfer UpgradeCap / Destroy UpgradeCap
-  if (!args.makeImmutable) {
-    if (!args.upgradeCapRecipient) {
-      throw new Error("Missing required field 'updateCapRecipient'!");
-    }
-    transaction.transferObjects([upgradeCap], args.upgradeCapRecipient);
-  } else {
-    transaction.moveCall({
-      target: "0x2::package::make_immutable",
-      arguments: [upgradeCap]
-    });
-  }
-
-  return executeTransactionHelper({
-    client: args.client,
-    signer: args.deployer,
-    transaction,
-    gasBudget: args.gasBudget
-  });
-}
-
 export async function executeTransactionHelper(args: {
   client: SuiClient;
   signer: Ed25519Keypair;
@@ -186,9 +146,19 @@ export async function executeTransactionHelper(args: {
     transaction: args.transaction
   });
 
+  return waitForTransaction({
+    client: args.client,
+    transactionDigest: initialTxOutput.digest
+  }) as any;
+}
+
+export async function waitForTransaction(args: {
+  client: SuiClient;
+  transactionDigest: string;
+}): Promise<SuiTransactionBlockResponse> {
   // Wait for the transaction to be available over API
   const txOutput = await args.client.waitForTransaction({
-    digest: initialTxOutput.digest,
+    digest: args.transactionDigest,
     options: {
       showBalanceChanges: true,
       showEffects: true,
@@ -255,15 +225,15 @@ export function getMutatedObjects(
   return getObjectsByType("mutated", txOutput, filters ?? {});
 }
 
-export function getPublishedPackages(
-  txOutput: SuiTransactionBlockResponse
-): SuiObjectChangePublished[] {
+export function getPublishedPackages(txOutput: {
+  objectChanges?: SuiObjectChange[] | null;
+}): SuiObjectChangePublished[] {
   return getObjectsByType("published", txOutput, {});
 }
 
 function getObjectsByType<T extends SuiObjectChange>(
   type: SuiObjectChange["type"],
-  txOutput: SuiTransactionBlockResponse,
+  txOutput: { objectChanges?: SuiObjectChange[] | null },
   filters: { objectId?: string; objectType?: RegExp | string }
 ) {
   let objects = txOutput.objectChanges?.filter((c): c is T => c.type === type);
@@ -343,7 +313,11 @@ export async function expectError(
     if (_.isRegExp(errDescription)) {
       assert.match(err.message, errDescription);
     } else {
-      assert(err.message.includes(errDescription));
+      const isErrorFound = err.message.includes(errDescription);
+      if (!isErrorFound) {
+        console.error(err);
+      }
+      return isErrorFound;
     }
     return true;
   });

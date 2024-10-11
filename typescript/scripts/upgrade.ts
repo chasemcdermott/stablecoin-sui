@@ -17,6 +17,7 @@
  */
 
 import { program } from "commander";
+import fs from "fs";
 import {
   getEd25519KeypairFromPrivateKey,
   getPublishedPackages,
@@ -26,16 +27,15 @@ import {
 } from "./helpers";
 import UpgradeServiceClient from "./helpers/upgradeServiceClient";
 import { SuiClient } from "@mysten/sui/client";
-import SuiCliWrapper from "./helpers/suiCliWrapper";
 
 export async function upgradeHelper(
   upgradeServiceClient: UpgradeServiceClient,
-  suiWrapper: SuiCliWrapper,
-  packageName: string,
+  modules: string[],
+  dependencies: string[],
+  digest: number[],
   options: {
     adminKey: string;
     gasBudget?: string;
-    withUnpublishedDependencies?: boolean;
   }
 ) {
   const admin = getEd25519KeypairFromPrivateKey(options.adminKey);
@@ -46,18 +46,11 @@ export async function upgradeHelper(
     );
   }
 
-  log("Building package");
-  const { modules, dependencies, digest } = suiWrapper.buildPackage({
-    packageName,
-    withUnpublishedDependencies: !!options.withUnpublishedDependencies
-  });
-
   // Use the latest published package ID, not the original.
   const latestPackageId = await upgradeServiceClient.getUpgradeCapPackageId();
-  log(
-    `Going to deploy package upgrade for ${packageName} with latest packageId ${latestPackageId}`
-  );
-  log(`Verify that package upgrade has digest ${digest}`);
+  log(`Going to publish the upgraded package for packageId ${latestPackageId}`);
+
+  log(`Verify that package upgrade has digest: `, digest);
   if (!(await waitForUserConfirmation())) {
     throw new Error("Terminating...");
   }
@@ -88,7 +81,6 @@ export async function upgradeHelper(
 export default program
   .createCommand("upgrade")
   .description("Publishes an upgraded version of the package at a new ID")
-  .argument("<packageName>", "The name of the package to upgrade")
   .requiredOption(
     "--upgrade-service-object-id <string>",
     "Object id of the target upgrade service object"
@@ -98,17 +90,37 @@ export default program
     "The private key of the upgrade service's admin"
   )
   .requiredOption(
+    "--build-artifact-filepath <string>",
+    "Path to a JSON build artifact"
+  )
+  .requiredOption(
     "-r, --rpc-url <string>",
     "Network RPC URL",
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
-  .action(async (packageName, options) => {
+  .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
     const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
       client,
       options.upgradeServiceObjectId
     );
-    const suiWrapper = new SuiCliWrapper({ rpcUrl: options.rpcUrl });
-    await upgradeHelper(upgradeServiceClient, suiWrapper, packageName, options);
+
+    if (!fs.existsSync(options.buildArtifactFilepath)) {
+      throw new Error(
+        `Cannot find build artifact at ${options.buildArtifactFilepath}`
+      );
+    }
+
+    const { modules, dependencies, digest } = JSON.parse(
+      fs.readFileSync(options.buildArtifactFilepath, "utf-8")
+    );
+
+    await upgradeHelper(
+      upgradeServiceClient,
+      modules,
+      dependencies,
+      digest,
+      options
+    );
   });

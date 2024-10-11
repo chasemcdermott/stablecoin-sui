@@ -36,7 +36,7 @@ export async function generateKeypairCommand(options: {
   const keypair = Ed25519Keypair.generate();
 
   if (options.prefund) {
-    log("Requesting test tokens...");
+    log(`Requesting test tokens from ${options.faucetUrl}...`);
     await requestSuiFromFaucetV0({
       host: options.faucetUrl || getFaucetHost("localnet"),
       recipient: keypair.toSuiAddress()
@@ -57,7 +57,7 @@ export default program
   .createCommand("generate-keypair")
   .description("Generate a new Sui keypair")
   .option("--prefund", "Fund generated signer with some test SUI tokens")
-  .option("--faucet-url", "Faucet URL", process.env.FAUCET_URL)
+  .option("--faucet-url <string>", "Faucet URL", process.env.FAUCET_URL)
   .action(async (options) => {
     const keypair = await generateKeypairCommand(options);
     log("Public key: ", keypair.getPublicKey().toSuiAddress());

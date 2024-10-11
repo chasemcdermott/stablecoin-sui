@@ -19,13 +19,14 @@
 import { SuiClient } from "@mysten/sui/client";
 import { program } from "commander";
 import {
-  deployPackageHelper,
+  executeTransactionHelper,
   getEd25519KeypairFromPrivateKey,
   getPublishedPackages,
   log,
   writeJsonOutput
 } from "./helpers";
 import SuiCliWrapper from "./helpers/suiCliWrapper";
+import { Transaction } from "@mysten/sui/transactions";
 
 /**
  * Deploys a package and transfers the package UpgradeCap to upgradeCapRecipient
@@ -60,13 +61,31 @@ export async function deployCommand(
   });
 
   log(`Deploying package '${packageName}'...`);
-  const transactionOutput = await deployPackageHelper({
-    client,
-    deployer,
+  const transaction = new Transaction();
+
+  // Command #1: Publish packages
+  const upgradeCap = transaction.publish({
     modules,
-    dependencies,
-    upgradeCapRecipient: options.upgradeCapRecipient ?? null,
-    makeImmutable: !!options.makeImmutable,
+    dependencies
+  });
+
+  // Command #2: Transfer UpgradeCap / Destroy UpgradeCap
+  if (!options.makeImmutable) {
+    if (!options.upgradeCapRecipient) {
+      throw new Error("Missing required field 'updateCapRecipient'!");
+    }
+    transaction.transferObjects([upgradeCap], options.upgradeCapRecipient);
+  } else {
+    transaction.moveCall({
+      target: "0x2::package::make_immutable",
+      arguments: [upgradeCap]
+    });
+  }
+
+  const transactionOutput = await executeTransactionHelper({
+    client,
+    signer: deployer,
+    transaction,
     gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null
   });
 

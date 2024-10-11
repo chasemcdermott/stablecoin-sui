@@ -34,6 +34,7 @@ import acceptTreasuryOwner from "./acceptTreasuryOwner";
 import acceptUpgradeServiceAdmin from "./acceptUpgradeServiceAdmin";
 import upgrade from "./upgrade";
 import upgradeMigration from "./upgradeMigration";
+import executeTransaction from "./executeTransaction";
 
 program
   .name("scripts")
@@ -52,7 +53,8 @@ program
   .addCommand(acceptTreasuryOwner)
   .addCommand(acceptUpgradeServiceAdmin)
   .addCommand(upgrade)
-  .addCommand(upgradeMigration);
+  .addCommand(upgradeMigration)
+  .addCommand(executeTransaction);
 
 if (process.env.NODE_ENV !== "TESTING") {
   program.parse();
