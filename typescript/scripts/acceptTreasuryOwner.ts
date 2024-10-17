@@ -32,8 +32,11 @@ export async function acceptTreasuryOwnerHelper(
   options: {
     pendingOwnerKey: string;
     gasBudget?: string;
+    dryRun?: boolean;
   }
 ) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const pendingOwnerKey = options.pendingOwnerKey;
   const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
 
@@ -55,9 +58,12 @@ export async function acceptTreasuryOwnerHelper(
   // Update roles
   const txOutput = await treasuryClient.acceptTreasuryOwner(
     pendingTreasuryOwner,
-    { gasBudget }
+    { gasBudget, dryRun: options.dryRun }
   );
-  writeJsonOutput("accept-treasury-owner", txOutput);
+  writeJsonOutput(
+    options.dryRun ? "accept-treasury-owner-dry-run" : "accept-treasury-owner",
+    txOutput
+  );
 
   log("New treasury owner accepted");
 }
@@ -80,6 +86,7 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 

@@ -369,6 +369,7 @@ async function testTransferCoinAndValidateBalanceChange({
 
   if (!sponsor) {
     await executeTransactionHelper({
+      dryRun: false,
       client,
       signer: sender,
       transaction: txb,

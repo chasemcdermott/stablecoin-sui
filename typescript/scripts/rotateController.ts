@@ -39,8 +39,11 @@ export async function rotateControllerHelper(
     oldControllerAddress: string;
     newControllerAddress: string;
     gasBudget?: string;
+    dryRun?: boolean;
   }
 ) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const { hotMasterMinterKey, oldControllerAddress, newControllerAddress } =
     options;
 
@@ -65,9 +68,13 @@ export async function rotateControllerHelper(
     hotMasterMinter,
     newControllerAddress,
     oldControllerAddress,
-    { gasBudget }
+    { gasBudget, dryRun: options.dryRun }
   );
-  writeJsonOutput("rotate-controller", txOutput);
+
+  writeJsonOutput(
+    options.dryRun ? "rotate-controller-dry-run" : "rotate-controller",
+    txOutput
+  );
 
   return txOutput;
 }
@@ -98,6 +105,7 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 

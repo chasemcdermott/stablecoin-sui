@@ -33,9 +33,11 @@ export async function upgradeMigrationHelper(
     newStablecoinPackageId: string;
     ownerKey: string;
     gasBudget?: string;
+    dryRun?: boolean;
   }
 ) {
   log(`Executing migration step ${action}`);
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
 
   const ownerKey = getEd25519KeypairFromPrivateKey(options.ownerKey);
   const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
@@ -57,12 +59,18 @@ export async function upgradeMigrationHelper(
     ownerKey,
     options.newStablecoinPackageId,
     action,
-    { gasBudget }
+    {
+      gasBudget,
+      dryRun: !!options.dryRun
+    }
   );
 
-  writeJsonOutput("upgrade-migration", txOutput);
+  writeJsonOutput(
+    options.dryRun ? "upgrade-migration-dry-run" : "upgrade-migration",
+    txOutput
+  );
 
-  log(`Migration step ${action} executed`);
+  return txOutput;
 }
 
 export default program
@@ -90,6 +98,7 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (action, options) => {
     const client = new SuiClient({ url: options.rpcUrl });
     const treasuryClient = await SuiTreasuryClient.buildFromId(

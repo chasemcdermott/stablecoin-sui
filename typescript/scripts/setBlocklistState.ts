@@ -37,8 +37,11 @@ export async function setBlocklistStateHelper(
     blocklisterKey: string;
     unblock?: boolean;
     gasBudget?: string;
+    dryRun?: boolean;
   }
 ) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const blocklister = getEd25519KeypairFromPrivateKey(options.blocklisterKey);
 
   log(
@@ -53,7 +56,11 @@ export async function setBlocklistStateHelper(
     !options.unblock,
     { gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null }
   );
-  writeJsonOutput(`set-blocklist-state`, txOutput);
+
+  writeJsonOutput(
+    options.dryRun ? "set-blocklist-state-dry-run" : "set-blocklist-state",
+    txOutput
+  );
   log(
     `Address '${addrToBlock}' is now ${options.unblock ? "unblocked" : "blocked"}!`
   );
@@ -84,6 +91,7 @@ export default program
     "If this flag is set, unblocklist the address. If this flag is omitted, blocklist the address."
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (address, options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 

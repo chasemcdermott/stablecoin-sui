@@ -125,11 +125,14 @@ export default class SuiTreasuryClient {
     );
   }
 
-  async configureNewController(
+  async configureNewController<DryRunEnabled extends boolean = false>(
     masterMinter: Ed25519Keypair,
     controllerAddress: string,
     minterAddress: string,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const txb = new Transaction();
     txb.moveCall({
@@ -142,6 +145,7 @@ export default class SuiTreasuryClient {
       ]
     });
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: masterMinter,
       transaction: txb,
@@ -149,10 +153,13 @@ export default class SuiTreasuryClient {
     });
   }
 
-  async setMintAllowance(
+  async setMintAllowance<DryRunEnabled extends boolean = false>(
     controller: Ed25519Keypair,
     mintAllowance: bigint,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const txb = new Transaction();
     txb.moveCall({
@@ -165,6 +172,7 @@ export default class SuiTreasuryClient {
       ]
     });
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: controller,
       transaction: txb,
@@ -172,12 +180,15 @@ export default class SuiTreasuryClient {
     });
   }
 
-  async mint(
+  async mint<DryRunEnabled extends boolean = false>(
     minter: Ed25519Keypair,
     mintCapId: string,
     recipient: string,
     amount: bigint,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const txb = new Transaction();
     txb.moveCall({
@@ -192,6 +203,7 @@ export default class SuiTreasuryClient {
       ]
     });
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: minter,
       transaction: txb,
@@ -199,11 +211,14 @@ export default class SuiTreasuryClient {
     });
   }
 
-  async setBlocklistState(
+  async setBlocklistState<DryRunEnabled extends boolean = false>(
     blocklisterKeys: Ed25519Keypair,
     addr: string,
     blocked: boolean,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const txb = new Transaction();
     const target = blocked
@@ -219,6 +234,7 @@ export default class SuiTreasuryClient {
       ]
     });
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: blocklisterKeys,
       transaction: txb,
@@ -226,10 +242,13 @@ export default class SuiTreasuryClient {
     });
   }
 
-  async setPausedState(
+  async setPausedState<DryRunEnabled extends boolean = false>(
     pauserKeys: Ed25519Keypair,
     paused: boolean,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const txb = new Transaction();
     const target = paused
@@ -244,6 +263,7 @@ export default class SuiTreasuryClient {
       ]
     });
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: pauserKeys,
       transaction: txb,
@@ -288,11 +308,14 @@ export default class SuiTreasuryClient {
     return isBlocklisted;
   }
 
-  async rotateController(
+  async rotateController<DryRunEnabled extends boolean = false>(
     masterMinter: Ed25519Keypair,
     newControllerAddress: string,
     oldControllerAddress: string,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const mintCapId = await this.getMintCapId(oldControllerAddress);
     if (!mintCapId) {
@@ -320,6 +343,7 @@ export default class SuiTreasuryClient {
       ]
     });
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: masterMinter,
       transaction: txb,
@@ -327,13 +351,16 @@ export default class SuiTreasuryClient {
     });
   }
 
-  async updateMetadata(
+  async updateMetadata<DryRunEnabled extends boolean = false>(
     owner: Ed25519Keypair,
     name: string,
     symbol: string,
     desc: string,
     iconUrl: string,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     if (!this.metadataObjectId) {
       throw new Error("Unknown metadata object ID");
@@ -353,6 +380,7 @@ export default class SuiTreasuryClient {
     });
 
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: owner,
       transaction: txb,
@@ -526,14 +554,17 @@ export default class SuiTreasuryClient {
     return BigInt(totalSupplyObject.value);
   }
 
-  async rotatePrivilegedRoles(
+  async rotatePrivilegedRoles<DryRunEnabled extends boolean = false>(
     owner: Ed25519Keypair,
     newMasterMinter: string,
     newBlockLister: string,
     newPauser: string,
     newMetadataUpdater: string,
     newTreasuryOwner: string,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const rotatePrivilegedRolesTx = new Transaction();
 
@@ -588,6 +619,7 @@ export default class SuiTreasuryClient {
     });
 
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: owner,
       transaction: rotatePrivilegedRolesTx,
@@ -610,9 +642,12 @@ export default class SuiTreasuryClient {
     return compatibleVersions;
   }
 
-  async acceptTreasuryOwner(
+  async acceptTreasuryOwner<DryRunEnabled extends boolean = false>(
     pendingOwner: Ed25519Keypair,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const acceptTreasuryOwnerTx = new Transaction();
 
@@ -623,6 +658,7 @@ export default class SuiTreasuryClient {
     });
 
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: pendingOwner,
       transaction: acceptTreasuryOwnerTx,
@@ -630,11 +666,14 @@ export default class SuiTreasuryClient {
     });
   }
 
-  async upgradeMigration(
+  async upgradeMigration<DryRunEnabled extends boolean = false>(
     owner: Ed25519Keypair,
     newPackageId: string, // TODO, refactor treasury client to be smarter about packageIDs
     migrationAction: string,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const migrationTx = new Transaction();
 
@@ -651,6 +690,7 @@ export default class SuiTreasuryClient {
     });
 
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: owner,
       transaction: migrationTx,

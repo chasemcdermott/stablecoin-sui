@@ -33,7 +33,7 @@ import { Transaction } from "@mysten/sui/transactions";
  *
  * @returns Transaction output
  */
-export async function deployCommand(
+export async function deployCommand<DryRunEnabled extends boolean = false>(
   packageName: string,
   options: {
     rpcUrl: string;
@@ -43,8 +43,11 @@ export async function deployCommand(
     makeImmutable?: boolean;
     writePackageId?: boolean;
     gasBudget?: string;
+    dryRun?: DryRunEnabled;
   }
 ) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const client = new SuiClient({ url: options.rpcUrl });
   const suiWrapper = new SuiCliWrapper({
     rpcUrl: options.rpcUrl
@@ -82,17 +85,21 @@ export async function deployCommand(
     });
   }
 
-  const transactionOutput = await executeTransactionHelper({
+  const txOutput = await executeTransactionHelper({
+    dryRun: !!options.dryRun as DryRunEnabled,
     client,
     signer: deployer,
     transaction,
     gasBudget: options.gasBudget != null ? BigInt(options.gasBudget) : null
   });
 
-  writeJsonOutput(`deploy-${packageName}`, transactionOutput);
+  writeJsonOutput(
+    options.dryRun ? `deploy-${packageName}-dry-run` : `deploy-${packageName}`,
+    txOutput
+  );
 
   if (options.writePackageId) {
-    const publishedPackageIds = getPublishedPackages(transactionOutput);
+    const publishedPackageIds = getPublishedPackages(txOutput);
     if (publishedPackageIds.length != 1) {
       throw new Error("Unexpected number of package IDs published");
     }
@@ -103,7 +110,7 @@ export async function deployCommand(
   }
 
   log("Deploy process complete!");
-  return transactionOutput;
+  return txOutput;
 }
 
 export default program
@@ -121,6 +128,7 @@ export default program
     "The address that will receive the UpgradeCap, optional if --make-immutable is set"
   )
   .option("--make-immutable", "Destroys the UpgradeCap after deployment")
+  .option("--dry-run", "Dry runs the transaction if set")
   .option(
     "--deployer-key <string>",
     "Deployer private key",
