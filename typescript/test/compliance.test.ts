@@ -31,7 +31,7 @@ import {
 } from "../scripts/helpers";
 import { generateKeypairCommand } from "../scripts/generateKeypair";
 import { deployCommand } from "../scripts/deploy";
-import { waitUntil, waitUntilNextEpoch } from "./utils";
+import { waitUntilNextEpoch } from "./utils";
 
 const AMOUNT: number = 1000000; // 1 USDC
 
@@ -385,18 +385,16 @@ async function testTransferCoinAndValidateBalanceChange({
     });
   }
 
-  waitUntil("Balances update as expected", async () => {
-    const senderBalAfter = await getCoinBalance(
-      client,
-      sender.toSuiAddress(),
-      coinOtwType
-    );
-    const recipientBalAfter = await getCoinBalance(
-      client,
-      recipient,
-      coinOtwType
-    );
-    assert.equal(senderBalAfter, senderBalBefore - amount);
-    assert.equal(recipientBalAfter, recipientBalBefore + amount);
-  });
+  const senderBalAfter = await getCoinBalance(
+    client,
+    sender.toSuiAddress(),
+    coinOtwType
+  );
+  const recipientBalAfter = await getCoinBalance(
+    client,
+    recipient,
+    coinOtwType
+  );
+  assert.equal(senderBalAfter, senderBalBefore - amount);
+  assert.equal(recipientBalAfter, recipientBalBefore + amount);
 }

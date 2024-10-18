@@ -305,22 +305,15 @@ export async function executeSponsoredTxHelper({
   const sponsoredBytes = await sponsor.signTransaction(txBytes);
   const senderBytes = await sender.signTransaction(txBytes);
 
-  const txOutput = await client.executeTransactionBlock({
+  const initialTxOutput = await client.executeTransactionBlock({
     transactionBlock: txBytes,
     signature: [senderBytes.signature, sponsoredBytes.signature],
-    options: {
-      showEffects: true,
-      showEvents: true,
-      showObjectChanges: true,
-      showBalanceChanges: true
-    }
   });
 
-  if (txOutput.effects?.status.status === "failure") {
-    throw new TransactionError(txOutput.effects.status.error, txOutput);
-  }
-
-  return txOutput;
+  return waitForTransaction({
+    client,
+    transactionDigest: initialTxOutput.digest,
+  });
 }
 
 export async function getCoinBalance(
