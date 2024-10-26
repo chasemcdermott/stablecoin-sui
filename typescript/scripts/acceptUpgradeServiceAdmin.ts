@@ -31,8 +31,11 @@ export async function acceptUpgradeServiceAdminHelper(
   options: {
     pendingUpgradeServiceAdminKey: string;
     gasBudget?: string;
+    dryRun?: boolean;
   }
 ) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const pendingUpgradeServiceAdminKey = options.pendingUpgradeServiceAdminKey;
   const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
   const pendingUpgradeServiceAdmin = getEd25519KeypairFromPrivateKey(
@@ -66,10 +69,15 @@ export async function acceptUpgradeServiceAdminHelper(
   // Accept pending admin for upgrade service
   const txOutput = await upgradeServiceClient.acceptPendingAdmin(
     pendingUpgradeServiceAdmin,
-    { gasBudget }
+    { gasBudget, dryRun: options.dryRun }
   );
 
-  writeJsonOutput("accept-upgrade-service-admin", txOutput);
+  writeJsonOutput(
+    options.dryRun
+      ? "accept-upgrade-service-admin-dry-run"
+      : "accept-upgrade-service-admin",
+    txOutput
+  );
   log(
     "Previously pending upgrade service admin has been accepted as the new admin."
   );
@@ -94,6 +102,7 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
     const upgradeServiceClient = await UpgradeServiceClient.buildFromId(

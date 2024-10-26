@@ -33,7 +33,10 @@ export async function changeUpgradeServiceAdminHelper(options: {
   newUpgradeServiceAdmin: string;
   rpcUrl: string;
   gasBudget?: string;
+  dryRun?: boolean;
 }) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const suiClient = new SuiClient({ url: options.rpcUrl });
   const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
     suiClient,
@@ -84,10 +87,15 @@ export async function changeUpgradeServiceAdminHelper(options: {
   const txOutput = await upgradeServiceClient.changeAdmin(
     upgradeServiceAdmin,
     newUpgradeServiceAdmin,
-    { gasBudget }
+    { gasBudget, dryRun: options.dryRun }
   );
 
-  writeJsonOutput("change-upgrade-service-admin", txOutput);
+  writeJsonOutput(
+    options.dryRun
+      ? "change-upgrade-service-admin-dry-run"
+      : "change-upgrade-service-admin",
+    txOutput
+  );
 
   log("Upgrade service admin change complete");
 }
@@ -115,6 +123,7 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (options) => {
     await changeUpgradeServiceAdminHelper(options);
   });

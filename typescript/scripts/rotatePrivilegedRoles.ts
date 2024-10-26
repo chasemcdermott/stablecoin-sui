@@ -37,8 +37,11 @@ export async function rotatePrivilegedRolesHelper(
     newMetadataUpdater: string;
     newTreasuryOwner: string;
     gasBudget?: string;
+    dryRun?: boolean;
   }
 ) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const {
     treasuryOwnerKey,
     newMasterMinter,
@@ -78,9 +81,15 @@ export async function rotatePrivilegedRolesHelper(
     newPauser,
     newMetadataUpdater,
     newTreasuryOwner,
-    { gasBudget }
+    { gasBudget, dryRun: options.dryRun }
   );
-  writeJsonOutput("rotate-privileged-roles", txOutput);
+
+  writeJsonOutput(
+    options.dryRun
+      ? "rotate-privileged-roles-dry-run"
+      : "rotate-privileged-roles",
+    txOutput
+  );
 
   log("Privileged role key rotation complete");
 }
@@ -123,6 +132,7 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
 

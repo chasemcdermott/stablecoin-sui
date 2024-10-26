@@ -28,7 +28,8 @@ import {
   SuiObjectChangeCreated,
   SuiObjectChangeMutated,
   SuiObjectChangePublished,
-  SuiTransactionBlockResponse
+  SuiTransactionBlockResponse,
+  DryRunTransactionBlockResponse
 } from "@mysten/sui/client";
 import {
   isValidSuiAddress,
@@ -131,19 +132,44 @@ export function getEd25519KeypairFromPrivateKey(privateKey: string) {
   );
 }
 
-export async function executeTransactionHelper(args: {
-  client: SuiClient;
+export async function executeTransactionHelper<
+  DryRunEnabled extends boolean
+>(args: {
+  dryRun: DryRunEnabled;
   signer: Ed25519Keypair;
+  client: SuiClient;
   transaction: Transaction;
   gasBudget: bigint | null;
-}): Promise<SuiTransactionBlockResponse> {
+}): Promise<
+  DryRunEnabled extends true
+    ? DryRunTransactionBlockResponse
+    : SuiTransactionBlockResponse
+> {
   if (args.gasBudget) {
     args.transaction.setGasBudget(args.gasBudget);
   }
 
-  const initialTxOutput = await args.client.signAndExecuteTransaction({
-    signer: args.signer,
-    transaction: args.transaction
+  args.transaction.setSenderIfNotSet(args.signer.toSuiAddress());
+
+  const transactionBlock = await args.transaction.build({
+    client: args.client,
+    onlyTransactionKind: false
+  });
+
+  // Logically, dry running only requires the unsigned transaction. As such, it
+  // does not require the signer keypair to be passed in. However, in all context
+  // that this function is called, the transaction's signer is available. For code
+  // cleanliness purposes, the signer parameter is retained.
+  if (args.dryRun) {
+    return args.client.dryRunTransactionBlock({
+      transactionBlock
+    }) as any;
+  }
+
+  const signedTx = await args.signer.signTransaction(transactionBlock);
+  const initialTxOutput = await args.client.executeTransactionBlock({
+    transactionBlock: signedTx.bytes,
+    signature: signedTx.signature
   });
 
   return waitForTransaction({
@@ -279,22 +305,15 @@ export async function executeSponsoredTxHelper({
   const sponsoredBytes = await sponsor.signTransaction(txBytes);
   const senderBytes = await sender.signTransaction(txBytes);
 
-  const txOutput = await client.executeTransactionBlock({
+  const initialTxOutput = await client.executeTransactionBlock({
     transactionBlock: txBytes,
     signature: [senderBytes.signature, sponsoredBytes.signature],
-    options: {
-      showEffects: true,
-      showEvents: true,
-      showObjectChanges: true,
-      showBalanceChanges: true
-    }
   });
 
-  if (txOutput.effects?.status.status === "failure") {
-    throw new TransactionError(txOutput.effects.status.error, txOutput);
-  }
-
-  return txOutput;
+  return waitForTransaction({
+    client,
+    transactionDigest: initialTxOutput.digest,
+  });
 }
 
 export async function getCoinBalance(

@@ -82,10 +82,13 @@ export default class UpgradeServiceClient {
     );
   }
 
-  public async depositUpgradeCap(
+  public async depositUpgradeCap<DryRunEnabled extends boolean = false>(
     upgradeCapOwner: Ed25519Keypair,
     upgradeCapObjectId: string,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const transaction = new Transaction();
     transaction.moveCall({
@@ -98,6 +101,7 @@ export default class UpgradeServiceClient {
     });
 
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: upgradeCapOwner,
       transaction,
@@ -105,10 +109,13 @@ export default class UpgradeServiceClient {
     });
   }
 
-  public async changeAdmin(
+  public async changeAdmin<DryRunEnabled extends boolean = false>(
     admin: Ed25519Keypair,
     newAdmin: string,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const changeUpgradeServiceAdminTx = new Transaction();
     changeUpgradeServiceAdminTx.moveCall({
@@ -122,6 +129,7 @@ export default class UpgradeServiceClient {
 
     // Initiate change upgrade service admin roles
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: admin,
       transaction: changeUpgradeServiceAdminTx,
@@ -129,13 +137,16 @@ export default class UpgradeServiceClient {
     });
   }
 
-  public async upgrade(
+  public async upgrade<DryRunEnabled extends boolean = false>(
     admin: Ed25519Keypair,
     latestPackageId: string,
     modules: string[],
     dependencies: string[],
     digest: number[],
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const upgradeTx = new Transaction();
 
@@ -169,7 +180,8 @@ export default class UpgradeServiceClient {
       arguments: [upgradeTx.object(this.upgradeServiceObjectId), upgradeReceipt]
     });
 
-    return await executeTransactionHelper({
+    return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: admin,
       transaction: upgradeTx,
@@ -188,9 +200,12 @@ export default class UpgradeServiceClient {
     );
   }
 
-  public async acceptPendingAdmin(
+  public async acceptPendingAdmin<DryRunEnabled extends boolean = false>(
     pendingAdmin: Ed25519Keypair,
-    options: { gasBudget: bigint | null }
+    options: {
+      gasBudget: bigint | null;
+      dryRun?: DryRunEnabled;
+    }
   ) {
     const acceptUpgradeServiceAdminTx = new Transaction();
     acceptUpgradeServiceAdminTx.moveCall({
@@ -203,6 +218,7 @@ export default class UpgradeServiceClient {
 
     // Accept the pending admin as the new admin
     return executeTransactionHelper({
+      dryRun: !!options.dryRun as DryRunEnabled,
       client: this.suiClient,
       signer: pendingAdmin,
       transaction: acceptUpgradeServiceAdminTx,

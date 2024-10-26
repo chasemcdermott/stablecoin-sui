@@ -27,13 +27,18 @@ import {
 } from "./helpers";
 import UpgradeServiceClient from "./helpers/upgradeServiceClient";
 
-export async function depositUpgradeCapCommand(options: {
+export async function depositUpgradeCapCommand<
+  DryRunEnabled extends boolean = false
+>(options: {
   rpcUrl: string;
   upgradeCapObjectId: string;
   upgradeCapOwnerKey: string;
   upgradeServiceObjectId: string;
   gasBudget?: string;
+  dryRun?: DryRunEnabled;
 }) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const client = new SuiClient({ url: options.rpcUrl });
   const upgradeServiceClient = await UpgradeServiceClient.buildFromId(
     client,
@@ -86,20 +91,24 @@ export async function depositUpgradeCapCommand(options: {
     `Storing UpgradeCap of id '${options.upgradeCapObjectId}' in UpgradeService<${upgradeServiceClient.upgradeServiceOtwType}> of id '${options.upgradeServiceObjectId}'...`
   );
 
-  const transactionOutput = upgradeServiceClient.depositUpgradeCap(
+  const txOutput = upgradeServiceClient.depositUpgradeCap(
     upgradeCapOwner,
     options.upgradeCapObjectId,
     {
-      gasBudget: options.gasBudget ? BigInt(options.gasBudget) : null
+      gasBudget: options.gasBudget ? BigInt(options.gasBudget) : null,
+      dryRun: options.dryRun
     }
   );
 
-  writeJsonOutput("deposit-upgrade-cap", transactionOutput);
+  writeJsonOutput(
+    options.dryRun ? "deposit-upgrade-cap-dry-run" : "deposit-upgrade-cap",
+    txOutput
+  );
   log(
     `Deposited UpgradeCap into UpgradeService<${upgradeServiceClient.upgradeServiceOtwType}> !`
   );
 
-  return transactionOutput;
+  return txOutput;
 }
 
 export default program
@@ -123,6 +132,7 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (options) => {
     await depositUpgradeCapCommand(options);
   });

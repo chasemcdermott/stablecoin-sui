@@ -249,6 +249,7 @@ async function wrapAndTransferCoin({
   });
 
   const txOutput = await executeTransactionHelper({
+    dryRun: false,
     client,
     signer: sender,
     transaction: txb,
@@ -287,6 +288,7 @@ async function unwrapAndTransferCoin({
   });
 
   const { effects } = await executeTransactionHelper({
+    dryRun: false,
     client,
     signer: sender,
     transaction: txb,

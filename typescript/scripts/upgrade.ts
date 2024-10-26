@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+import { SuiClient } from "@mysten/sui/client";
 import { program } from "commander";
 import fs from "fs";
 import {
@@ -26,7 +27,6 @@ import {
   writeJsonOutput
 } from "./helpers";
 import UpgradeServiceClient from "./helpers/upgradeServiceClient";
-import { SuiClient } from "@mysten/sui/client";
 
 export async function upgradeHelper(
   upgradeServiceClient: UpgradeServiceClient,
@@ -36,8 +36,11 @@ export async function upgradeHelper(
   options: {
     adminKey: string;
     gasBudget?: string;
+    dryRun?: boolean;
   }
 ) {
+  log(`Dry Run: ${options.dryRun ? "enabled" : "disabled"}`);
+
   const admin = getEd25519KeypairFromPrivateKey(options.adminKey);
   const currentAdminAddress = await upgradeServiceClient.getAdmin();
   if (currentAdminAddress != admin.toSuiAddress()) {
@@ -56,18 +59,21 @@ export async function upgradeHelper(
   }
 
   const gasBudget = options.gasBudget ? BigInt(options.gasBudget) : null;
-  const upgradeTxOutput = await upgradeServiceClient.upgrade(
+  const txOutput = await upgradeServiceClient.upgrade(
     admin,
     latestPackageId,
     modules,
     dependencies,
     digest,
-    { gasBudget }
+    {
+      gasBudget,
+      dryRun: !!options.dryRun
+    }
   );
 
-  writeJsonOutput("upgrade", upgradeTxOutput);
+  writeJsonOutput(options.dryRun ? "upgrade-dry-run" : "upgrade", txOutput);
 
-  const published = getPublishedPackages(upgradeTxOutput);
+  const published = getPublishedPackages(txOutput);
   if (published.length != 1) {
     throw new Error(
       `Expected one published package but found ${published.length}`
@@ -75,7 +81,7 @@ export async function upgradeHelper(
   }
   log(`New Package ID: ${published[0].packageId}`);
 
-  return upgradeTxOutput;
+  return txOutput;
 }
 
 export default program
@@ -99,6 +105,7 @@ export default program
     process.env.RPC_URL
   )
   .option("--gas-budget <string>", "Gas Budget (in MIST)")
+  .option("--dry-run", "Dry runs the transaction if set")
   .action(async (options) => {
     const client = new SuiClient({ url: options.rpcUrl });
     const upgradeServiceClient = await UpgradeServiceClient.buildFromId(

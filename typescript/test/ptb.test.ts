@@ -109,6 +109,7 @@ describe("Test PTBs", () => {
     });
 
     await executeTransactionHelper({
+      dryRun: false,
       client,
       signer: deployerKeys,
       transaction: txb,
