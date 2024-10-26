@@ -37,13 +37,6 @@ jobs:
             sed -i 's/^rev = .*/rev = "framework\/testnet"/' ./packages/stablecoin/Move.toml
             sed -i 's/^rev = .*/rev = "framework\/testnet"/' ./packages/mock/coin_store/Move.toml
 
-      - name: TEMP - check toml files
-        run: |
-            cat ./packages/usdc/Move.toml
-            cat ./packages/sui_extensions/Move.toml
-            cat ./packages/stablecoin/Move.toml
-            cat ./packages/mock/coin_store/Move.toml
-
       - name: Install Node
         uses: actions/setup-node@v3
         with:
