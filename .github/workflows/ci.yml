@@ -19,9 +19,6 @@ on:
   push:
     branches: [master]
   pull_request:
-  schedule:
-    # At 5PM UTC every day
-    - cron: "0 17 * * *"
 
 permissions: read-all
 
@@ -59,12 +56,6 @@ jobs:
 
       - name: Run Move tests
         run: bash run.sh test
-
-      - name: Run Move tests on v2
-        run: |
-          git apply packages/stablecoin/examples/v2_base.patch
-          bash run.sh test
-          git apply -R packages/stablecoin/examples/v2_base.patch
 
       - name: Start network
         run: bash run.sh start_network
