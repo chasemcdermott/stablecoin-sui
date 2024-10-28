@@ -25,7 +25,7 @@ else
   OS="macos-arm64"
 fi
 
-latest_mainnet_release=$(curl -s "https://api.github.com/repos/Mystenlabs/sui/releases?per_page=10" | jq -r '.[] | select(.tag_name | startswith("mainnet")) | .tag_name' | head -n 1);
+latest_mainnet_release=$(curl -s "https://api.github.com/repos/Mystenlabs/sui/releases?per_page=25" | jq -r '.[] | select(.tag_name | startswith("mainnet")) | .tag_name' | head -n 1);
 SUI_VERSION=$(echo "$latest_mainnet_release" | grep -oE '[0-9]+(\.[0-9]+)*$')
 SUI_INSTALLATION_DIRECTORY="$HOME/.sui/bin"
 
