@@ -25,7 +25,8 @@ else
   OS="macos-arm64"
 fi
 
-SUI_VERSION="1.32.2"
+latest_mainnet_release=$(curl -s "https://api.github.com/repos/Mystenlabs/sui/releases?per_page=25" | jq -r '.[] | select(.tag_name | startswith("mainnet")) | .tag_name' | head -n 1);
+SUI_VERSION=$(echo "$latest_mainnet_release" | grep -oE '[0-9]+(\.[0-9]+)*$')
 SUI_INSTALLATION_DIRECTORY="$HOME/.sui/bin"
 
 if ! command -v sui &> /dev/null || ! sui -V | grep -q "sui $SUI_VERSION-"
